@@ -49,8 +49,6 @@ from .conftest import (
     view,
 )
 
-pytestmark = pytest.mark.xfail(reason="chunk: sessions")
-
 JOURNAL = {"command_type": "add_journal_entry", "text": "The referee adds a line."}
 BIG_SEED = 7_301_928_455_610_293
 """A seed long enough that its digits can't turn up in a response by chance."""
