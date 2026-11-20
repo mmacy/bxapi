@@ -3,7 +3,6 @@
 import json
 from typing import Any
 
-import pytest
 from osrlib.crawl.adventure import Adventure
 from osrlib.versioning import check_document
 from starlette.testclient import TestClient
@@ -34,8 +33,6 @@ from .conftest import (
     send,
     upload_adventure,
 )
-
-pytestmark = pytest.mark.xfail(reason="chunk: adventures")
 
 
 def check_info(info: Any) -> None:

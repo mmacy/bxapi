@@ -27,8 +27,6 @@ from .conftest import (
     leaves,
 )
 
-pytestmark = pytest.mark.xfail(reason="chunk: characters")
-
 ROLL_KEYS = {"id", "scores", "eligible_class_ids", "created_at"}
 
 

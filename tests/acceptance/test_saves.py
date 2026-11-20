@@ -4,7 +4,6 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-import pytest
 from osrlib.core.events import Visibility
 from osrlib.persistence import load_game, save_game
 from starlette.testclient import TestClient
@@ -36,8 +35,6 @@ from .conftest import (
     upload_adventure,
     view,
 )
-
-pytestmark = pytest.mark.xfail(reason="chunk: saves")
 
 
 def save(client: TestClient, session_id: str, **body: Any) -> dict[str, Any]:
