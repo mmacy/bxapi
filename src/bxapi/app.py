@@ -11,9 +11,12 @@ uvicorn bxapi.app:create_app --factory --port 8640
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import APIRouter, Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
+from fastapi.routing import APIRoute
 from starlette.datastructures import Headers
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -21,7 +24,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from bxapi import __version__
 from bxapi.auth import authenticate
 from bxapi.db import Database
-from bxapi.errors import ApiError, install_error_handlers, problem_response, problem_responses
+from bxapi.errors import PROBLEM_MEDIA_TYPE, ApiError, install_error_handlers, problem_response, problem_responses
 from bxapi.routers import V1_ROUTERS, meta
 from bxapi.settings import Settings
 
@@ -97,6 +100,41 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.db.close()
 
 
+def _operation_id(route: APIRoute) -> str:
+    # The endpoint function's name, like "roll_dice", so a generated client gets short method names.
+    return route.name
+
+
+def _install_openapi(app: FastAPI) -> None:
+    """Make the application's OpenAPI document describe error responses as problem documents."""
+
+    def openapi() -> dict[str, Any]:
+        if app.openapi_schema is None:
+            schema = get_openapi(
+                title=app.title,
+                version=app.version,
+                description=app.description,
+                routes=app.routes,
+                tags=app.openapi_tags,
+            )
+            for path in schema.get("paths", {}).values():
+                for operation in path.values():
+                    for status, response in operation.get("responses", {}).items():
+                        content = response.get("content", {})
+                        if status.startswith(("4", "5")) and "application/json" in content:
+                            # FastAPI documents every response model as application/json. The server
+                            # sends every error as a problem document.
+                            problem = {"schema": {"$ref": "#/components/schemas/Problem"}}
+                            response["content"] = {PROBLEM_MEDIA_TYPE: problem}
+            schemas = schema.get("components", {}).get("schemas", {})
+            for unused in ("HTTPValidationError", "ValidationError"):
+                schemas.pop(unused, None)
+            app.openapi_schema = schema
+        return app.openapi_schema
+
+    app.openapi = openapi
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     """Build the bxapi application.
 
@@ -130,7 +168,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ```
     """
     settings = settings if settings is not None else Settings()
-    app = FastAPI(title="bxapi", version=__version__, description=_DESCRIPTION, openapi_tags=_TAGS, lifespan=_lifespan)
+    app = FastAPI(
+        title="bxapi",
+        version=__version__,
+        description=_DESCRIPTION,
+        openapi_tags=_TAGS,
+        lifespan=_lifespan,
+        generate_unique_id_function=_operation_id,
+    )
+    _install_openapi(app)
     app.state.settings = settings
     app.state.db = Database(settings.database)
     install_error_handlers(app)

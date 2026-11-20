@@ -199,7 +199,9 @@ def problem_responses(*statuses: int) -> dict[int | str, dict[str, Any]]:
     """Return the `responses` argument that documents an endpoint's error statuses in OpenAPI.
 
     Pass the result to a route decorator. Every route under `/v1` can also return 401 and 422,
-    which the router documents once for all of them.
+    which the router documents once for all of them. [`create_app`][bxapi.app.create_app]
+    changes the media type of each of these responses to `application/problem+json` when it
+    builds the OpenAPI document.
 
     Args:
         *statuses: The error statuses the endpoint can return, like `404` and `409`.
@@ -215,14 +217,7 @@ def problem_responses(*statuses: int) -> dict[int | str, dict[str, Any]]:
         assert responses[404]["description"] == "Not Found"
         ```
     """
-    return {
-        status: {
-            "description": HTTPStatus(status).phrase,
-            "model": Problem,
-            "content": {PROBLEM_MEDIA_TYPE: {"schema": {"$ref": "#/components/schemas/Problem"}}},
-        }
-        for status in statuses
-    }
+    return {status: {"description": HTTPStatus(status).phrase, "model": Problem} for status in statuses}
 
 
 def install_error_handlers(app: FastAPI) -> None:

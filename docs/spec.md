@@ -16,11 +16,12 @@ This file is the contract for version 1 of the API. `AGENTS.md` is the guide for
 ## Conventions
 
 - **Base path.** Every endpoint except `GET /health` is under `/v1`.
-- **Bodies.** Requests and responses are JSON. Field names are snake_case.
+- **Bodies.** Requests and responses are JSON. Field names are snake_case. A request body with a field the endpoint doesn't define gets 422 `validation_error`. A body that is an osrlib model, like a command, is the exception: osrlib ignores unknown fields.
 - **Identifiers.** A stored resource has an id made of a prefix and 22 random URL-safe characters: `chr_` for a character, `rol_` for an ability roll, `adv_` for an adventure, `ses_` for a session, and `sav_` for a save. An adventure that comes with the server has an id that starts with `builtin-`.
 - **Timestamps.** UTC, in RFC 3339 format with whole seconds, like `2026-11-20T22:01:05Z`.
 - **Lists.** A list endpoint takes `limit` (1 to 200, default 50) and `offset` (default 0), and returns `{"items": [...], "total": n, "limit": n, "offset": n}`. Stored resources are listed newest first.
 - **Documents.** osrlib wraps each serialized adventure, character, party, and save in an envelope with the keys `kind`, `schema_version`, `engine_version`, and `payload`. This specification calls the envelope a *document*. An endpoint that imports a document accepts the document as the whole request body.
+- **OpenAPI.** `GET /openapi.json` describes every endpoint. Each operation's `operationId` is a short snake_case name, like `roll_dice`, that doesn't change between releases.
 - **Creation.** A request that creates a stored resource returns 201 and the resource. A delete returns 204 with no body.
 
 ### Authentication and roles
@@ -95,7 +96,7 @@ The exact summary fields depend on osrlib's models. The implementer chooses them
 
 ### Dice and generators
 
-Stateless. Any role. Every request body accepts an optional `seed` (an integer from 0 to 2^63 - 1). When the request has none, the server draws one. Every response includes the `seed` it used. The same request with the same seed returns the same result on the same osrlib version.
+Stateless. Any role. Every request body accepts an optional `seed` (an integer from 0 to 2^53 - 1, the largest integer a JavaScript client reads exactly). When the request has none, the server draws one. Every response includes the `seed` it used. The same request with the same seed returns the same result on the same osrlib version.
 
 | Method and path | Body | Returns |
 | --- | --- | --- |

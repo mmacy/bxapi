@@ -27,3 +27,8 @@ def test_only_a_referee_chooses_a_stored_seed() -> None:
     with pytest.raises(ApiError) as refused:
         referee_seed(42, PLAYER)
     assert (refused.value.status, refused.value.code) == (403, "referee_required")
+
+
+def test_a_javascript_client_reads_every_seed_exactly() -> None:
+    assert MAX_SEED == 2**53 - 1
+    assert float(MAX_SEED) == MAX_SEED

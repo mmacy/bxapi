@@ -47,7 +47,7 @@ The gate has no exceptions: no `noqa`, no `type: ignore`, and no ignore list. Fi
 - **Filter every query on the caller's client.** A resource that belongs to another client is a 404.
 - **Raise `ApiError`** (or use the helpers in `bxapi.errors`) for every failure. Never return an error as a plain dict or raise FastAPI's `HTTPException`. Add a new error code to the table in `docs/spec.md`.
 - **Endpoints are plain `def`.** No `async def` endpoint, and no hidden global state. Everything an endpoint needs comes from `request.app.state` or a dependency.
-- **Every route has a `summary`, a docstring, and typed request and response models.** They become the OpenAPI document, which is the reference clients read.
+- **Every route has a `summary`, a docstring, and typed request and response models.** They become the OpenAPI document, which is the reference clients read. A request body model extends `bxapi.models.RequestModel`, which refuses unknown fields. The endpoint function's name becomes the operation's `operationId`, so give it a name that reads well as a client method (`roll_dice`, `get_session`), keep it unique across the application, and don't rename it once it's merged.
 - **Tests go through HTTP.** Test an endpoint with the `client`, `player`, `referee`, and `other` fixtures in `tests/conftest.py`. Assert on structure and on what osrlib returned, and never on a particular die roll unless the test passes a seed.
 - Refactor freely and update every call site. Keep no alias for an old name and no code "just in case".
 
