@@ -56,7 +56,7 @@ Every error response is an RFC 9457 problem document with the media type `applic
 | 413 | `content_too_large` | The request body is larger than `BXAPI_MAX_BODY_BYTES`. | |
 | 422 | `validation_error` | The request doesn't match the endpoint's schema. | `errors`, pydantic's list |
 | 422 | `content_invalid` | osrlib refused a document or a value as malformed. | |
-| 422 | `character_invalid` | The choices for a new character break a rule. | `rejections`, when osrlib reports them |
+| 422 | `character_invalid` | The choices for a new character break a rule, or name a class or an item osrlib doesn't have. | `rejections`, when osrlib reports them |
 | 422 | `party_invalid` | The characters named for a new session can't form a party. | |
 | 500 | `internal_error` | A bug. The response says nothing about the cause, and the server logs the traceback. | |
 
@@ -119,7 +119,7 @@ B/X players roll ability scores before they choose a class. To support that, a c
 
 | Method and path | Role | Body | Returns |
 | --- | --- | --- | --- |
-| `POST /v1/ability-rolls` | player | `seed` (referee only) | 201: `id`, `scores`, `eligible_class_ids`, `created_at` |
+| `POST /v1/ability-rolls` | player | `seed` (referee only). The body is optional. | 201: the roll: `id`, `scores`, `eligible_class_ids`, `used` (`false`), `created_at` |
 | `GET /v1/ability-rolls/{roll_id}` | player | | The roll, with `used` set to whether a character was created from it. |
 | `POST /v1/characters` | player | See below. | 201: the stored character. |
 | `POST /v1/characters/import` | referee | A character document. | 201: the stored character. |
@@ -138,14 +138,31 @@ The body of `POST /v1/characters`:
 | `adjustment` | no | A trade of ability points, as osrlib's `AbilityAdjustment`. |
 | `starting_spell_ids` | no | An arcane caster's first spells. |
 | `extra_languages` | no | The extra languages a high Intelligence allows. |
-| `purchases` | no | Starting gear to buy: a list of `{item_id, quantity}`. |
+| `purchases` | no | Starting gear to buy, in order: a list of `{item_id, quantity}`. `quantity` is a number of osrlib's purchase lots, 1 or more, and defaults to 1. One lot of gear or ammunition is a bundle, like six torches. |
 | `equip_item_ids` | no | Which purchased items to equip. |
 | `hp_reroll_at_first_level` | no | The optional rule that rerolls a first hit die of 1 or 2. Default `false`. |
 | `seed` | no | Referee only. |
 
-A stored character is `{id, name, class_id, level, created_at, character, derived}`. `character` is osrlib's `Character` model. `derived` contains the values osrlib computes from it and doesn't serialize: THAC0, both armour classes, the saving throws, the ability modifiers, and the languages.
+`scores` is osrlib's score table, keyed by `str`, `int`, `wis`, `dex`, `con`, and `cha`. `eligible_class_ids` lists, in osrlib's class order, each class for which osrlib's `validate_class_choice` returns no rejections.
 
-When a choice breaks a rule, the response is 422 `character_invalid`, and an ability roll named in the request stays unused. A successful creation marks the roll used. A second creation from the same roll gets 409 `ability_roll_used`.
+A stored character is `{id, name, class_id, level, created_at, character, derived}`. `character` is osrlib's `Character` model. `derived` contains the values osrlib computes from it and doesn't serialize. Each key is the name of the `Character` property or the osrlib function that computes it:
+
+- `thac0` and `attack_bonus`.
+- `armour_class` (descending) and `armour_class_ascending`.
+- `saves`, osrlib's `SavingThrows`.
+- The ability modifiers: `melee_modifier`, `open_doors_chance`, `missile_modifier`, `initiative_modifier`, `hit_point_modifier`, `magic_save_modifier`, and `npc_reaction_modifier`.
+- `xp_modifier_pct` and `level_title`, from the functions of those names in `osrlib.core.classes`. `level_title` is `null` past the class's last title.
+- `alignment_tongue` and `languages`.
+
+`derived` leaves out the movement rate, because it depends on the ruleset of the session that plays the character.
+
+The server creates a character with osrlib's step-by-step creation functions, in the order osrlib lists them: roll the scores (unless the request names an ability roll), check the class, check and apply the adjustment, check the first spells, roll hit points, check the extra languages, roll starting gold, buy each purchase, and equip each item. The first step that refuses a choice ends the creation with 422 `character_invalid`. The response includes osrlib's `rejections` when that step returns them. A class id or an item id osrlib doesn't have, and an id in `equip_item_ids` that isn't among the purchases, get 422 `character_invalid` with no `rejections`. A malformed body, like an unknown `alignment` or a `quantity` of 0, gets 422 `validation_error`.
+
+When a choice breaks a rule, an ability roll named in the request stays unused. A successful creation marks the roll used and stores the character in one database transaction, so two creations from one roll never both succeed, and a used roll always has a character. A second creation from the same roll gets 409 `ability_roll_used`. An `ability_roll_id` that matches no roll of the caller's client gets 404.
+
+The `document` column of a `characters` row is what osrlib's `Character.to_document` returns for the stored character. `POST /v1/characters/import` accepts the same document. It stores the character with its `id` cleared, because a session assigns each party member an id when it starts. A document that isn't a valid character document gets 422 `content_invalid`, and one stamped with a newer schema version gets 409 `version_unsupported`.
+
+`POST /v1/generate/character` runs the same steps and stores nothing. Its `rolls` is `{ability_rolls, hit_point_roll, gold_roll}`: osrlib's `AbilityScoreRolls`, `HitPointRoll`, and `RollResult`. With the same seed and choices, it returns the character osrlib's `create_character` returns.
 
 ### Adventures
 
@@ -160,7 +177,23 @@ An adventure is the content a session plays: a town, dungeons, and the triggers 
 | `GET /v1/adventures/{adventure_id}/document` | referee | The adventure document. |
 | `DELETE /v1/adventures/{adventure_id}` | player | 204. An adventure that comes with the server gets 403 `adventure_read_only`. |
 
-Adventure info contains only what a player may know before play: `id`, `name`, `builtin`, `created_at`, the town's name, each dungeon's id, name, and number of levels, and the text the adventure's author wrote for players to read before play, if the model has any. It never contains map geometry, keyed areas, monsters, treasure, triggers, or quest internals.
+Adventure info contains only what a player may know before play:
+
+| Field | Meaning |
+| --- | --- |
+| `id` | The adventure's id. `null` in the result of `POST /v1/adventures/validate`. |
+| `name` | The adventure's title. |
+| `builtin` | Whether the adventure comes with the server. |
+| `created_at` | When the client stored the adventure. `null` for an adventure that comes with the server, and in the result of `POST /v1/adventures/validate`. |
+| `description` | The adventure's `description`, the text its author wrote for players. |
+| `hooks` | The adventure's `hooks`: the reasons a party might take it on. |
+| `party` | osrlib's `PartySpec`: the character levels and party size the adventure is written for, or `null`. |
+| `town` | `{name, description}` of the town. |
+| `dungeons` | A list of `{id, name, level_count}`, one for each dungeon. |
+
+It never contains map geometry, keyed areas, monsters, treasure, triggers, or quest internals.
+
+The `document` column of an `adventures` row is the adventure document as uploaded, so `parse_adventure` reads it back. The list puts the adventures that come with the server first, in id order, and then the client's adventures, newest first. `limit`, `offset`, and `total` count the two parts as one list. An upload that osrlib refuses gets 422 `content_invalid`, and a document stamped with a newer schema version gets 409 `version_unsupported`. `POST /v1/adventures/validate` returns `{"valid": false, "detail": "..."}` in both cases.
 
 A session embeds a copy of its adventure, so deleting an adventure doesn't affect a session that already started.
 

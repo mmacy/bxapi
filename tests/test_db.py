@@ -95,51 +95,78 @@ def test_utc_now_is_rfc3339_with_whole_seconds() -> None:
     assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", utc_now())
 
 
+CHARACTER = {"name": "Hild", "class_id": "fighter", "level": 1, "max_hp": 8, "document": {"kind": "character"}}
+
+
 def test_ability_roll_round_trip_and_client_filter(db: Database) -> None:
-    roll = db.insert_ability_roll(ME, scores={"strength": 9, "dexterity": 14})
+    roll = db.insert_ability_roll(ME, scores={"str": 9, "dex": 14})
     assert roll.id.startswith("rol_")
     assert db.get_ability_roll(ME, roll.id) == roll
     assert db.get_ability_roll(OTHER, roll.id) is None
     assert db.get_ability_roll(ME, "rol_missing") is None
 
-    assert not db.mark_ability_roll_used(OTHER, roll.id)
-    assert db.get_ability_roll(ME, roll.id) == roll
 
-    assert db.mark_ability_roll_used(ME, roll.id)
+def test_a_character_from_a_roll_marks_the_roll_used_once(db: Database) -> None:
+    roll = db.insert_ability_roll(ME, scores={"str": 9, "dex": 14})
+
+    assert db.insert_character_from_ability_roll(OTHER, roll.id, **CHARACTER) is None
+    assert db.get_ability_roll(ME, roll.id) == roll
+    assert db.list_characters(OTHER, limit=10, offset=0).total == 0
+
+    row = db.insert_character_from_ability_roll(ME, roll.id, **CHARACTER)
+    assert row is not None and row.id.startswith("chr_")
+    assert db.get_character(ME, row.id) == row
     stored = db.get_ability_roll(ME, roll.id)
     assert stored is not None and stored.used
-    assert stored.scores == {"strength": 9, "dexterity": 14}
-    assert not db.mark_ability_roll_used(ME, roll.id)
-    assert not db.mark_ability_roll_used(ME, "rol_missing")
+    assert stored.scores == {"str": 9, "dex": 14}
+
+    assert db.insert_character_from_ability_roll(ME, roll.id, **CHARACTER) is None
+    assert db.insert_character_from_ability_roll(ME, "rol_missing", **CHARACTER) is None
+    assert db.list_characters(ME, limit=10, offset=0).total == 1
 
 
-def test_one_thread_marks_a_roll_used(db: Database) -> None:
+def test_a_failed_insert_leaves_the_roll_unused(db: Database, monkeypatch: pytest.MonkeyPatch) -> None:
+    roll = db.insert_ability_roll(ME, scores={})
+    existing = db.insert_character(ME, **CHARACTER)
+    # A repeated id breaks the UNIQUE constraint after the roll is marked, inside the transaction.
+    monkeypatch.setattr("bxapi.db.new_id", lambda prefix: existing.id)
+    with pytest.raises(sqlite3.IntegrityError):
+        db.insert_character_from_ability_roll(ME, roll.id, **CHARACTER)
+    stored = db.get_ability_roll(ME, roll.id)
+    assert stored is not None and not stored.used
+    assert db.list_characters(ME, limit=10, offset=0).total == 1
+
+
+def test_one_thread_creates_a_character_from_a_roll(db: Database) -> None:
     roll = db.insert_ability_roll(ME, scores={})
     threads = 32
     barrier = threading.Barrier(threads)
 
-    def mark() -> bool:
+    def create() -> bool:
         barrier.wait()
-        return db.mark_ability_roll_used(ME, roll.id)
+        return db.insert_character_from_ability_roll(ME, roll.id, **CHARACTER) is not None
 
     with ThreadPoolExecutor(threads) as pool:
-        results = list(pool.map(lambda _: mark(), range(threads)))
+        results = list(pool.map(lambda _: create(), range(threads)))
     assert results.count(True) == 1
+    assert db.list_characters(ME, limit=50, offset=0).total == 1
 
 
-def test_one_thread_marks_a_roll_used_across_two_databases(path: str) -> None:
+def test_one_thread_creates_a_character_from_a_roll_across_two_databases(path: str) -> None:
     first, second = Database(path), Database(path)
     roll = first.insert_ability_roll(ME, scores={})
     threads = 32
     barrier = threading.Barrier(threads)
 
-    def mark(index: int) -> bool:
+    def create(index: int) -> bool:
         barrier.wait()
-        return (first if index % 2 else second).mark_ability_roll_used(ME, roll.id)
+        database = first if index % 2 else second
+        return database.insert_character_from_ability_roll(ME, roll.id, **CHARACTER) is not None
 
     with ThreadPoolExecutor(threads) as pool:
-        results = list(pool.map(mark, range(threads)))
+        results = list(pool.map(create, range(threads)))
     assert results.count(True) == 1
+    assert first.list_characters(ME, limit=50, offset=0).total == 1
     first.close()
     second.close()
 
