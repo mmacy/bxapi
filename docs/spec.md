@@ -100,14 +100,14 @@ Stateless. Any role. Every request body accepts an optional `seed` (an integer f
 
 | Method and path | Body | Returns |
 | --- | --- | --- |
-| `POST /v1/dice/roll` | `expression`, `times` (1 to 100, default 1) | `expression`, `seed`, and `rolls`: one `{rolls, total}` for each time. |
+| `POST /v1/dice/roll` | `expression`, `times` (1 to 100, default 1) | `expression`, `seed`, and `rolls`: one osrlib `RollResult` (`rolls`, `modifier`, `multiplier`, `total`) for each time. |
 | `POST /v1/generate/character` | The choices `POST /v1/characters` accepts, except `ability_roll_id`. | `seed`, `character`, `derived`, and the creation `rolls`. Nothing is stored. |
 | `POST /v1/generate/treasure` | `treasure_type` (a letter), `tier` (`basic` or `expert`) | `seed` and `treasure`, osrlib's generated treasure. |
-| `POST /v1/generate/npc-party` | `kind` (`basic` or `expert`), `count` | `seed` and `party`, osrlib's NPC party. |
-| `POST /v1/generate/room` | `level_number` | `seed` and `room`, the stocked area osrlib rolled. |
+| `POST /v1/generate/npc-party` | `kind` (`basic` or `expert`), `count` (1 to 100) | `seed` and `party`, osrlib's NPC party. |
+| `POST /v1/generate/room` | `level_number` (1 or more) | `seed` and `room`, the stocked area osrlib rolled. |
 | `POST /v1/generate/monsters` | `monster_id`, `count` (1 to 100, default 1) | `seed` and `monsters`, each with rolled hit points. |
 
-A dice expression osrlib can't parse gets 422 `content_invalid`. An unknown monster id or treasure type gets 422 `validation_error` or `content_invalid`, whichever osrlib's check produces.
+A dice expression osrlib can't parse gets 422 `content_invalid`. An unknown monster id or treasure type gets 422 `content_invalid`.
 
 ### Characters
 
