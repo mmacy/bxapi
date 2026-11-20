@@ -71,28 +71,30 @@ Every error response is an RFC 9457 problem document with the media type `applic
 
 ### Rules reference
 
-Read-only views of the rules content osrlib loads with the functions in `osrlib.data`. A list returns a page of summaries. A detail endpoint returns osrlib's model for that entry, unchanged. `q` matches a substring of an entry's id or name, ignoring case. An unknown id gets 404. Every response under `/v1/rules` has the header `Cache-Control: private, max-age=3600`, because the content changes only when the server's osrlib does.
+Read-only views of the rules content osrlib loads with the functions in `osrlib.data`. A list returns a page of summaries. A detail endpoint returns osrlib's model for that entry, unchanged. `q` matches a substring of an entry's id or name, ignoring case. An unknown id gets 404. Every successful response under `/v1/rules` has the header `Cache-Control: private, max-age=3600`, because the content changes only when the server's osrlib does. An error response doesn't have it.
+
+The rules reference is the rulebook, so every role can read all of it, including the entries a referee would normally keep to themselves, like what a cursed item does. What a session's players have learned about a particular item is a different matter, and the player view covers it.
 
 | Method and path | Returns |
 | --- | --- |
-| `GET /v1/rules/classes` | A page of class summaries: id, name, and the facts a class picker shows (prime requisites, requirements, hit die, maximum level). |
+| `GET /v1/rules/classes` | A page of class summaries: id, name, and the facts a class picker shows (race, prime requisites, requirements, hit die, maximum level). |
 | `GET /v1/rules/classes/{class_id}` | The class definition. |
-| `GET /v1/rules/monsters?q=` | A page of monster summaries: id, name, hit dice, armour class, alignment. |
+| `GET /v1/rules/monsters?q=` | A page of monster summaries: id, name, hit dice, armour class (descending and ascending), XP, alignment. |
 | `GET /v1/rules/monsters/{monster_id}` | The monster template. |
-| `GET /v1/rules/spells?q=&class_id=&level=` | A page of spell summaries: id, name, level, and the classes that cast it. |
+| `GET /v1/rules/spells?q=&class_id=&level=` | A page of spell summaries: id, name, level, `spell_list`, range, and duration. `class_id` selects the spells on that class's spell list. A class that casts no spells gets an empty page, and an unknown class gets 404. |
 | `GET /v1/rules/spells/{spell_id}` | The spell template. |
-| `GET /v1/rules/equipment?q=&category=` | A page of equipment summaries: id, name, category, cost. |
+| `GET /v1/rules/equipment?q=&item_type=` | A page of equipment summaries: id, name, `item_type` (`weapon`, `armour`, `gear`, or `ammunition`), and `cost_gp`, listed weapons first, then armour, gear, and ammunition. |
 | `GET /v1/rules/equipment/{item_id}` | The item template. |
-| `GET /v1/rules/magic-items?q=&category=` | A page of magic item summaries: id, name, category. |
+| `GET /v1/rules/magic-items?q=&category=` | A page of magic item summaries: id, name, category. `category` is one of osrlib's magic item categories. |
 | `GET /v1/rules/magic-items/{item_id}` | The magic item template. |
-| `GET /v1/rules/languages` | Every language. |
-| `GET /v1/rules/tables` | The names of the printed tables: `abilities`, `combat`, `encounters`, `treasure`. |
+| `GET /v1/rules/languages` | A page of languages, in alphabetical order by id. The alignment languages aren't in osrlib's catalog, so they aren't listed. |
+| `GET /v1/rules/tables` | A page of the names of the printed tables: `abilities`, `combat`, `encounters`, `treasure`. |
 | `GET /v1/rules/tables/{name}` | One set of tables, as osrlib's model. |
-| `GET /v1/rules/commands?kind=&mode=` | Every command: `command_type`, `kind` (`play` or `referee`), `allowed_modes`, and the summary line of its documentation. |
-| `GET /v1/rules/commands/{command_type}` | The same, with the command's JSON Schema. |
-| `GET /v1/rules/license` | The Open Game License text that covers the rules content, from osrlib's data package. |
+| `GET /v1/rules/commands?kind=&mode=` | A page of commands: `command_type`, `kind` (`play` or `referee`), `allowed_modes`, and the summary line of its documentation. osrlib has more commands than the default `limit`, so a client that wants them all passes `limit=200`. |
+| `GET /v1/rules/commands/{command_type}` | The same, with `json_schema`, the JSON Schema of the command. |
+| `GET /v1/rules/license` | `name` and `text`: the Open Game License and its Section 15 notice, from osrlib's data package. |
 
-The exact summary fields depend on osrlib's models. The implementer chooses them from the model's fields, and never invents a field or computes one.
+Each summary field is a field of osrlib's model, with the same name and value. A command's `kind` and `summary` are the exceptions.
 
 ### Dice and generators
 
