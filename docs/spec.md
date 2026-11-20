@@ -57,7 +57,7 @@ Every error response is an RFC 9457 problem document with the media type `applic
 | 422 | `validation_error` | The request doesn't match the endpoint's schema. | `errors`, pydantic's list |
 | 422 | `content_invalid` | osrlib refused a document or a value as malformed. | |
 | 422 | `character_invalid` | The choices for a new character break a rule, or name a class or an item osrlib doesn't have. | `rejections`, when osrlib reports them |
-| 422 | `party_invalid` | The characters named for a new session can't form a party. | |
+| 422 | `party_invalid` | The characters named for a new session can't form a party: osrlib refused the party, or two members have the same id. | |
 | 500 | `internal_error` | A bug. The response says nothing about the cause, and the server logs the traceback. | |
 
 ## Endpoints
@@ -213,20 +213,24 @@ A session is one game in progress. It starts in town and ends in `game_over` or 
 | `GET /v1/sessions/{session_id}/view` | player | osrlib's `PlayerView`. |
 | `GET /v1/sessions/{session_id}/referee-view` | referee | osrlib's `RefereeView`. |
 | `GET /v1/sessions/{session_id}/events` | player | A page of the event log. |
-| `POST /v1/sessions/{session_id}/saves` | player | 201: save info. The body is `{"label": "..."}`, and `label` is optional. |
+| `POST /v1/sessions/{session_id}/saves` | player | 201: save info. The body is `{"label": "..."}`, and both the body and `label` are optional. A save without a label has `label: null`. Saving doesn't change the session or its revision. |
 
 The body of `POST /v1/sessions`:
 
 | Field | Required | Meaning |
 | --- | --- | --- |
 | `adventure_id` | yes | The adventure to play. |
-| `character_ids` | one of the two | The stored characters that form the party, in marching order. |
+| `character_ids` | one of the two | The stored characters that form the party, in marching order. The session plays copies, so a list can name a character more than once. |
 | `party_document` | one of the two | Referee only. A party document, in place of stored characters. |
-| `name` | no | A label for the session. Defaults to the adventure's name. |
+| `name` | no | A label for the session, 1 to 200 characters. Defaults to the adventure's name. |
 | `ruleset` | no | osrlib's `Ruleset` fields, to change optional rules. Defaults to the rules as written. |
 | `seed` | no | Referee only. |
 
-Session info is `{id, name, adventure_id, adventure_name, mode, ended, revision, clock, schema_version, engine_version, created_at, updated_at}`. `clock` is `{rounds, turns, days}`. `ended` is `true` in the modes `game_over` and `victory`.
+A request with both `character_ids` and `party_document`, or with neither, gets 422 `validation_error`. A player who sends `party_document` or `seed` gets 403 `referee_required`. An unknown adventure or character id gets 404 `not_found`, with `resource` set to `adventure` or `character`. osrlib requires a party of at least one member and sets no upper limit. A party it refuses gets 422 `party_invalid`, and so does a party in which two members have the same id, because every command names a member by id. A malformed `party_document` gets 422 `content_invalid`.
+
+Session info is `{id, name, adventure_id, adventure_name, mode, ended, revision, clock, schema_version, engine_version, created_at, updated_at}`. `clock` is `{rounds, turns, days}`, with the turns and days that osrlib's `GameClock` counts. `ended` is `true` in the modes `game_over` and `victory`. `updated_at` is the time of the last accepted command, or `created_at` before the first one. Renaming the session doesn't change it.
+
+`adventure_id` is `null` when the server can't tell which adventure a restored session plays. A session restored from a save gets the `adventure_id` of the session the save was made from. When that session was deleted, or the save was imported, the server uses the id of a built-in adventure whose content is the same as the save's copy, and `null` when there's none. The session plays the copy of the adventure in its save either way.
 
 #### Commands
 
@@ -244,7 +248,7 @@ The command outcome:
 | `ended` | Whether the session is over. |
 | `revision` | The session's revision after the command. |
 
-A caller sees the events with player visibility. A referee who passes `visibility=referee` sees every event. A player who passes it gets 403 `referee_required`. A player who sends a referee command gets 403 `referee_command`, and the session never executes it.
+A caller sees the events with player visibility. A referee who passes `visibility=referee` sees every event. A player who passes it gets 403 `referee_required`, and the session doesn't execute the command. A player who sends a referee command gets 403 `referee_command`, and the session never executes it. A field the command doesn't define is ignored, because osrlib's commands ignore unknown fields.
 
 **Revisions.** A session's revision starts at 0 and goes up by 1 each time the session accepts a command request. A refused command leaves it unchanged. A client that might send a request twice, like a retry after a timeout, passes `expected_revision` as a query parameter. If the session's revision is different, the server executes nothing and returns 409 `revision_conflict` with the current `revision`. The client then reads the view and decides what to do.
 
@@ -256,9 +260,11 @@ A caller sees the events with player visibility. A referee who passes `visibilit
 
 - The server registers osrlib's `Interpreter` on every session it creates, restores, or loads, so the adventure's triggers and quests run.
 - After every accepted command, the server writes the session's save document, its mode, and its revision to the database. A server that restarts loses no accepted command.
-- The server keeps up to `BXAPI_SESSION_CACHE_SIZE` sessions loaded in memory, each with a lock. A request takes the session's lock to execute a command or read a view. When the cache is full, the server drops the session used longest ago and loads it from the database when a request next needs it.
+- The server keeps up to `BXAPI_SESSION_CACHE_SIZE` sessions loaded in memory, each with a lock. A request takes the session's lock to execute a command, read a view, or read the event log, so a view or a page of events always shows the session between two commands. When the cache is full, the server drops the session used longest ago and loads it from the database when a request next needs it. A request that's using a dropped session finishes with its copy, and a request that arrives meanwhile waits for the same lock.
 - Before each request uses a loaded session, the server compares the revision in the database with the revision of the loaded copy. If they differ, another process changed the session, and the server loads it again.
 - The write after a command succeeds only if the database still has the revision the command started from. If it doesn't, the server discards the loaded copy and returns 409 `session_busy`. Two processes that share one database file can therefore serve the same session without losing or repeating a command.
+- If osrlib raises an exception while it executes a command, the server discards the loaded copy, writes nothing, and returns 500 `internal_error`. The next request loads the session from the database.
+- Session info, the session list, the commands endpoint, renaming, and saving read the `sessions` table and don't take the lock. A save copies the save document of the last accepted command.
 
 ### Saves
 
@@ -268,13 +274,15 @@ A save is a copy of a session at one moment. Restoring a save creates a new sess
 | --- | --- | --- |
 | `GET /v1/saves?session_id=` | player | A page of save info. |
 | `GET /v1/saves/{save_id}` | player | Save info. |
-| `PATCH /v1/saves/{save_id}` | player | Save info, after changing `label`. |
+| `PATCH /v1/saves/{save_id}` | player | Save info, after changing `label`. The body is `{"label": "..."}`, and `null` removes the label. |
 | `DELETE /v1/saves/{save_id}` | player | 204 |
-| `POST /v1/saves/{save_id}/restore` | player | 201: info for the new session. The body is `{"name": "..."}`, and `name` is optional. |
+| `POST /v1/saves/{save_id}/restore` | player | 201: info for the new session, at revision 0. The body is `{"name": "..."}`, and both the body and `name` are optional. |
 | `GET /v1/saves/{save_id}/document` | referee | The save document. |
 | `POST /v1/saves/import` | referee | 201: save info. The body is a save document. |
 
 Save info is `{id, session_id, adventure_name, label, mode, clock, created_at}`. `session_id` is the session the save was made from, which may have been deleted since. It's `null` for an imported save.
+
+A restored session plays on from the save as the original session would have: the server loads the document with osrlib's `load_game` and registers the `Interpreter` again. An import loads the document the same way before it stores anything, and stores the document osrlib writes back out of the loaded game, in the format of the server's osrlib. A document osrlib can't load gets 422 `content_invalid`, and one with a newer `schema_version` gets 409 `version_unsupported`.
 
 ## Storage
 
