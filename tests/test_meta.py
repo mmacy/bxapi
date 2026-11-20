@@ -60,3 +60,15 @@ def test_operation_ids_are_the_endpoint_names_and_unique(client: TestClient) -> 
     assert "get_meta" in operation_ids
     assert "health" in operation_ids
     assert len(operation_ids) == len(set(operation_ids))
+
+
+def test_every_field_bxapi_defines_has_a_description(client: TestClient) -> None:
+    schemas = client.get("/openapi.json").json()["components"]["schemas"]
+    for name in ("Meta", "Problem"):
+        for field, schema in schemas[name]["properties"].items():
+            assert schema.get("description"), f"{name}.{field} has no description"
+
+
+def test_a_trailing_slash_is_not_redirected(client: TestClient) -> None:
+    response = client.get("/v1/meta/", follow_redirects=False)
+    assert (response.status_code, response.json()["code"]) == (404, "not_found")

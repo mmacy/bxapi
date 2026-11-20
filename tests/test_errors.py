@@ -137,3 +137,10 @@ def test_cors_headers_only_for_configured_origins(settings: Settings, make_clien
     assert (
         "access-control-allow-origin" not in make_client(settings).get("/health", headers={"Origin": allowed}).headers
     )
+
+
+def test_not_found_repeats_at_most_128_characters_of_the_id() -> None:
+    problem = not_found("monster", "x" * 5000).problem().model_dump()
+    assert problem["id"] == "x" * 128 + "..."
+    assert len(problem["detail"]) < 200
+    assert not_found("monster", "goblin").problem().model_dump()["id"] == "goblin"

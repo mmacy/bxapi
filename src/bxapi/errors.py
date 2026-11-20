@@ -55,6 +55,8 @@ PROBLEM_MEDIA_TYPE = "application/problem+json"
 
 _log = logging.getLogger("bxapi")
 
+_MAX_ID_SHOWN = 128
+
 
 class Problem(BaseModel):
     """The body of an error response.
@@ -63,7 +65,7 @@ class Problem(BaseModel):
     `validation_error`. The table of codes in `docs/spec.md` lists them.
     """
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", use_attribute_docstrings=True)
 
     type: str = "about:blank"
     """Always `"about:blank"`. Read `code` to identify the error."""
@@ -127,12 +129,14 @@ def not_found(resource: str, resource_id: str) -> ApiError:
 
     Args:
         resource: The kind of resource, like `"session"`.
-        resource_id: The identifier the caller sent.
+        resource_id: The identifier the caller sent. The response repeats at most its first 128
+            characters.
 
     Returns:
         An [`ApiError`][bxapi.errors.ApiError] with the code `not_found`.
     """
-    return ApiError(404, "not_found", f"No {resource} has the id {resource_id!r}.", resource=resource, id=resource_id)
+    shown = resource_id if len(resource_id) <= _MAX_ID_SHOWN else resource_id[:_MAX_ID_SHOWN] + "..."
+    return ApiError(404, "not_found", f"No {resource} has the id {shown!r}.", resource=resource, id=shown)
 
 
 def forbidden(code: str, detail: str, **extras: Any) -> ApiError:

@@ -2,10 +2,10 @@
 
 from fastapi import APIRouter, Request
 from osrlib.versioning import SCHEMA_VERSION, engine_version
-from pydantic import BaseModel
 
 from bxapi import __version__
 from bxapi.auth import CurrentPrincipal
+from bxapi.models import ApiModel
 from bxapi.settings import Role
 
 __all__ = ["Health", "Meta", "health_router", "router"]
@@ -14,14 +14,14 @@ health_router = APIRouter(tags=["meta"])
 router = APIRouter(tags=["meta"])
 
 
-class Health(BaseModel):
+class Health(ApiModel):
     """The body of the health check."""
 
     status: str = "ok"
     """Always `"ok"`. A server that can't answer returns no body at all."""
 
 
-class Meta(BaseModel):
+class Meta(ApiModel):
     """The server's versions, and the caller as the server sees it."""
 
     api_version: str
