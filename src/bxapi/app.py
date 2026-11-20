@@ -1,13 +1,16 @@
 """The application factory.
 
-[`create_app`][bxapi.app.create_app] builds the FastAPI application: the error handlers, the
-request size limit, the cross-origin headers, and every router. Serve it with the `bxapi`
-command, or point an ASGI server at the factory:
+[`create_app`][bxapi.app.create_app] builds the FastAPI application: the database, the error
+handlers, the request size limit, the cross-origin headers, and every router. Serve it with the
+`bxapi` command, or point an ASGI server at the factory:
 
 ```sh
 uvicorn bxapi.app:create_app --factory --port 8640
 ```
 """
+
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,6 +20,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from bxapi import __version__
 from bxapi.auth import authenticate
+from bxapi.db import Database
 from bxapi.errors import ApiError, install_error_handlers, problem_response, problem_responses
 from bxapi.routers import V1_ROUTERS, meta
 from bxapi.settings import Settings
@@ -87,6 +91,12 @@ class BodyLimitMiddleware:
         await self.app(scope, limited_receive, send)
 
 
+@asynccontextmanager
+async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+    yield
+    app.state.db.close()
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     """Build the bxapi application.
 
@@ -95,6 +105,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     Every route under `/v1` requires a valid API key when the settings contain any keys.
     `GET /health` never does.
+
+    The function opens the database in the settings and puts it at `app.state.db`. It opens the
+    database here rather than at startup, so a test client that never runs the application's
+    startup can still use it. When the server shuts the application down, the application closes
+    the database.
 
     Args:
         settings: The settings to run with. When it's `None`, the function reads them from the
@@ -115,8 +130,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ```
     """
     settings = settings if settings is not None else Settings()
-    app = FastAPI(title="bxapi", version=__version__, description=_DESCRIPTION, openapi_tags=_TAGS)
+    app = FastAPI(title="bxapi", version=__version__, description=_DESCRIPTION, openapi_tags=_TAGS, lifespan=_lifespan)
     app.state.settings = settings
+    app.state.db = Database(settings.database)
     install_error_handlers(app)
     app.add_middleware(BodyLimitMiddleware, max_bytes=settings.max_body_bytes)
     if settings.cors_origins:

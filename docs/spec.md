@@ -246,13 +246,17 @@ One SQLite database file, opened with Python's `sqlite3` module. No ORM. The `Da
 
 | Table | Columns |
 | --- | --- |
-| `ability_rolls` | `id`, `client`, `scores` (JSON), `used`, `created_at` |
-| `characters` | `id`, `client`, `name`, `class_id`, `level`, `max_hp`, `document` (JSON), `created_at` |
-| `adventures` | `id`, `client`, `name`, `info` (JSON), `document` (JSON), `created_at` |
-| `sessions` | `id`, `client`, `name`, `adventure_id`, `adventure_name`, `mode`, `revision`, `clock_rounds`, `document` (JSON), `created_at`, `updated_at` |
-| `saves` | `id`, `client`, `session_id`, `adventure_name`, `label`, `mode`, `clock_rounds`, `document` (JSON), `created_at` |
+| `ability_rolls` | `seq`, `id`, `client`, `scores` (JSON), `used`, `created_at` |
+| `characters` | `seq`, `id`, `client`, `name`, `class_id`, `level`, `max_hp`, `document` (JSON), `created_at` |
+| `adventures` | `seq`, `id`, `client`, `name`, `info` (JSON), `document` (JSON), `created_at` |
+| `sessions` | `seq`, `id`, `client`, `name`, `adventure_id`, `adventure_name`, `mode`, `revision`, `clock_rounds`, `schema_version`, `engine_version`, `document` (JSON), `created_at`, `updated_at` |
+| `saves` | `seq`, `id`, `client`, `session_id`, `adventure_name`, `label`, `mode`, `clock_rounds`, `document` (JSON), `created_at` |
 
 Every query that reads or changes a row filters on `client`.
+
+`seq` is each table's integer primary key, which SQLite assigns in the order the rows are inserted. `id` is unique. A list sorts by `created_at` and then by `seq`, both descending, so two rows created in the same second are always listed in the same order.
+
+`schema_version` and `engine_version` in `sessions` are copies of the keys of the same names in the session's document. The `Database` class writes them each time it writes the document, so the server can return session info without reading the document.
 
 ## Settings
 
