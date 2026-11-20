@@ -26,6 +26,7 @@ from bxapi.auth import authenticate
 from bxapi.db import Database
 from bxapi.errors import PROBLEM_MEDIA_TYPE, ApiError, install_error_handlers, problem_response, problem_responses
 from bxapi.routers import V1_ROUTERS, meta
+from bxapi.session_manager import SessionManager
 from bxapi.settings import Settings
 
 __all__ = ["BodyLimitMiddleware", "create_app"]
@@ -144,10 +145,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     Every route under `/v1` requires a valid API key when the settings contain any keys.
     `GET /health` never does.
 
-    The function opens the database in the settings and puts it at `app.state.db`. It opens the
-    database here rather than at startup, so a test client that never runs the application's
-    startup can still use it. When the server shuts the application down, the application closes
-    the database.
+    The function opens the database in the settings and puts it at `app.state.db`, and puts the
+    [`SessionManager`][bxapi.session_manager.SessionManager] that runs the sessions at
+    `app.state.sessions`. It opens the database here rather than at startup, so a test client that
+    never runs the application's startup can still use it. When the server shuts the application
+    down, the application closes the database.
 
     Args:
         settings: The settings to run with. When it's `None`, the function reads them from the
@@ -181,6 +183,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     _install_openapi(app)
     app.state.settings = settings
     app.state.db = Database(settings.database)
+    app.state.sessions = SessionManager(app.state.db, cache_size=settings.session_cache_size)
     install_error_handlers(app)
     app.add_middleware(BodyLimitMiddleware, max_bytes=settings.max_body_bytes)
     if settings.cors_origins:
