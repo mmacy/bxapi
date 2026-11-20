@@ -6,6 +6,8 @@ from typing import Annotated
 from fastapi import Depends, Query
 from pydantic import BaseModel, Field
 
+from bxapi.models import ApiModel
+
 __all__ = ["Page", "PageParams", "PageQuery", "paginate"]
 
 MAX_LIMIT = 200
@@ -32,7 +34,7 @@ PageQuery = Annotated[PageParams, Depends(_page_params)]
 """Annotate an endpoint parameter with this type to read `limit` and `offset` from the query."""
 
 
-class Page[Item](BaseModel):
+class Page[Item](ApiModel):
     """One page of a list, with the size of the whole list."""
 
     items: list[Item]

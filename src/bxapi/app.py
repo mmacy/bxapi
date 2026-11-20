@@ -175,6 +175,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         openapi_tags=_TAGS,
         lifespan=_lifespan,
         generate_unique_id_function=_operation_id,
+        # A path with a trailing slash is a 404, not a redirect to a path that may not exist either.
+        redirect_slashes=False,
     )
     _install_openapi(app)
     app.state.settings = settings
