@@ -1,15 +1,19 @@
-"""Character creation: the choices a client sends, the osrlib steps that apply them, and the derived values.
+"""The server creates characters from a client's choices with osrlib's step-by-step creation functions.
 
 A character starts from an ability roll the server stored earlier, or from scores the server
-rolls in the same request. [`character_from_scores`][bxapi.creation.character_from_scores]
-creates one from stored scores, and [`roll_character`][bxapi.creation.roll_character] rolls
-the scores first. Both run the same step-by-step creation functions from
-`osrlib.core.character`, in the order osrlib lists them. osrlib's one-call `create_character`
-can't start from scores that already exist, so neither function calls it.
+rolls in the same request. Either way, one seed decides every roll: the ability scores, the hit
+points, and the starting gold. [`roll_character`][bxapi.creation.roll_character] rolls a new
+character from a seed, and [`character_from_roll`][bxapi.creation.character_from_roll] creates
+one from a stored roll and its seed. Both run the step-by-step creation functions from
+`osrlib.core.character`, in the order osrlib lists them, so the result is the character that
+osrlib's `create_character` returns for the same seed and choices. bxapi doesn't call
+`create_character`, because it reports only the first refused choice, as a `ValueError` with no
+`Rejection` records.
 
 Each step that refuses a choice stops the creation with 422 `character_invalid`. When osrlib
-returns `Rejection` records for the step, the problem document includes them as
-`rejections`.
+returns `Rejection` records for the step, the problem document includes them as `rejections`.
+When the server refuses one input with no rejections from osrlib, like an unknown class id, the
+problem document has `field`, `index` for a list, and `id`, which locate the input.
 """
 
 from collections.abc import Mapping, Sequence
@@ -48,7 +52,9 @@ __all__ = [
     "DerivedValues",
     "GeneratedCharacter",
     "Purchase",
-    "character_from_scores",
+    "MAX_NAME_LENGTH",
+    "MAX_QUANTITY",
+    "character_from_roll",
     "creation_stream",
     "derive",
     "eligible_class_ids",
@@ -57,28 +63,40 @@ __all__ = [
 ]
 
 
+MAX_NAME_LENGTH = 100
+"""The longest character name the server accepts, in characters."""
+
+MAX_QUANTITY = 10_000
+"""The most lots of one item a single purchase can buy."""
+
+
 class Purchase(RequestModel):
     """One item to buy with the starting gold."""
 
     item_id: str
     """The id of an item from `GET /v1/rules/equipment`, like `sword`."""
-    quantity: int = Field(default=1, ge=1)
-    """How many lots to buy. A lot is the unit the item is sold in. Weapons and armour sell one at a
-    time, and gear and ammunition sell in bundles, so one lot of torches is six torches."""
+    quantity: int = Field(default=1, ge=1, le=MAX_QUANTITY)
+    """How many lots to buy, from 1 to 10,000. A lot is the unit the item is sold in. osrlib sells
+    weapons and armour one at a time, and gear and ammunition in bundles, so one lot of torches is
+    six torches."""
 
 
 class CharacterChoices(RequestModel):
     """The choices a player makes for a new first-level character."""
 
-    name: str = Field(min_length=1)
-    """The character's name."""
+    name: str = Field(min_length=1, max_length=MAX_NAME_LENGTH)
+    """The character's name, 1 to 100 characters."""
     class_id: str
     """A class id from `GET /v1/rules/classes`, like `fighter`."""
     alignment: Alignment
     """The character's alignment."""
     adjustment: AbilityAdjustment | None = None
-    """A trade of ability points, as osrlib's `AbilityAdjustment`: two points off STR, INT, or WIS
-    for each point added to a prime requisite. Leave it out to keep the scores as rolled."""
+    """A trade of ability points, as osrlib's `AbilityAdjustment`. `lowered` maps each ability to
+    take points from to the points taken, and `raised` maps each ability to add points to to the
+    points added. The keys are `str` (Strength), `int` (Intelligence), `wis` (Wisdom), `dex`
+    (Dexterity), `con` (Constitution), and `cha` (Charisma). osrlib checks the trade, and the server
+    returns a trade osrlib refuses as 422 `character_invalid` with osrlib's rejections. Leave the
+    field out to keep the scores as rolled."""
     starting_spell_ids: list[str] = []
     """The spells in an arcane caster's first spell book. A first-level magic-user or elf needs
     exactly one first-level spell. Leave it empty for every other class."""
@@ -104,11 +122,7 @@ class CreationRolls(ApiModel):
 
 
 class DerivedValues(ApiModel):
-    """The values osrlib computes from a character and doesn't store in the character document.
-
-    osrlib computes each one from the character's level, scores, alignment, class, and the
-    equipment the character wears and wields.
-    """
+    """The values osrlib computes from a character and doesn't store in the character document."""
 
     thac0: int
     """The d20 roll the character needs to hit armour class 0."""
@@ -139,7 +153,7 @@ class DerivedValues(ApiModel):
     """The percentage the class adds to or takes from each experience award, from the prime
     requisites."""
     level_title: str | None
-    """The title of the character's class at its level, like `Veteran`, or `None` past the last
+    """The title of the character's class at its level, like `Veteran`, or `null` past the last
     title."""
     alignment_tongue: str
     """The id of the secret language of the character's alignment, like `alignment_lawful`."""
@@ -215,48 +229,60 @@ def _refused(detail: str, rejections: Sequence[Rejection]) -> ApiError:
     )
 
 
+def _bad_input(detail: str, field: str, input_id: str, index: int | None = None) -> ApiError:
+    if index is None:
+        return invalid("character_invalid", detail, field=field, id=input_id)
+    return invalid("character_invalid", detail, field=field, index=index, id=input_id)
+
+
 def _class(class_id: str) -> ClassDefinition:
     try:
         return load_classes().get(class_id)
     except ValueError as error:
-        raise invalid("character_invalid", f"No class has the id {class_id!r}.") from error
+        raise _bad_input(f"No class has the id {class_id!r}.", "class_id", class_id) from error
 
 
 def _buy_and_equip(inventory: Inventory, definition: ClassDefinition, choices: CharacterChoices) -> None:
     equipment = load_equipment()
-    for wanted in choices.purchases:
+    for index, wanted in enumerate(choices.purchases):
         try:
             template = equipment.get(wanted.item_id)
         except ValueError as error:
-            raise invalid("character_invalid", f"No item has the id {wanted.item_id!r}.") from error
+            raise _bad_input(f"No item has the id {wanted.item_id!r}.", "purchases", wanted.item_id, index) from error
         rejections = validate_purchase(inventory.purse, template, wanted.quantity)
         if rejections:
             raise _refused("The starting gold doesn't cover the purchases.", rejections)
         purchase(inventory, template, wanted.quantity)
-    for item_id in choices.equip_item_ids:
+    bought = {wanted.item_id for wanted in choices.purchases}
+    for index, item_id in enumerate(choices.equip_item_ids):
         instance = next(
             (item for item in inventory.items if isinstance(item, ItemInstance) and item.template.id == item_id), None
         )
+        if instance is None and item_id in bought:
+            detail = (
+                f"equip_item_ids equips {item_id!r} more times than the purchases buy it. Equipping a purchase equips "
+                "all of it, whatever its quantity."
+            )
+            raise _bad_input(detail, "equip_item_ids", item_id, index)
         if instance is None:
-            raise invalid("character_invalid", f"The item {item_id!r} in equip_item_ids isn't in the purchases.")
+            raise _bad_input(f"The purchases don't include {item_id!r}.", "equip_item_ids", item_id, index)
         rejections = validate_equip(definition, instance, inventory)
         if rejections:
             raise _refused(f"The class can't equip the item {item_id!r}.", rejections)
         equip(inventory, definition, instance)
 
 
-def roll_character(choices: CharacterChoices, stream: RngStream) -> GeneratedCharacter:
-    """Create a first-level character, rolling the ability scores first.
+def roll_character(choices: CharacterChoices, seed: int) -> GeneratedCharacter:
+    """Create a first-level character from a seed, rolling the ability scores first.
 
-    The function rolls the scores with osrlib's `roll_ability_scores`, then runs the other
-    steps that [`character_from_scores`][bxapi.creation.character_from_scores] lists. The
-    stream advances in the same order as in osrlib's `create_character`: scores, hit points,
-    then gold. So the same seed and choices give the same character as `create_character`.
+    The function draws from osrlib's character creation stream for `seed`, in the order that
+    osrlib's `create_character` draws: scores, hit points, then gold. So the same seed and
+    choices give the character `create_character` returns. The steps after the ability roll are
+    the ones [`character_from_roll`][bxapi.creation.character_from_roll] lists.
 
     Args:
         choices: The player's choices.
-        stream: The character creation stream, from
-            [`creation_stream`][bxapi.creation.creation_stream].
+        seed: The seed for every creation roll.
 
     Returns:
         The character, and the dice rolled for it.
@@ -266,16 +292,23 @@ def roll_character(choices: CharacterChoices, stream: RngStream) -> GeneratedCha
             refuses a choice.
     """
     definition = _class(choices.class_id)
+    stream = creation_stream(seed)
     ability_rolls = roll_ability_scores(stream)
     character, hit_point_roll, gold_roll = _create(choices, definition, dict(ability_rolls.scores), stream)
     rolls = CreationRolls(ability_rolls=ability_rolls, hit_point_roll=hit_point_roll, gold_roll=gold_roll)
     return GeneratedCharacter(character=character, rolls=rolls)
 
 
-def character_from_scores(choices: CharacterChoices, scores: dict[AbilityScore, int], stream: RngStream) -> Character:
-    """Create a first-level character from ability scores rolled earlier.
+def character_from_roll(choices: CharacterChoices, seed: int, scores: dict[AbilityScore, int]) -> Character:
+    """Create a first-level character from a stored ability roll and the seed it was rolled from.
 
-    The function runs osrlib's step-by-step creation functions after the ability roll, in the
+    The function re-creates the creation stream for `seed` and rolls the ability scores on it
+    again, so the hit points and the gold come from the same draws on every attempt. The
+    character gets `scores`, the scores the player saw. With the osrlib that rolled them, the
+    scores rolled again are the same, and the character is the one osrlib's `create_character`
+    returns for the same seed and choices.
+
+    After the ability roll, the function runs osrlib's step-by-step creation functions in the
     order the `osrlib.core.character` module lists them:
 
     1. `validate_class_choice`.
@@ -290,10 +323,8 @@ def character_from_scores(choices: CharacterChoices, scores: dict[AbilityScore, 
 
     Args:
         choices: The player's choices.
-        scores: All six ability scores, as rolled.
-        stream: The character creation stream, from
-            [`creation_stream`][bxapi.creation.creation_stream]. The function draws the hit
-            points and the gold from it.
+        seed: The seed the stored roll was rolled from.
+        scores: The stored roll's six ability scores.
 
     Returns:
         The character.
@@ -303,7 +334,10 @@ def character_from_scores(choices: CharacterChoices, scores: dict[AbilityScore, 
             refuses a choice. The error includes osrlib's rejections when the step returns
             them.
     """
-    character, _, _ = _create(choices, _class(choices.class_id), scores, stream)
+    definition = _class(choices.class_id)
+    stream = creation_stream(seed)
+    roll_ability_scores(stream)
+    character, _, _ = _create(choices, definition, scores, stream)
     return character
 
 

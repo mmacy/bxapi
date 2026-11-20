@@ -46,8 +46,8 @@ def check_info(info: Any) -> None:
     assert TOWN_NAME in values, f"adventure info has no town name: {text}"
     dungeons = [value for value in values if isinstance(value, dict) and DUNGEON_ID in value.values()]
     assert dungeons, f"adventure info has no entry for the dungeon {DUNGEON_ID!r}: {text}"
-    assert DUNGEON_NAME in dungeons[0].values() and 2 in dungeons[0].values(), (
-        f"the dungeon's entry lacks its name or its number of levels, 2: {dungeons[0]}"
+    assert DUNGEON_NAME in dungeons[0].values() and 2 not in dungeons[0].values(), (
+        f"the dungeon's entry lacks its name, or shows its number of levels: {dungeons[0]}"
     )
     # SPEC QUESTION: "the text the adventure's author wrote for players to read before play" is
     # read here as osrlib's `Adventure.description`, which the player view also shows. The spec

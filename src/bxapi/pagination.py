@@ -12,6 +12,9 @@ __all__ = ["Page", "PageParams", "PageQuery", "paginate"]
 
 MAX_LIMIT = 200
 DEFAULT_LIMIT = 50
+MAX_OFFSET = 2**53 - 1
+"""The largest `offset` a list accepts: the largest integer a JavaScript client reads exactly. SQLite
+can't take an offset above 2^63 - 1."""
 
 
 class PageParams(BaseModel):
@@ -19,13 +22,18 @@ class PageParams(BaseModel):
 
     limit: int = Field(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT)
     """The largest number of items to return."""
-    offset: int = Field(default=0, ge=0)
-    """How many items to skip before the first one returned."""
+    offset: int = Field(default=0, ge=0, le=MAX_OFFSET)
+    """How many items to skip before the first one returned, from 0 to 2^53 - 1."""
 
 
 def _page_params(
     limit: Annotated[int, Query(ge=1, le=MAX_LIMIT, description="The largest number of items to return.")] = 50,
-    offset: Annotated[int, Query(ge=0, description="How many items to skip before the first one returned.")] = 0,
+    offset: Annotated[
+        int,
+        Query(
+            ge=0, le=MAX_OFFSET, description="How many items to skip before the first one returned, from 0 to 2^53 - 1."
+        ),
+    ] = 0,
 ) -> PageParams:
     return PageParams(limit=limit, offset=offset)
 

@@ -99,7 +99,7 @@ CHARACTER = {"name": "Hild", "class_id": "fighter", "level": 1, "max_hp": 8, "do
 
 
 def test_ability_roll_round_trip_and_client_filter(db: Database) -> None:
-    roll = db.insert_ability_roll(ME, scores={"str": 9, "dex": 14})
+    roll = db.insert_ability_roll(ME, scores={"str": 9, "dex": 14}, seed=2**53 - 1)
     assert roll.id.startswith("rol_")
     assert db.get_ability_roll(ME, roll.id) == roll
     assert db.get_ability_roll(OTHER, roll.id) is None
@@ -107,7 +107,7 @@ def test_ability_roll_round_trip_and_client_filter(db: Database) -> None:
 
 
 def test_a_character_from_a_roll_marks_the_roll_used_once(db: Database) -> None:
-    roll = db.insert_ability_roll(ME, scores={"str": 9, "dex": 14})
+    roll = db.insert_ability_roll(ME, scores={"str": 9, "dex": 14}, seed=1)
 
     assert db.insert_character_from_ability_roll(OTHER, roll.id, **CHARACTER) is None
     assert db.get_ability_roll(ME, roll.id) == roll
@@ -126,7 +126,7 @@ def test_a_character_from_a_roll_marks_the_roll_used_once(db: Database) -> None:
 
 
 def test_a_failed_insert_leaves_the_roll_unused(db: Database, monkeypatch: pytest.MonkeyPatch) -> None:
-    roll = db.insert_ability_roll(ME, scores={})
+    roll = db.insert_ability_roll(ME, scores={}, seed=1)
     existing = db.insert_character(ME, **CHARACTER)
     # A repeated id breaks the UNIQUE constraint after the roll is marked, inside the transaction.
     monkeypatch.setattr("bxapi.db.new_id", lambda prefix: existing.id)
@@ -138,7 +138,7 @@ def test_a_failed_insert_leaves_the_roll_unused(db: Database, monkeypatch: pytes
 
 
 def test_one_thread_creates_a_character_from_a_roll(db: Database) -> None:
-    roll = db.insert_ability_roll(ME, scores={})
+    roll = db.insert_ability_roll(ME, scores={}, seed=1)
     threads = 32
     barrier = threading.Barrier(threads)
 
@@ -154,7 +154,7 @@ def test_one_thread_creates_a_character_from_a_roll(db: Database) -> None:
 
 def test_one_thread_creates_a_character_from_a_roll_across_two_databases(path: str) -> None:
     first, second = Database(path), Database(path)
-    roll = first.insert_ability_roll(ME, scores={})
+    roll = first.insert_ability_roll(ME, scores={}, seed=1)
     threads = 32
     barrier = threading.Barrier(threads)
 
@@ -436,10 +436,10 @@ def test_save_pages_filter_on_session(db: Database) -> None:
 def test_memory_database_is_shared_across_threads() -> None:
     db = Database(":memory:")
     with ThreadPoolExecutor(8) as pool:
-        ids = list(pool.map(lambda _: db.insert_ability_roll(ME, scores={}).id, range(40)))
+        ids = list(pool.map(lambda _: db.insert_ability_roll(ME, scores={}, seed=1).id, range(40)))
     assert all(db.get_ability_roll(ME, roll_id) is not None for roll_id in ids)
 
-    roll = db.insert_ability_roll(ME, scores={"strength": 3})
+    roll = db.insert_ability_roll(ME, scores={"strength": 3}, seed=1)
     with ThreadPoolExecutor(1) as pool:
         assert pool.submit(db.get_ability_roll, ME, roll.id).result() == roll
     db.close()
@@ -487,5 +487,5 @@ def test_app_opens_the_database_and_closes_it_at_shutdown(settings: Settings) ->
 def test_app_database_works_without_entering_the_client(settings: Settings) -> None:
     app = create_app(settings.model_copy(update={"database": ":memory:"}))
     TestClient(app).get("/health")
-    assert app.state.db.insert_ability_roll(ME, scores={}).id.startswith("rol_")
+    assert app.state.db.insert_ability_roll(ME, scores={}, seed=1).id.startswith("rol_")
     app.state.db.close()

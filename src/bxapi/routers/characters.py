@@ -1,17 +1,18 @@
 """Stored characters, the ability score rolls that start one, and the stateless character generator."""
 
-from typing import Annotated, Any
+from typing import Annotated, Any, Self
 
 from fastapi import APIRouter, Body, Request, Response
 from osrlib.core.abilities import AbilityScore
 from osrlib.core.character import Character, roll_ability_scores
+from pydantic import model_validator
 
 from bxapi.auth import CurrentPrincipal, RefereePrincipal
 from bxapi.creation import (
     CharacterChoices,
     CreationRolls,
     DerivedValues,
-    character_from_scores,
+    character_from_roll,
     creation_stream,
     derive,
     eligible_class_ids,
@@ -19,7 +20,7 @@ from bxapi.creation import (
     scores_from_json,
 )
 from bxapi.db import AbilityRollRow, CharacterDocumentRow, Database
-from bxapi.errors import ApiError, conflict, not_found, problem_responses
+from bxapi.errors import ApiError, conflict, invalid, not_found, problem_responses
 from bxapi.models import ApiModel, RequestModel
 from bxapi.pagination import Page, PageQuery
 from bxapi.seeds import Seed, referee_seed, seed_or_draw
@@ -44,7 +45,8 @@ class AbilityRollRequest(RequestModel):
     """The body of a request for an ability roll."""
 
     seed: Seed | None = None
-    """The seed for the roll. Only a referee may pass one, and the server never returns it."""
+    """The seed for the roll. Only a referee may pass one, and the server never returns it. The seed
+    decides the hit point and gold rolls of the character created from the roll too."""
 
 
 class AbilityRoll(ApiModel):
@@ -58,7 +60,8 @@ class AbilityRoll(ApiModel):
     eligible_class_ids: list[str]
     """The ids of the classes whose minimum scores these scores meet, from osrlib's class check."""
     used: bool
-    """Whether a character was created from the roll. A roll starts one character at most."""
+    """Whether a character was created from the roll. You can create at most one character from a
+    roll, and deleting the character doesn't free the roll."""
     created_at: str
     """When the server stored the roll."""
 
@@ -67,11 +70,17 @@ class CharacterRequest(CharacterChoices):
     """The choices for a new stored character."""
 
     ability_roll_id: str | None = None
-    """The id of an unused ability roll to take the scores from. Without it, the server rolls the
-    scores as part of the request."""
+    """The id of an unused ability roll to take the scores from. The roll's seed also decides the
+    hit point and gold rolls. Without it, the server rolls the scores as part of the request."""
     seed: Seed | None = None
-    """The seed for the creation rolls. Only a referee may pass one, and the server never
-    returns it."""
+    """The seed for the creation rolls, when the request has no `ability_roll_id`. Only a referee
+    may pass one, and the server never returns it."""
+
+    @model_validator(mode="after")
+    def _one_source_of_dice(self) -> Self:
+        if self.ability_roll_id is not None and self.seed is not None:
+            raise ValueError("pass seed or ability_roll_id, not both: an ability roll has its own seed")
+        return self
 
 
 class GenerateCharacterRequest(CharacterChoices):
@@ -145,7 +154,19 @@ def _ability_roll(row: AbilityRollRow) -> AbilityRoll:
     )
 
 
-def _stored(row: CharacterDocumentRow, character: Character) -> StoredCharacter:
+def _roll_used(roll_id: str) -> ApiError:
+    return conflict("ability_roll_used", f"A character was already created from the ability roll {roll_id!r}.")
+
+
+def _derived(character: Character) -> DerivedValues:
+    try:
+        return derive(character)
+    except ValueError as error:
+        # A document can pass osrlib's model and still refer to an item osrlib doesn't have.
+        raise invalid("content_invalid", f"osrlib can't compute the character's values: {error}") from error
+
+
+def _stored(row: CharacterDocumentRow, character: Character, derived: DerivedValues) -> StoredCharacter:
     return StoredCharacter(
         id=row.id,
         name=row.name,
@@ -153,20 +174,18 @@ def _stored(row: CharacterDocumentRow, character: Character) -> StoredCharacter:
         level=row.level,
         created_at=row.created_at,
         character=character,
-        derived=derive(character),
+        derived=derived,
     )
 
 
-def _roll_used(roll_id: str) -> ApiError:
-    return conflict("ability_roll_used", f"A character was already created from the ability roll {roll_id!r}.")
-
-
 def _store(db: Database, client: str, character: Character, roll_id: str | None = None) -> StoredCharacter:
+    # The derived values come first, so a character osrlib can't compute them for is never stored.
+    derived = _derived(character)
     name, class_id, level, max_hp = character.name, character.class_id, character.level, character.max_hp
     document = character.to_document()
     if roll_id is None:
         row = db.insert_character(client, name=name, class_id=class_id, level=level, max_hp=max_hp, document=document)
-        return _stored(row, character)
+        return _stored(row, character, derived)
     created = db.insert_character_from_ability_roll(
         client, roll_id, name=name, class_id=class_id, level=level, max_hp=max_hp, document=document
     )
@@ -174,7 +193,7 @@ def _store(db: Database, client: str, character: Character, roll_id: str | None 
         if db.get_ability_roll(client, roll_id) is None:
             raise not_found("ability roll", roll_id)
         raise _roll_used(roll_id)
-    return _stored(created, character)
+    return _stored(created, character, derived)
 
 
 @router.post(
@@ -192,12 +211,17 @@ def create_ability_roll(
     Show the player the scores and `eligible_class_ids`, then pass the roll's `id` as
     `ability_roll_id` to `POST /v1/characters`. The body is optional.
 
+    The server stores the roll's seed with it, and the character created from the roll gets
+    its hit point and gold rolls from the same seed. So every attempt to create a character
+    from one roll gets the same rolls. The server doesn't limit how many rolls a client asks
+    for.
+
     A player who passes `seed` gets 403 `referee_required`.
     """
     seed = referee_seed(body.seed if body is not None else None, principal)
     rolled = roll_ability_scores(creation_stream(seed))
     row = _db(request).insert_ability_roll(
-        principal.client, scores={ability.value: score for ability, score in rolled.scores.items()}
+        principal.client, scores={ability.value: score for ability, score in rolled.scores.items()}, seed=seed
     )
     return _ability_roll(row)
 
@@ -223,27 +247,28 @@ def get_ability_roll(request: Request, principal: CurrentPrincipal, roll_id: str
 def create_character(request: Request, principal: CurrentPrincipal, body: CharacterRequest) -> StoredCharacter:
     """Create a first-level character from the player's choices, and store it.
 
-    With `ability_roll_id`, the character gets that roll's scores, and the roll becomes used.
-    Without it, the server rolls the scores first. Then osrlib checks the class, applies the
+    With `ability_roll_id`, the character gets that roll's scores, its hit points and gold come
+    from the roll's seed, and the roll becomes used. Without it, the server rolls the scores
+    first. Then osrlib checks the class, applies the
     ability adjustment, checks the first spells, rolls hit points, checks the extra languages,
     rolls starting gold, and buys and equips the gear, in that order.
 
     When a choice breaks a rule, the response is 422 `character_invalid`, with osrlib's
     `rejections` when it reports them, and the ability roll stays unused. A roll that already
     started a character gets 409 `ability_roll_used`. An unknown roll id gets 404. A player who
-    passes `seed` gets 403 `referee_required`.
+    passes `seed` gets 403 `referee_required`, and a request with both `seed` and
+    `ability_roll_id` gets 422 `validation_error`.
     """
-    seed = referee_seed(body.seed, principal)
     db = _db(request)
-    stream = creation_stream(seed)
     if body.ability_roll_id is None:
-        return _store(db, principal.client, roll_character(body, stream).character)
+        seed = referee_seed(body.seed, principal)
+        return _store(db, principal.client, roll_character(body, seed).character)
     roll = db.get_ability_roll(principal.client, body.ability_roll_id)
     if roll is None:
         raise not_found("ability roll", body.ability_roll_id)
     if roll.used:
         raise _roll_used(body.ability_roll_id)
-    character = character_from_scores(body, scores_from_json(roll.scores), stream)
+    character = character_from_roll(body, roll.seed, scores_from_json(roll.scores))
     return _store(db, principal.client, character, body.ability_roll_id)
 
 
@@ -261,12 +286,27 @@ def import_character(
 ) -> StoredCharacter:
     """Store a character from a character document, the format osrlib's `Character.to_document` writes.
 
-    The server clears the character's `id`, which a session gives each party member, because a
-    session assigns a new one when it starts. A document that isn't a valid character document
-    gets 422 `content_invalid`. A document stamped with a newer schema version than the
+    The server accepts any character osrlib's `Character` model accepts, like a fighter at level
+    14. It clears the character's `id`, because a session assigns each party member an id when it
+    starts.
+
+    A condition or a stat modifier that an effect granted refers to the effect by its
+    `effect_id`, and the effect belongs to the game the character came from. In a new session the
+    condition would never end, and the modifier would end with an unrelated effect that has the
+    same id. So a character with a stat modifier, or with a condition that has an `effect_id`,
+    gets 422 `content_invalid`. A condition with no `effect_id`, like `dead`, is accepted.
+
+    A document that isn't a valid character document, or that refers to an item osrlib doesn't
+    have, gets 422 `content_invalid`. A document stamped with a newer schema version than the
     server's osrlib reads gets 409 `version_unsupported`. Only a referee may import a character.
     """
     character = Character.from_document(document)
+    if character.stat_modifiers or any(condition.effect_id is not None for condition in character.conditions):
+        raise invalid(
+            "content_invalid",
+            "The character has conditions or stat modifiers from effects in another game. Remove `stat_modifiers` and "
+            "each condition with an `effect_id` before you import it.",
+        )
     character.id = None
     return _store(_db(request), principal.client, character)
 
@@ -300,7 +340,8 @@ def get_character(request: Request, principal: CurrentPrincipal, character_id: s
     row = _db(request).get_character(principal.client, character_id)
     if row is None:
         raise not_found("character", character_id)
-    return _stored(row, Character.from_document(row.document))
+    character = Character.from_document(row.document)
+    return _stored(row, character, _derived(character))
 
 
 @router.delete(
@@ -327,7 +368,7 @@ def generate_character(body: GenerateCharacterRequest) -> GeneratedCharacterResp
     when it reports them.
     """
     seed = seed_or_draw(body.seed)
-    generated = roll_character(body, creation_stream(seed))
+    generated = roll_character(body, seed)
     return GeneratedCharacterResponse(
-        seed=seed, character=generated.character, derived=derive(generated.character), rolls=generated.rolls
+        seed=seed, character=generated.character, derived=_derived(generated.character), rolls=generated.rolls
     )
