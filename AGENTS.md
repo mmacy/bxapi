@@ -6,7 +6,7 @@ Guidance for agents working on bxapi, an HTTP API for the 1981 B/X rules. Other 
 
 [osrlib](https://github.com/mmacy/osrlib-python) applies every game rule. bxapi is a FastAPI application that puts osrlib behind HTTP and adds authentication, storage, and one-at-a-time access to each game. `src/bxapi/app.py` builds the application. `settings.py` reads the `BXAPI_` environment variables, `auth.py` turns an API key into a client and a role, `errors.py` turns every failure into a problem document, and `db.py` is the only module that runs SQL. Each group of endpoints is one module in `src/bxapi/routers/`. `docs/spec.md` is the API's contract: read it before you add or change an endpoint, and change it in the same pull request when the API changes.
 
-osrlib is installed from PyPI. Its documentation is at <https://mmacy.github.io/osrlib-python/>. If the machine has a checkout at `~/repos/osr-suite/osrlib-python`, read the source and `docs/` there, but never edit it, and remember that `uv pip show osrlib` reports the version bxapi runs.
+osrlib is installed from PyPI, and the installed source in `.venv/lib/python3.14/site-packages/osrlib/` is the authority for every name, field, and behavior. Its documentation is at <https://mmacy.github.io/osrlib-python/>. A checkout of osrlib on the same machine, like `~/repos/osr-suite/osrlib-python`, can be many commits ahead of the release bxapi installs, so confirm anything you read there against the installed package, and never edit the checkout.
 
 ## Run and verify
 

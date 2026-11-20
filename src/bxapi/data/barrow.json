@@ -1,0 +1,547 @@
+{
+  "kind": "adventure",
+  "schema_version": 4,
+  "engine_version": "2.4.0",
+  "payload": {
+    "name": "The Barrow of the Forgotten King",
+    "description": "A plundered barrow outside town, and the idol the temple wants back.",
+    "hooks": [
+      "The temple pays 200 gp for the Jade Idol's return."
+    ],
+    "party": null,
+    "town": {
+      "name": "Threshold",
+      "description": "A walled market town at the edge of the moors.",
+      "services": [
+        "equipment",
+        "temple healing",
+        "treasure buyers"
+      ],
+      "travel_turns": {
+        "barrow": 2
+      }
+    },
+    "dungeons": [
+      {
+        "id": "barrow",
+        "name": "The Barrow",
+        "levels": [
+          {
+            "number": 1,
+            "width": 5,
+            "height": 1,
+            "edges": {
+              "1,0:west": {
+                "kind": "open",
+                "door": null
+              },
+              "2,0:west": {
+                "kind": "open",
+                "door": null
+              },
+              "3,0:west": {
+                "kind": "open",
+                "door": null
+              },
+              "4,0:west": {
+                "kind": "open",
+                "door": null
+              }
+            },
+            "areas": [
+              {
+                "id": "guard_room",
+                "name": "Guard room",
+                "description": "Broken spears and gnawed bones litter the flagstones.",
+                "cells": [
+                  [
+                    2,
+                    0
+                  ],
+                  [
+                    3,
+                    0
+                  ]
+                ],
+                "encounter": {
+                  "monsters": [
+                    {
+                      "template_id": "goblin",
+                      "count_dice": null,
+                      "count_fixed": 2
+                    }
+                  ],
+                  "alignment": null,
+                  "aware": false,
+                  "stance": null,
+                  "hoard": true
+                },
+                "features": [],
+                "trap": null,
+                "treasure": null
+              },
+              {
+                "id": "shrine",
+                "name": "Shrine of the Barrow King",
+                "description": "A toppled altar; something green glints beneath it.",
+                "cells": [
+                  [
+                    4,
+                    0
+                  ]
+                ],
+                "encounter": null,
+                "features": [
+                  {
+                    "id": "idol_shrine",
+                    "kind": "treasure_cache",
+                    "description": "The idol rests in a hollow under the altar stone.",
+                    "cell": [
+                      4,
+                      0
+                    ],
+                    "item_ids": [
+                      "jade-idol"
+                    ],
+                    "magic_item_ids": [],
+                    "coins": {
+                      "pp": 0,
+                      "gp": 50,
+                      "ep": 0,
+                      "sp": 0,
+                      "cp": 0
+                    },
+                    "valuables": [],
+                    "trap": null
+                  }
+                ],
+                "trap": null,
+                "treasure": null
+              }
+            ],
+            "features": [],
+            "transitions": [
+              {
+                "kind": "stairs_down",
+                "position": [
+                  4,
+                  0
+                ],
+                "side": null,
+                "to_dungeon_id": "barrow",
+                "to_level_number": 2,
+                "to_position": [
+                  0,
+                  0
+                ],
+                "to_facing": "east",
+                "requires": null
+              }
+            ],
+            "wandering": {
+              "chance_in_six": 0,
+              "interval_turns": 2,
+              "table": null
+            },
+            "entrance": [
+              0,
+              0
+            ],
+            "guidance": "Grave goods, not treasure: the barrow king was buried, not hoarded. Keep the goblins squalid and the shrine quiet."
+          },
+          {
+            "number": 2,
+            "width": 3,
+            "height": 1,
+            "edges": {
+              "1,0:west": {
+                "kind": "open",
+                "door": null
+              },
+              "2,0:west": {
+                "kind": "open",
+                "door": null
+              }
+            },
+            "areas": [
+              {
+                "id": "vault",
+                "name": "Looted vault",
+                "description": "Empty niches, but one flagstone sits proud of the floor.",
+                "cells": [
+                  [
+                    2,
+                    0
+                  ]
+                ],
+                "encounter": null,
+                "features": [],
+                "trap": null,
+                "treasure": {
+                  "letters": [],
+                  "unguarded": true
+                }
+              }
+            ],
+            "features": [],
+            "transitions": [
+              {
+                "kind": "stairs_up",
+                "position": [
+                  0,
+                  0
+                ],
+                "side": null,
+                "to_dungeon_id": "barrow",
+                "to_level_number": 1,
+                "to_position": [
+                  4,
+                  0
+                ],
+                "to_facing": "west",
+                "requires": null
+              }
+            ],
+            "wandering": {
+              "chance_in_six": 6,
+              "interval_turns": 1,
+              "table": {
+                "id": "barrow_rivals",
+                "label": "Barrow halls",
+                "min_level": 2,
+                "max_level": null,
+                "rows": [
+                  {
+                    "roll": 1,
+                    "name": "Basic Adventurers",
+                    "entry": {
+                      "kind": "npc_party",
+                      "party_kind": "basic"
+                    },
+                    "count_dice": null,
+                    "count_fixed": 2
+                  },
+                  {
+                    "roll": 2,
+                    "name": "Basic Adventurers",
+                    "entry": {
+                      "kind": "npc_party",
+                      "party_kind": "basic"
+                    },
+                    "count_dice": null,
+                    "count_fixed": 2
+                  },
+                  {
+                    "roll": 3,
+                    "name": "Basic Adventurers",
+                    "entry": {
+                      "kind": "npc_party",
+                      "party_kind": "basic"
+                    },
+                    "count_dice": null,
+                    "count_fixed": 2
+                  },
+                  {
+                    "roll": 4,
+                    "name": "Basic Adventurers",
+                    "entry": {
+                      "kind": "npc_party",
+                      "party_kind": "basic"
+                    },
+                    "count_dice": null,
+                    "count_fixed": 2
+                  },
+                  {
+                    "roll": 5,
+                    "name": "Basic Adventurers",
+                    "entry": {
+                      "kind": "npc_party",
+                      "party_kind": "basic"
+                    },
+                    "count_dice": null,
+                    "count_fixed": 2
+                  },
+                  {
+                    "roll": 6,
+                    "name": "Basic Adventurers",
+                    "entry": {
+                      "kind": "npc_party",
+                      "party_kind": "basic"
+                    },
+                    "count_dice": null,
+                    "count_fixed": 2
+                  },
+                  {
+                    "roll": 7,
+                    "name": "Basic Adventurers",
+                    "entry": {
+                      "kind": "npc_party",
+                      "party_kind": "basic"
+                    },
+                    "count_dice": null,
+                    "count_fixed": 2
+                  },
+                  {
+                    "roll": 8,
+                    "name": "Basic Adventurers",
+                    "entry": {
+                      "kind": "npc_party",
+                      "party_kind": "basic"
+                    },
+                    "count_dice": null,
+                    "count_fixed": 2
+                  },
+                  {
+                    "roll": 9,
+                    "name": "Basic Adventurers",
+                    "entry": {
+                      "kind": "npc_party",
+                      "party_kind": "basic"
+                    },
+                    "count_dice": null,
+                    "count_fixed": 2
+                  },
+                  {
+                    "roll": 10,
+                    "name": "Basic Adventurers",
+                    "entry": {
+                      "kind": "npc_party",
+                      "party_kind": "basic"
+                    },
+                    "count_dice": null,
+                    "count_fixed": 2
+                  },
+                  {
+                    "roll": 11,
+                    "name": "Basic Adventurers",
+                    "entry": {
+                      "kind": "npc_party",
+                      "party_kind": "basic"
+                    },
+                    "count_dice": null,
+                    "count_fixed": 2
+                  },
+                  {
+                    "roll": 12,
+                    "name": "Basic Adventurers",
+                    "entry": {
+                      "kind": "npc_party",
+                      "party_kind": "basic"
+                    },
+                    "count_dice": null,
+                    "count_fixed": 2
+                  },
+                  {
+                    "roll": 13,
+                    "name": "Basic Adventurers",
+                    "entry": {
+                      "kind": "npc_party",
+                      "party_kind": "basic"
+                    },
+                    "count_dice": null,
+                    "count_fixed": 2
+                  },
+                  {
+                    "roll": 14,
+                    "name": "Basic Adventurers",
+                    "entry": {
+                      "kind": "npc_party",
+                      "party_kind": "basic"
+                    },
+                    "count_dice": null,
+                    "count_fixed": 2
+                  },
+                  {
+                    "roll": 15,
+                    "name": "Basic Adventurers",
+                    "entry": {
+                      "kind": "npc_party",
+                      "party_kind": "basic"
+                    },
+                    "count_dice": null,
+                    "count_fixed": 2
+                  },
+                  {
+                    "roll": 16,
+                    "name": "Basic Adventurers",
+                    "entry": {
+                      "kind": "npc_party",
+                      "party_kind": "basic"
+                    },
+                    "count_dice": null,
+                    "count_fixed": 2
+                  },
+                  {
+                    "roll": 17,
+                    "name": "Basic Adventurers",
+                    "entry": {
+                      "kind": "npc_party",
+                      "party_kind": "basic"
+                    },
+                    "count_dice": null,
+                    "count_fixed": 2
+                  },
+                  {
+                    "roll": 18,
+                    "name": "Basic Adventurers",
+                    "entry": {
+                      "kind": "npc_party",
+                      "party_kind": "basic"
+                    },
+                    "count_dice": null,
+                    "count_fixed": 2
+                  },
+                  {
+                    "roll": 19,
+                    "name": "Basic Adventurers",
+                    "entry": {
+                      "kind": "npc_party",
+                      "party_kind": "basic"
+                    },
+                    "count_dice": null,
+                    "count_fixed": 2
+                  },
+                  {
+                    "roll": 20,
+                    "name": "Basic Adventurers",
+                    "entry": {
+                      "kind": "npc_party",
+                      "party_kind": "basic"
+                    },
+                    "count_dice": null,
+                    "count_fixed": 2
+                  }
+                ],
+                "overrides_applied": []
+              }
+            },
+            "entrance": null,
+            "guidance": "Somebody else is always down here first. Rivals are rude, not evil."
+          }
+        ]
+      }
+    ],
+    "monsters": [],
+    "items": [
+      {
+        "item_type": "gear",
+        "id": "jade-idol",
+        "name": "Jade Idol of the Barrow King",
+        "cost_gp": 0,
+        "lot_size": 1,
+        "capacity_coins": null,
+        "combat": null,
+        "params": {},
+        "overrides_applied": []
+      }
+    ],
+    "triggers": [],
+    "quests": [
+      {
+        "id": "the-idol",
+        "name": "The Jade Idol",
+        "activation": {
+          "pattern": {
+            "pattern_type": "dungeon_entered",
+            "dungeon_id": "barrow"
+          },
+          "conditions": []
+        },
+        "objectives": [
+          {
+            "id": "recover-idol",
+            "name": "Recover the idol",
+            "when": {
+              "pattern": {
+                "pattern_type": "item_acquired",
+                "item_id": "jade-idol"
+              },
+              "conditions": []
+            },
+            "hidden": false,
+            "reveal_when": null,
+            "narrative": {
+              "refusal": "",
+              "success": "",
+              "fired": "",
+              "offer": "",
+              "progress": "The idol comes up out of the hollow, cold as well-water.",
+              "completion": "",
+              "journal": "",
+              "guidance": "",
+              "speaker": ""
+            }
+          },
+          {
+            "id": "return-home",
+            "name": "Bring it home",
+            "when": {
+              "pattern": {
+                "pattern_type": "town_entered"
+              },
+              "conditions": [
+                {
+                  "condition_type": "has_item",
+                  "item_id": "jade-idol",
+                  "consumes": false
+                }
+              ]
+            },
+            "hidden": false,
+            "reveal_when": null,
+            "narrative": {
+              "refusal": "",
+              "success": "",
+              "fired": "",
+              "offer": "",
+              "progress": "Threshold's gate shuts behind you with the idol inside it.",
+              "completion": "",
+              "journal": "",
+              "guidance": "",
+              "speaker": ""
+            }
+          }
+        ],
+        "rewards": [
+          {
+            "command_type": "grant_coins",
+            "source": null,
+            "character_id": "@first",
+            "coins": {
+              "pp": 0,
+              "gp": 200,
+              "ep": 0,
+              "sp": 0,
+              "cp": 0
+            }
+          },
+          {
+            "command_type": "award_xp",
+            "source": null,
+            "character_id": "@party",
+            "amount": 1200
+          },
+          {
+            "command_type": "set_flag",
+            "source": null,
+            "key": "quest.idol",
+            "value": "recovered"
+          }
+        ],
+        "completion": "all",
+        "concludes_adventure": true,
+        "narrative": {
+          "refusal": "",
+          "success": "",
+          "fired": "",
+          "offer": "The temple wants the Jade Idol off the barrow king's altar and back on its own.",
+          "progress": "",
+          "completion": "The almoner counts out the reward without looking up. The idol is home.",
+          "journal": "",
+          "guidance": "",
+          "speaker": "the temple almoner"
+        }
+      }
+    ]
+  }
+}
