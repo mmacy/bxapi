@@ -4,19 +4,29 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from osrlib.core.abilities import AbilityScore
+from osrlib.core.abilities import AbilityAdjustment, AbilityScore, apply_adjustment, validate_adjustment
 from osrlib.core.alignment import Alignment
-from osrlib.core.character import CHARACTER_CREATION_STREAM, Character, create_character, roll_ability_scores
-from osrlib.core.classes import level_title, xp_modifier_pct
+from osrlib.core.character import (
+    CHARACTER_CREATION_STREAM,
+    Character,
+    CharacterCreationResult,
+    create_character,
+    roll_ability_scores,
+    validate_class_choice,
+)
+from osrlib.core.classes import ClassDefinition, level_title, xp_modifier_pct
+from osrlib.core.items import ItemInstance, MagicItemCategory, validate_equip
 from osrlib.core.rng import RngStreams
 from osrlib.core.ruleset import Ruleset
-from osrlib.data import load_classes
+from osrlib.core.spells import caster_profile
+from osrlib.data import load_ability_tables, load_classes, load_equipment, load_languages, load_magic_items, load_spells
 
-from bxapi.creation import eligible_class_ids
 from bxapi.db import CharacterDocumentRow, Database
 from bxapi.settings import Settings
 
 FIGHTER = {"name": "Hild", "class_id": "fighter", "alignment": "lawful"}
+CLASS_IDS = [definition.id for definition in load_classes().classes]
+MAX_OFFSET = 2**53 - 1
 GEAR = {"purchases": [{"item_id": "leather", "quantity": 1}, {"item_id": "dagger"}], "equip_item_ids": ["leather"]}
 
 DERIVED_KEYS = {
@@ -60,15 +70,98 @@ def expected_derived(character: Character) -> dict[str, Any]:
     }
 
 
-def osrlib_character(seed: int, **choices: Any) -> Any:
+def osrlib_character(
+    seed: int, class_id: str = "fighter", *, hp_reroll: bool = False, **choices: Any
+) -> CharacterCreationResult:
     return create_character(
         name="Hild",
-        class_id="fighter",
+        class_id=class_id,
         alignment=Alignment.LAWFUL,
-        ruleset=Ruleset(),
+        ruleset=Ruleset(hp_reroll_at_first_level=hp_reroll),
         stream=RngStreams(master_seed=seed).get(CHARACTER_CREATION_STREAM),
         **choices,
     )
+
+
+def osrlib_eligible(scores: dict[str, int]) -> list[str]:
+    table = {AbilityScore(key): value for key, value in scores.items()}
+    return [definition.id for definition in load_classes().classes if not validate_class_choice(table, definition)]
+
+
+def legal_choices(definition: ClassDefinition, seed: int) -> dict[str, Any] | None:
+    """Return osrlib's arguments for a character that uses every choice, or `None` if this seed can't have one.
+
+    The choices are a legal adjustment, an extra language, a first spell for an arcane caster, a
+    weapon the class may wield, and a torch.
+    """
+    scores = roll_ability_scores(RngStreams(master_seed=seed).get(CHARACTER_CREATION_STREAM)).scores
+    if validate_class_choice(scores, definition):
+        return None
+    primes, fixed = definition.prime_requisites, definition.may_not_lower
+    adjustment = None
+    for lowered in (AbilityScore.WIS, AbilityScore.STR, AbilityScore.INT):
+        for raised in primes:
+            candidate = AbilityAdjustment(lowered={lowered: 2}, raised={raised: 1})
+            if validate_adjustment(scores, candidate, primes, fixed):
+                continue
+            adjusted = apply_adjustment(scores, candidate, primes, fixed)
+            if load_ability_tables().additional_languages(adjusted[AbilityScore.INT]) >= 1:
+                adjustment = candidate
+    if adjustment is None:
+        return None
+    language = next(
+        entry.id for entry in load_languages().languages if entry.choosable and entry.id not in definition.languages
+    )
+    profile = caster_profile(definition)
+    spells = [load_spells().by_list(profile.spell_list, 1)[0].id] if profile and profile.kind == "arcane" else []
+    weapon = next(
+        template
+        for template in load_equipment().weapons
+        if template.cost_gp <= 10 and not validate_equip(definition, ItemInstance(template=template))
+    )
+    return {
+        "adjustment": adjustment,
+        "starting_spell_ids": spells,
+        "extra_languages": [language],
+        "purchases": [(weapon.id, 1), ("torch", 1)],
+        "equip_ids": [weapon.id],
+    }
+
+
+def request_body(class_id: str, choices: dict[str, Any], *, hp_reroll: bool) -> dict[str, Any]:
+    """Return the API's body for the osrlib arguments `legal_choices` returns."""
+    return FIGHTER | {
+        "class_id": class_id,
+        "adjustment": choices["adjustment"].model_dump(mode="json"),
+        "starting_spell_ids": choices["starting_spell_ids"],
+        "extra_languages": choices["extra_languages"],
+        "purchases": [{"item_id": item_id, "quantity": lots} for item_id, lots in choices["purchases"]],
+        "equip_item_ids": choices["equip_ids"],
+        "hp_reroll_at_first_level": hp_reroll,
+    }
+
+
+def full_cases(class_id: str, *, hp_reroll: bool, count: int = 3) -> list[tuple[int, dict[str, Any]]]:
+    """Return seeds, with their choices, for which osrlib creates the character with every choice.
+
+    With `hp_reroll`, each seed's first hit die shows 1 or 2, so the reroll changes the hit points.
+    """
+    definition = load_classes().get(class_id)
+    found: list[tuple[int, dict[str, Any]]] = []
+    for seed in range(5000):
+        choices = legal_choices(definition, seed)
+        if choices is None:
+            continue
+        try:
+            result = osrlib_character(seed, class_id, hp_reroll=hp_reroll, **choices)
+        except ValueError:
+            continue
+        if hp_reroll and len(result.hit_point_roll.rolls) == 1:
+            continue
+        found.append((seed, choices))
+        if len(found) == count:
+            return found
+    raise AssertionError(f"no {count} seeds below 5000 give a {class_id} every choice")
 
 
 def rolled_scores(seed: int) -> dict[str, int]:
@@ -99,17 +192,20 @@ def test_a_referee_roll_matches_osrlib_and_lists_the_eligible_classes(referee: T
     assert set(body) == {"id", "scores", "eligible_class_ids", "used", "created_at"}
     assert body["id"].startswith("rol_")
     assert body["scores"] == rolled_scores(7)
-    scores = {AbilityScore(key): value for key, value in body["scores"].items()}
-    assert body["eligible_class_ids"] == eligible_class_ids(scores)
+    assert body["eligible_class_ids"] == osrlib_eligible(body["scores"])
     assert body["used"] is False
     assert "seed" not in body
+    assert "seed" not in referee.get(f"/v1/ability-rolls/{body['id']}").json()
 
 
-def test_eligible_classes_come_from_osrlib() -> None:
-    scores = dict.fromkeys(AbilityScore, 12)
-    scores[AbilityScore.CON] = 7
-    every = [definition.id for definition in load_classes().classes]
-    assert eligible_class_ids(scores) == [class_id for class_id in every if class_id not in {"dwarf", "halfling"}]
+def test_eligible_classes_come_from_osrlib(referee: TestClient) -> None:
+    every = set(CLASS_IDS)
+    narrowed = 0
+    for seed in range(60):
+        body = referee.post("/v1/ability-rolls", json={"seed": seed}).json()
+        assert body["eligible_class_ids"] == osrlib_eligible(body["scores"])
+        narrowed += set(body["eligible_class_ids"]) != every
+    assert narrowed, "no seed rolled scores that miss a class's requirements"
 
 
 def test_a_player_rolls_without_a_body_but_not_with_a_seed(player: TestClient) -> None:
@@ -150,18 +246,64 @@ def test_the_stored_document_is_the_osrlib_document(referee: TestClient, keyed_s
     assert row.max_hp == character.max_hp
 
 
-def test_a_character_from_a_roll_uses_its_scores_and_draws_hp_and_gold(referee: TestClient) -> None:
-    roll = referee.post("/v1/ability-rolls", json={"seed": 21}).json()
-    body = FIGHTER | {"ability_roll_id": roll["id"], "seed": 5}
-    stored = referee.post("/v1/characters", json=body).json()
-    assert stored["character"]["scores"] == roll["scores"]
-    # With no ability roll to make, the hit points and the gold are the first draws of the stream.
-    stream = RngStreams(master_seed=5).get(CHARACTER_CREATION_STREAM)
-    fighter = load_classes().get("fighter")
-    character = Character.model_validate(stored["character"])
-    first_die = stream.randbelow(fighter.row(1).hit_dice.die) + 1
-    assert character.max_hp == max(1, first_die + character.hit_point_modifier)
-    assert referee.get(f"/v1/ability-rolls/{roll['id']}").json()["used"] is True
+@pytest.mark.parametrize("path", ["generate", "ability roll"])
+@pytest.mark.parametrize("hp_reroll", [False, True])
+@pytest.mark.parametrize("class_id", CLASS_IDS)
+def test_every_choice_matches_osrlib_create_character(
+    referee: TestClient, class_id: str, hp_reroll: bool, path: str
+) -> None:
+    for seed, choices in full_cases(class_id, hp_reroll=hp_reroll):
+        expected = osrlib_character(seed, class_id, hp_reroll=hp_reroll, **choices).character
+        body = request_body(class_id, choices, hp_reroll=hp_reroll)
+        if path == "generate":
+            response = referee.post("/v1/generate/character", json=body | {"seed": seed})
+            assert response.status_code == 200, response.text
+        else:
+            roll = referee.post("/v1/ability-rolls", json={"seed": seed}).json()
+            response = referee.post("/v1/characters", json=body | {"ability_roll_id": roll["id"]})
+            assert response.status_code == 201, response.text
+        made = response.json()
+        assert made["character"] == expected.model_dump(mode="json"), f"seed {seed}"
+        assert made["derived"] == expected_derived(expected)
+
+
+def test_a_roll_decides_the_hit_points_and_the_gold(referee: TestClient) -> None:
+    for seed in range(20):
+        roll = referee.post("/v1/ability-rolls", json={"seed": seed}).json()
+        # The server rolls the scores again from the stored seed, and gets the stored scores.
+        assert roll["scores"] == rolled_scores(seed)
+        if "fighter" not in roll["eligible_class_ids"]:
+            continue
+        stored = referee.post("/v1/characters", json=FIGHTER | {"ability_roll_id": roll["id"]}).json()
+        expected = osrlib_character(seed).character
+        assert stored["character"] == expected.model_dump(mode="json")
+        assert stored["character"]["inventory"]["purse"]["gp"] == expected.inventory.purse.gp
+        assert stored["character"]["max_hp"] == expected.max_hp
+
+
+def test_retrying_a_refused_creation_never_changes_the_gold(referee: TestClient) -> None:
+    # A player who could retry for a new gold roll would ask for gear only a high roll covers.
+    seed = 3
+    gold = osrlib_character(seed).gold_roll.total
+    dagger = load_equipment().get("dagger").cost_gp
+    roll = referee.post("/v1/ability-rolls", json={"seed": seed}).json()
+    greedy = FIGHTER | {
+        "ability_roll_id": roll["id"],
+        "purchases": [{"item_id": "dagger", "quantity": gold // dagger + 1}],
+    }
+    refusals = [referee.post("/v1/characters", json=greedy) for _ in range(100)]
+    assert {response.status_code for response in refusals} == {422}
+    assert len({response.text for response in refusals}) == 1
+    affordable = greedy | {"purchases": [{"item_id": "dagger", "quantity": gold // dagger}]}
+    stored = referee.post("/v1/characters", json=affordable).json()
+    assert stored["character"]["inventory"]["purse"]["gp"] == gold - (gold // dagger) * dagger
+
+
+def test_a_seed_with_an_ability_roll_is_a_validation_error(referee: TestClient) -> None:
+    roll = referee.post("/v1/ability-rolls").json()
+    response = referee.post("/v1/characters", json=FIGHTER | {"ability_roll_id": roll["id"], "seed": 5})
+    assert (response.status_code, response.json()["code"]) == (422, "validation_error")
+    assert referee.get(f"/v1/ability-rolls/{roll['id']}").json()["used"] is False
 
 
 def test_rejections_are_osrlibs(referee: TestClient) -> None:
@@ -201,15 +343,44 @@ def test_each_refused_step_is_character_invalid(
 
 
 @pytest.mark.parametrize(
-    "choices",
-    [{"class_id": "no_such_class"}, {"purchases": [{"item_id": "no_such_item"}]}, {"equip_item_ids": ["sword"]}],
+    ("choices", "members"),
+    [
+        ({"class_id": "no_such_class"}, {"field": "class_id", "id": "no_such_class"}),
+        (
+            {"purchases": [{"item_id": "dagger"}, {"item_id": "no_such_item"}]},
+            {"field": "purchases", "index": 1, "id": "no_such_item"},
+        ),
+        (
+            {"purchases": [{"item_id": "dagger"}], "equip_item_ids": ["dagger", "sword"]},
+            {"field": "equip_item_ids", "index": 1, "id": "sword"},
+        ),
+    ],
 )
-def test_an_unknown_id_or_an_unbought_item_is_character_invalid_without_rejections(
-    player: TestClient, choices: dict[str, Any]
+def test_an_input_osrlib_has_no_rejection_for_is_located(
+    player: TestClient, choices: dict[str, Any], members: dict[str, Any]
 ) -> None:
     problem = player.post("/v1/characters", json=FIGHTER | choices).json()
     assert problem["code"] == "character_invalid"
     assert "rejections" not in problem
+    assert {key: problem.get(key) for key in ("field", "index", "id")} == {"index": None} | members
+
+
+@pytest.mark.parametrize(
+    ("purchases", "index"),
+    [([{"item_id": "dagger", "quantity": 2}], 1), ([{"item_id": "dagger"}, {"item_id": "dagger"}], 2)],
+)
+def test_equipping_more_than_was_bought_says_so(
+    player: TestClient, purchases: list[dict[str, Any]], index: int
+) -> None:
+    body = FIGHTER | {"purchases": purchases, "equip_item_ids": ["dagger", "dagger", "dagger"]}
+    problem = player.post("/v1/characters", json=body).json()
+    assert (problem["code"], problem["field"], problem["index"], problem["id"]) == (
+        "character_invalid",
+        "equip_item_ids",
+        index,
+        "dagger",
+    )
+    assert "more times than the purchases buy it" in problem["detail"]
 
 
 @pytest.mark.parametrize(
@@ -219,6 +390,10 @@ def test_an_unknown_id_or_an_unbought_item_is_character_invalid_without_rejectio
         FIGHTER | {"name": ""},
         FIGHTER | {"alignment": "evil"},
         FIGHTER | {"purchases": [{"item_id": "dagger", "quantity": 0}]},
+        FIGHTER | {"purchases": [{"item_id": "dagger", "quantity": 10_001}]},
+        FIGHTER | {"purchases": [{"item_id": "dagger", "quantity": 10**30}]},
+        FIGHTER | {"name": "x" * 101},
+        FIGHTER | {"name": "x" * 7_000_000},
         FIGHTER | {"purchases": [{"item_id": "dagger", "lots": 1}]},
         FIGHTER | {"adjustment": {"lowered": {"int": -2}}},
         FIGHTER | {"seed": -1},
@@ -282,7 +457,7 @@ def test_import_stores_the_document_and_clears_the_session_id(referee: TestClien
 
 
 def test_import_errors(referee: TestClient, player: TestClient) -> None:
-    document = osrlib_character(4).character.to_document()
+    document: dict[str, Any] = osrlib_character(4).character.to_document()
     refused = player.post("/v1/characters/import", json=document)
     assert (refused.status_code, refused.json()["code"]) == (403, "referee_required")
     newer = referee.post("/v1/characters/import", json=document | {"schema_version": 10**6})
@@ -365,3 +540,88 @@ def test_the_openapi_document_names_and_tags_the_operations(client: TestClient) 
         assert operation["operationId"] == operation_id
         assert operation["tags"] == (["generate"] if "generate" in path else ["characters"])
         assert operation["summary"] and operation["description"]
+
+
+def test_the_largest_name_and_quantity_reach_osrlib(player: TestClient) -> None:
+    assert player.post("/v1/characters", json=FIGHTER | {"name": "x" * 100}).status_code == 201
+    costly = FIGHTER | {"purchases": [{"item_id": "dagger", "quantity": 10_000}]}
+    assert player.post("/v1/characters", json=costly).json()["code"] == "character_invalid"
+
+
+def test_a_name_of_spaces_is_kept_as_osrlib_keeps_it(player: TestClient) -> None:
+    assert osrlib_character(1).character.model_copy(update={"name": "   "}).name == "   "
+    stored = player.post("/v1/characters", json=FIGHTER | {"name": "   "})
+    assert stored.status_code == 201
+    assert stored.json()["character"]["name"] == "   "
+
+
+# Imports that osrlib's model accepts but the server refuses
+
+
+def magic_item(template_id: str, **fields: Any) -> dict[str, Any]:
+    return {"instance_type": "magic_item", "instance_id": "magic-item-0001", "template_id": template_id, **fields}
+
+
+def magic_armour_id() -> str:
+    """Return a magic armour whose armour class osrlib computes from its `base_item_id`."""
+    return next(
+        template.id
+        for template in load_magic_items().items
+        if template.category is MagicItemCategory.ARMOUR and template.ac_set is None
+    )
+
+
+@pytest.mark.parametrize(
+    ("slot", "value"),
+    [
+        ("worn_armour", magic_item("no_such_item")),
+        ("rings", [magic_item("no_such_ring")]),
+        ("worn_armour", magic_item(magic_armour_id(), base_item_id="no_such_armour")),
+    ],
+)
+def test_an_import_osrlib_cant_compute_values_for_stores_nothing(referee: TestClient, slot: str, value: Any) -> None:
+    document: dict[str, Any] = osrlib_character(4).character.to_document()
+    document["payload"]["inventory"][slot] = value
+    Character.from_document(document)
+    response = referee.post("/v1/characters/import", json=document)
+    assert (response.status_code, response.json()["code"]) == (422, "content_invalid")
+    assert referee.get("/v1/characters").json()["total"] == 0
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"conditions": [{"condition": "asleep", "effect_id": "effect-0001"}]},
+        {"stat_modifiers": [{"kind": "ac_bonus", "value": 2, "effect_id": "effect-0001"}]},
+    ],
+)
+def test_an_import_with_effects_from_another_game_is_refused(referee: TestClient, fields: dict[str, Any]) -> None:
+    document: dict[str, Any] = osrlib_character(4).character.to_document()
+    document["payload"] |= fields
+    Character.from_document(document)
+    response = referee.post("/v1/characters/import", json=document)
+    assert (response.status_code, response.json()["code"]) == (422, "content_invalid")
+    assert referee.get("/v1/characters").json()["total"] == 0
+
+
+def test_an_import_accepts_what_osrlibs_model_accepts(referee: TestClient) -> None:
+    veteran = osrlib_character(4).character.model_copy(update={"level": 14, "xp": 2_400_000})
+    document: dict[str, Any] = veteran.to_document()
+    document["payload"]["conditions"] = [{"condition": "dead", "effect_id": None}]
+    response = referee.post("/v1/characters/import", json=document)
+    assert response.status_code == 201, response.text
+    assert response.json()["level"] == 14
+    assert response.json()["character"]["conditions"] == [{"condition": "dead", "effect_id": None}]
+
+
+# Offsets
+
+
+@pytest.mark.parametrize("path", ["/v1/characters", "/v1/rules/classes", "/v1/adventures"])
+def test_the_largest_offset_is_an_empty_page(player: TestClient, path: str) -> None:
+    page = player.get(path, params={"offset": MAX_OFFSET})
+    assert page.status_code == 200
+    assert (page.json()["items"], page.json()["offset"]) == ([], MAX_OFFSET)
+    too_far = player.get(path, params={"offset": MAX_OFFSET + 1})
+    assert (too_far.status_code, too_far.json()["code"]) == (422, "validation_error")
+    assert player.get(path, params={"offset": 10**30}).json()["code"] == "validation_error"

@@ -16,7 +16,7 @@ This file is the contract for version 1 of the API. `AGENTS.md` is the guide for
 ## Conventions
 
 - **Base path.** Every endpoint except `GET /health` is under `/v1`.
-- **Bodies.** Requests and responses are JSON. Field names are snake_case. A request body with a field the endpoint doesn't define gets 422 `validation_error`. A body that is an osrlib model, like a command, is the exception: osrlib ignores unknown fields.
+- **Bodies.** Requests and responses are JSON. Field names are snake_case. A request body with a field the endpoint doesn't define gets 422 `validation_error`. A body or a field that is an osrlib model, like a command or a character's `adjustment`, is the exception: osrlib ignores unknown fields.
 - **Identifiers.** A stored resource has an id made of a prefix and 22 random URL-safe characters: `chr_` for a character, `rol_` for an ability roll, `adv_` for an adventure, `ses_` for a session, and `sav_` for a save. An adventure that comes with the server has an id that starts with `builtin-`.
 - **Timestamps.** UTC, in RFC 3339 format with whole seconds, like `2026-11-20T22:01:05Z`.
 - **Lists.** A list endpoint takes `limit` (1 to 200, default 50) and `offset` (default 0), and returns `{"items": [...], "total": n, "limit": n, "offset": n}`. Stored resources are listed newest first.
@@ -55,8 +55,8 @@ Every error response is an RFC 9457 problem document with the media type `applic
 | 409 | `version_unsupported` | A document is stamped with a schema version newer than the server's osrlib. | |
 | 413 | `content_too_large` | The request body is larger than `BXAPI_MAX_BODY_BYTES`. | |
 | 422 | `validation_error` | The request doesn't match the endpoint's schema. | `errors`, pydantic's list |
-| 422 | `content_invalid` | osrlib refused a document or a value as malformed. | |
-| 422 | `character_invalid` | The choices for a new character break a rule, or name a class or an item osrlib doesn't have. | `rejections`, when osrlib reports them |
+| 422 | `content_invalid` | osrlib refused a document or a value as malformed, or the server refused an imported character. | |
+| 422 | `character_invalid` | The choices for a new character break a rule, or name a class or an item osrlib doesn't have. | `rejections`, when osrlib reports them. Otherwise `field`, the request field that's wrong, like `equip_item_ids`, `index`, the entry's position when `field` is a list, and `id`, the value of that entry. |
 | 422 | `party_invalid` | The characters named for a new session can't form a party: osrlib refused the party, or two members have the same id. | |
 | 500 | `internal_error` | A bug. The response says nothing about the cause, and the server logs the traceback. | |
 
@@ -115,11 +115,11 @@ A dice expression osrlib can't parse gets 422 `content_invalid`. An unknown mons
 
 The server rolls a character and stores it. A session copies the characters it starts with, so a stored character stays as it was created and can start any number of sessions.
 
-B/X players roll ability scores before they choose a class. To support that, a client first asks for an *ability roll*, shows the player the scores and the classes they qualify for, and then creates the character from that roll.
+B/X players roll ability scores before they choose a class. To support that, a client first asks for an *ability roll*, shows the player the scores and the classes they qualify for, and then creates the character from that roll. The server rolls the scores from a seed and stores the seed with the roll, and it never returns that seed. The character created from the roll gets its hit point and gold rolls from the same seed, so every attempt to create a character from one roll gets the same rolls. bxapi doesn't limit how many ability rolls a client asks for, so a game that wants a limit enforces it.
 
 | Method and path | Role | Body | Returns |
 | --- | --- | --- | --- |
-| `POST /v1/ability-rolls` | player | `seed` (referee only). The body is optional. | 201: the roll: `id`, `scores`, `eligible_class_ids`, `used` (`false`), `created_at` |
+| `POST /v1/ability-rolls` | player | `seed` (referee only), which decides the scores and the hit point and gold rolls. The body is optional. | 201: the roll: `id`, `scores`, `eligible_class_ids`, `used` (`false`), `created_at` |
 | `GET /v1/ability-rolls/{roll_id}` | player | | The roll, with `used` set to whether a character was created from it. |
 | `POST /v1/characters` | player | See below. | 201: the stored character. |
 | `POST /v1/characters/import` | referee | A character document. | 201: the stored character. |
@@ -131,17 +131,17 @@ The body of `POST /v1/characters`:
 
 | Field | Required | Meaning |
 | --- | --- | --- |
-| `name` | yes | The character's name. |
+| `name` | yes | The character's name, 1 to 100 characters. osrlib accepts a name of spaces. |
 | `class_id` | yes | A class id from `/v1/rules/classes`. |
 | `alignment` | yes | `lawful`, `neutral`, or `chaotic`. |
-| `ability_roll_id` | no | Create the character from these scores. Without it, the server rolls the scores as part of the request. |
-| `adjustment` | no | A trade of ability points, as osrlib's `AbilityAdjustment`. |
+| `ability_roll_id` | no | Create the character from these scores, with the hit point and gold rolls of the roll's seed. Without it, the server rolls the scores as part of the request. |
+| `adjustment` | no | A trade of ability points, as osrlib's `AbilityAdjustment`: `lowered` and `raised`, each a map from an ability to a number of points. osrlib checks the trade. |
 | `starting_spell_ids` | no | An arcane caster's first spells. |
 | `extra_languages` | no | The extra languages a high Intelligence allows. |
-| `purchases` | no | Starting gear to buy, in order: a list of `{item_id, quantity}`. `quantity` is a number of osrlib's purchase lots, 1 or more, and defaults to 1. One lot of gear or ammunition is a bundle, like six torches. |
+| `purchases` | no | Starting gear to buy, in order: a list of `{item_id, quantity}`. `quantity` is a number of osrlib's purchase lots, from 1 to 10,000, and defaults to 1. osrlib sells weapons and armour one at a time, and gear and ammunition in bundles, so one lot of torches is six torches. |
 | `equip_item_ids` | no | Which purchased items to equip. |
 | `hp_reroll_at_first_level` | no | The optional rule that rerolls a first hit die of 1 or 2. Default `false`. |
-| `seed` | no | Referee only. |
+| `seed` | no | Referee only. A request with both `seed` and `ability_roll_id` gets 422 `validation_error`, because the roll's seed decides the rolls. |
 
 `scores` is osrlib's score table, keyed by `str`, `int`, `wis`, `dex`, `con`, and `cha`. `eligible_class_ids` lists, in osrlib's class order, each class for which osrlib's `validate_class_choice` returns no rejections.
 
@@ -156,11 +156,13 @@ A stored character is `{id, name, class_id, level, created_at, character, derive
 
 `derived` leaves out the movement rate, because it depends on the ruleset of the session that plays the character.
 
-The server creates a character with osrlib's step-by-step creation functions, in the order osrlib lists them: roll the scores (unless the request names an ability roll), check the class, check and apply the adjustment, check the first spells, roll hit points, check the extra languages, roll starting gold, buy each purchase, and equip each item. The first step that refuses a choice ends the creation with 422 `character_invalid`. The response includes osrlib's `rejections` when that step returns them. A class id or an item id osrlib doesn't have, and an id in `equip_item_ids` that isn't among the purchases, get 422 `character_invalid` with no `rejections`. A malformed body, like an unknown `alignment` or a `quantity` of 0, gets 422 `validation_error`.
+The server creates a character with osrlib's step-by-step creation functions, in the order osrlib lists them: roll the scores (unless the request names an ability roll), check the class, check and apply the adjustment, check the first spells, roll hit points, check the extra languages, roll starting gold, buy each purchase, and equip each item. The first step that refuses a choice ends the creation with 422 `character_invalid`. The response includes osrlib's `rejections` when that step returns them. A class id or an item id osrlib doesn't have, and an id in `equip_item_ids` that the purchases don't buy, or don't buy as many times, get 422 `character_invalid` with `field`, `index`, and `id` instead of `rejections`. Equipping a purchase equips all of it, whatever its `quantity`. A malformed body, like an unknown `alignment`, a `quantity` of 0, or a name longer than 100 characters, gets 422 `validation_error`.
 
-When a choice breaks a rule, an ability roll named in the request stays unused. A successful creation marks the roll used and stores the character in one database transaction, so two creations from one roll never both succeed, and a used roll always has a character. A second creation from the same roll gets 409 `ability_roll_used`. An `ability_roll_id` that matches no roll of the caller's client gets 404.
+When a choice breaks a rule, an ability roll named in the request stays unused. A successful creation marks the roll used and stores the character in one database transaction, so two creations from one roll never both succeed, and a failed creation never marks the roll used. Deleting the character doesn't free the roll. A second creation from the same roll gets 409 `ability_roll_used`. An `ability_roll_id` that matches no roll of the caller's client gets 404.
 
-The `document` column of a `characters` row is what osrlib's `Character.to_document` returns for the stored character. `POST /v1/characters/import` accepts the same document. It stores the character with its `id` cleared, because a session assigns each party member an id when it starts. A document that isn't a valid character document gets 422 `content_invalid`, and one stamped with a newer schema version gets 409 `version_unsupported`.
+The `document` column of a `characters` row is what osrlib's `Character.to_document` returns for the stored character. `POST /v1/characters/import` accepts the same document, with any character osrlib's `Character` model accepts, like a fighter at level 14. It stores the character with its `id` cleared, because a session assigns each party member an id when it starts. The server builds `derived` before it stores anything. A document that isn't a valid character document gets 422 `content_invalid`, and so does a character osrlib can't compute `derived` for, like one that wears a magic item osrlib doesn't have. A document stamped with a newer schema version gets 409 `version_unsupported`.
+
+An import also gets 422 `content_invalid` when the character has a stat modifier, or a condition with an `effect_id`. Each of these refers to an effect in the game the character came from. In a new session such a condition would never end, and osrlib would remove such a modifier when an unrelated effect with the same `effect_id` ended. A condition with no `effect_id`, like `dead`, is accepted.
 
 `POST /v1/generate/character` runs the same steps and stores nothing. Its `rolls` is `{ability_rolls, hit_point_roll, gold_roll}`: osrlib's `AbilityScoreRolls`, `HitPointRoll`, and `RollResult`. With the same seed and choices, it returns the character osrlib's `create_character` returns.
 
@@ -171,10 +173,10 @@ An adventure is the content a session plays: a town, dungeons, and the triggers 
 | Method and path | Role | Returns |
 | --- | --- | --- |
 | `POST /v1/adventures` | player | 201: the adventure's info. The body is an adventure document, which the server validates with osrlib before it stores it. |
-| `POST /v1/adventures/validate` | player | 200: `{"valid": true, "adventure": info}` or `{"valid": false, "detail": "..."}`. Stores nothing. |
+| `POST /v1/adventures/validate` | player | 200: `{"valid": true, "adventure": info}` or `{"valid": false, "code": "...", "detail": "..."}`. Stores nothing. |
 | `GET /v1/adventures` | player | A page of adventure info: the adventures that come with the server first, then the client's. |
 | `GET /v1/adventures/{adventure_id}` | player | The adventure's info. |
-| `GET /v1/adventures/{adventure_id}/document` | referee | The adventure document. |
+| `GET /v1/adventures/{adventure_id}/document` | referee | The adventure document as uploaded, including any field osrlib ignores. |
 | `DELETE /v1/adventures/{adventure_id}` | player | 204. An adventure that comes with the server gets 403 `adventure_read_only`. |
 
 Adventure info contains only what a player may know before play:
@@ -189,11 +191,11 @@ Adventure info contains only what a player may know before play:
 | `hooks` | The adventure's `hooks`: the reasons a party might take it on. |
 | `party` | osrlib's `PartySpec`: the character levels and party size the adventure is written for, or `null`. |
 | `town` | `{name, description}` of the town. |
-| `dungeons` | A list of `{id, name, level_count}`, one for each dungeon. |
+| `dungeons` | A list of `{id, name}`, one for each dungeon. Info leaves out how many levels a dungeon has, because osrlib's player view shows only the levels the party has explored. |
 
 It never contains map geometry, keyed areas, monsters, treasure, triggers, or quest internals.
 
-The `document` column of an `adventures` row is the adventure document as uploaded, so `parse_adventure` reads it back. The list puts the adventures that come with the server first, in id order, and then the client's adventures, newest first. `limit`, `offset`, and `total` count the two parts as one list. An upload that osrlib refuses gets 422 `content_invalid`, and a document stamped with a newer schema version gets 409 `version_unsupported`. `POST /v1/adventures/validate` returns `{"valid": false, "detail": "..."}` in both cases.
+The server stores the adventure document as uploaded, and parses it again when a session starts. Two uploads of the same document store two adventures, each with its own id. The list puts the adventures that come with the server first, in id order, and then the client's adventures, newest first. `limit`, `offset`, and `total` count the two parts as one list. An upload that osrlib refuses gets 422 `content_invalid`, and a document stamped with a newer schema version gets 409 `version_unsupported`. `POST /v1/adventures/validate` returns `valid: false` in both cases, with `code` set to the code the upload would return.
 
 A session embeds a copy of its adventure, so deleting an adventure doesn't affect a session that already started.
 

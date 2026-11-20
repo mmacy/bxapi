@@ -41,14 +41,16 @@ class TownInfo(ApiModel):
 
 
 class DungeonInfo(ApiModel):
-    """What a player may know about one of the adventure's dungeons before play."""
+    """What a player may know about one of the adventure's dungeons before play.
+
+    It leaves out how many levels the dungeon has, because osrlib's player view shows only the
+    levels the party has explored.
+    """
 
     id: str
     """The dungeon's id. A session's `enter_dungeon` command takes it as `dungeon_id`."""
     name: str
     """The dungeon's name, or an empty string."""
-    level_count: int
-    """How many levels the dungeon has."""
 
 
 class AdventurePreview(ApiModel):
@@ -65,7 +67,7 @@ class AdventurePreview(ApiModel):
     """The reasons the author gives for a party to take the adventure on."""
     party: PartySpec | None
     """The character levels and party size the adventure is written for, as osrlib's `PartySpec`,
-    or `None` when the author gives none."""
+    or `null` when the author gives none."""
     town: TownInfo
     """The adventure's town, where a session starts."""
     dungeons: list[DungeonInfo]
@@ -77,12 +79,12 @@ class AdventureInfo(AdventurePreview):
 
     id: str | None
     """The adventure's id. A stored adventure's id starts with `adv_`, and an adventure that
-    comes with the server has an id that starts with `builtin-`. It's `None` in the result of
+    comes with the server has an id that starts with `builtin-`. It's `null` in the result of
     `POST /v1/adventures/validate`, which stores nothing."""
     builtin: bool
     """Whether the adventure comes with the server. No client can delete one that does."""
     created_at: str | None
-    """When the client stored the adventure. It's `None` for an adventure that comes with the
+    """When the client stored the adventure. It's `null` for an adventure that comes with the
     server, and in the result of `POST /v1/adventures/validate`."""
 
 
@@ -93,16 +95,20 @@ class ValidAdventure(ApiModel):
     """Always `true`."""
     adventure: AdventureInfo
     """What a player may know about the adventure before play, with `id` and `created_at` set to
-    `None`."""
+    `null`."""
 
 
 class InvalidAdventure(ApiModel):
-    """The result of validating a document that osrlib refuses."""
+    """The result of validating a document that the server refuses."""
 
     valid: Literal[False]
     """Always `false`."""
+    code: Literal["content_invalid", "version_unsupported"]
+    """The error code `POST /v1/adventures` returns for the same document: `content_invalid` for a
+    document osrlib refuses, and `version_unsupported` for a document stamped with a newer schema
+    version than the server's osrlib reads."""
     detail: str
-    """osrlib's reason for refusing the document."""
+    """Why the document was refused."""
 
 
 def _db(request: Request) -> Database:
@@ -116,10 +122,7 @@ def _preview(adventure: Adventure) -> AdventurePreview:
         hooks=list(adventure.hooks),
         party=adventure.party,
         town=TownInfo(name=adventure.town.name, description=adventure.town.description),
-        dungeons=[
-            DungeonInfo(id=dungeon.id, name=dungeon.name, level_count=len(dungeon.levels))
-            for dungeon in adventure.dungeons
-        ],
+        dungeons=[DungeonInfo(id=dungeon.id, name=dungeon.name) for dungeon in adventure.dungeons],
     )
 
 
@@ -138,8 +141,9 @@ def upload_adventure(
 ) -> AdventureInfo:
     """Check an adventure document with osrlib and store it as uploaded.
 
-    The server runs every check osrlib makes on an adventure, so an adventure that uploads can
-    start a session. A document osrlib refuses gets 422 `content_invalid`. A document stamped
+    The server runs every check osrlib makes on an adventure, so an adventure you can upload can
+    start a session. Each upload stores a new adventure, even when the document is the same as
+    one already stored. A document osrlib refuses gets 422 `content_invalid`. A document stamped
     with a newer schema version than the server's osrlib reads gets 409 `version_unsupported`.
     """
     adventure = parse_adventure(document)
@@ -154,14 +158,15 @@ def upload_adventure(
 def validate_adventure(document: Annotated[dict[str, Any], _DOCUMENT_BODY]) -> ValidAdventure | InvalidAdventure:
     """Run the checks of `POST /v1/adventures` on a document, and store nothing.
 
-    The response is 200 either way. When osrlib refuses the document, or the document is
-    stamped with a newer schema version than the server's osrlib reads, `valid` is `false` and
-    `detail` says why.
+    The response is 200 either way. When the upload would fail, `valid` is `false`, `code` is
+    the error code the upload would return, and `detail` says why.
     """
     try:
         adventure = parse_adventure(document)
-    except (ContentValidationError, SaveVersionError) as error:
-        return InvalidAdventure(valid=False, detail=str(error))
+    except ContentValidationError as error:
+        return InvalidAdventure(valid=False, code="content_invalid", detail=str(error))
+    except SaveVersionError as error:
+        return InvalidAdventure(valid=False, code="version_unsupported", detail=str(error))
     info = AdventureInfo(**dict(_preview(adventure)), id=None, builtin=False, created_at=None)
     return ValidAdventure(valid=True, adventure=info)
 
@@ -205,7 +210,8 @@ def get_adventure(request: Request, principal: CurrentPrincipal, adventure_id: s
 def get_adventure_document(request: Request, principal: RefereePrincipal, adventure_id: str) -> dict[str, Any]:
     """Return the whole adventure document, as uploaded, with the map, monsters, treasure, triggers, and quests.
 
-    Only a referee may read it. It works for the adventures that come with the server too.
+    The document is the one the client uploaded, including any field osrlib ignores. Only a
+    referee may read it. It works for the adventures that come with the server too.
     """
     builtin = builtin_adventures().get(adventure_id)
     if builtin is not None:

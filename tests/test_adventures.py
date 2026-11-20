@@ -31,10 +31,7 @@ def expected_info(adventure: Any) -> dict[str, Any]:
         "hooks": list(adventure.hooks),
         "party": None if adventure.party is None else adventure.party.model_dump(mode="json"),
         "town": {"name": adventure.town.name, "description": adventure.town.description},
-        "dungeons": [
-            {"id": dungeon.id, "name": dungeon.name, "level_count": len(dungeon.levels)}
-            for dungeon in adventure.dungeons
-        ],
+        "dungeons": [{"id": dungeon.id, "name": dungeon.name} for dungeon in adventure.dungeons],
     }
 
 
@@ -66,7 +63,7 @@ def test_info_leaves_out_everything_a_player_may_not_know(player: TestClient) ->
     info = player.get(f"/v1/adventures/{BARROW_ID}").json()
     assert set(info) == INFO_KEYS
     assert set(info["town"]) == {"name", "description"}
-    assert all(set(dungeon) == {"id", "name", "level_count"} for dungeon in info["dungeons"])
+    assert all(set(dungeon) == {"id", "name"} for dungeon in info["dungeons"])
 
 
 def test_upload_errors(player: TestClient) -> None:
@@ -89,10 +86,15 @@ def test_validate_reports_without_storing(player: TestClient) -> None:
         "valid": True,
         "adventure": expected_info(parse_adventure(a_document())) | {"id": None, "builtin": False, "created_at": None},
     }
-    for bad in (a_document() | {"kind": "save"}, a_document() | {"schema_version": SCHEMA_VERSION + 1}):
+    for bad, code in (
+        (a_document() | {"kind": "save"}, "content_invalid"),
+        (a_document() | {"schema_version": SCHEMA_VERSION + 1}, "version_unsupported"),
+    ):
         result = player.post("/v1/adventures/validate", json=bad)
         assert result.status_code == 200
-        assert set(result.json()) == {"valid", "detail"} and result.json()["valid"] is False
+        assert set(result.json()) == {"valid", "code", "detail"}
+        assert (result.json()["valid"], result.json()["code"]) == (False, code)
+        assert player.post("/v1/adventures", json=bad).json()["code"] == code
     assert player.get("/v1/adventures").json()["total"] == len(builtin_adventures())
 
 
@@ -175,3 +177,13 @@ def test_the_openapi_document_names_the_operations(client: TestClient) -> None:
         assert operation["operationId"] == operation_id
         assert operation["tags"] == ["adventures"]
         assert operation["summary"] and operation["description"]
+
+
+def test_two_uploads_of_one_document_make_two_adventures(player: TestClient, referee: TestClient) -> None:
+    document = a_document()
+    document["payload"]["unknown_to_osrlib"] = {"kept": True}
+    first = player.post("/v1/adventures", json=document).json()
+    second = player.post("/v1/adventures", json=document).json()
+    assert first["id"] != second["id"]
+    assert player.get("/v1/adventures").json()["total"] == len(builtin_adventures()) + 2
+    assert referee.get(f"/v1/adventures/{first['id']}/document").json() == document

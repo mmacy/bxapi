@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS ability_rolls (
     id TEXT NOT NULL UNIQUE,
     client TEXT NOT NULL,
     scores TEXT NOT NULL,
+    seed INTEGER NOT NULL,
     used INTEGER NOT NULL,
     created_at TEXT NOT NULL
 ) STRICT;
@@ -144,6 +145,9 @@ class AbilityRollRow:
     """The roll's id, which starts with `rol_`."""
     scores: JsonObject
     """The scores, as the caller stored them."""
+    seed: int
+    """The seed the scores were rolled from. Creating a character from the roll draws the rest of
+    the creation rolls from the same seed. Never return it to a client."""
     used: bool
     """Whether a character was created from the roll."""
     created_at: str
@@ -329,7 +333,7 @@ class Database:
         from bxapi.db import Database
 
         db = Database(":memory:")
-        roll = db.insert_ability_roll("local", scores={"str": 12})
+        roll = db.insert_ability_roll("local", scores={"str": 12}, seed=7)
         fields = {"name": "Hild", "class_id": "fighter", "level": 1, "max_hp": 8, "document": {}}
         assert db.insert_character_from_ability_roll("local", roll.id, **fields) is not None
         assert db.insert_character_from_ability_roll("local", roll.id, **fields) is None
@@ -353,17 +357,18 @@ class Database:
 
     # Ability rolls
 
-    def insert_ability_roll(self, client: str, *, scores: JsonObject) -> AbilityRollRow:
+    def insert_ability_roll(self, client: str, *, scores: JsonObject, seed: int) -> AbilityRollRow:
         """Store a new, unused ability roll.
 
         Args:
             client: The client the roll belongs to.
             scores: The rolled scores.
+            seed: The seed the scores were rolled from.
 
         Returns:
             The stored roll, with a new id.
         """
-        row = AbilityRollRow(id=new_id("rol"), scores=scores, used=False, created_at=utc_now())
+        row = AbilityRollRow(id=new_id("rol"), scores=scores, seed=seed, used=False, created_at=utc_now())
         values = _values(row) | {"scores": _dumps(scores), "used": 0}
         self._insert("ability_rolls", client, values)
         return row
@@ -403,10 +408,10 @@ class Database:
         """Mark an unused ability roll used and store the character created from it, in one transaction.
 
         When two requests create a character from the same roll at once, only one of them
-        stores a character. If the insert fails, the roll stays unused. So a used roll always
-        has a character behind it, across threads and across processes that share the file.
-        Check the character's choices before you call it, so that a refused character leaves
-        the roll unused.
+        stores a character. If the insert fails, the roll stays unused. Both hold across threads
+        and across processes that share the file. Deleting the character later leaves the roll
+        used. Check the character's choices before you call it, so that a refused character
+        leaves the roll unused.
 
         Args:
             client: The client the roll and the character belong to.
