@@ -275,6 +275,29 @@ def _ability_roll(row: sqlite3.Row) -> AbilityRollRow:
     return AbilityRollRow(**values)
 
 
+def _character_row(*, name: str, class_id: str, level: int, max_hp: int, document: JsonObject) -> CharacterDocumentRow:
+    return CharacterDocumentRow(
+        id=new_id("chr"),
+        name=name,
+        class_id=class_id,
+        level=level,
+        max_hp=max_hp,
+        created_at=utc_now(),
+        document=document,
+    )
+
+
+def _character_values(row: CharacterDocumentRow) -> dict[str, Any]:
+    return _values(row) | {"document": _dumps(row.document)}
+
+
+def _insert_statement(table: str, client: str, values: dict[str, Any]) -> tuple[str, list[Any]]:
+    values = {"client": client} | values
+    columns = ", ".join(values)
+    placeholders = ", ".join("?" for _ in values)
+    return f"INSERT INTO {table} ({columns}) VALUES ({placeholders})", list(values.values())
+
+
 def _envelope_versions(document: JsonObject) -> tuple[int, str]:
     return int(document["schema_version"]), str(document["engine_version"])
 
@@ -287,7 +310,7 @@ class Database:
     run a query on it, so every endpoint thread can share it. With `":memory:"`, every thread
     sees the same data, and the data is gone when you close the database.
 
-    Two processes can open the same file. Each statement that changes a row is one SQLite
+    Two processes can open the same file. Each method that changes rows is one SQLite
     transaction, so a conditional update, like
     [`update_session`][bxapi.db.Database.update_session], checks and writes the row with no
     other connection in between. A statement waits up to
@@ -306,9 +329,10 @@ class Database:
         from bxapi.db import Database
 
         db = Database(":memory:")
-        roll = db.insert_ability_roll("local", scores={"strength": 12})
-        assert db.mark_ability_roll_used("local", roll.id)
-        assert not db.mark_ability_roll_used("local", roll.id)
+        roll = db.insert_ability_roll("local", scores={"str": 12})
+        fields = {"name": "Hild", "class_id": "fighter", "level": 1, "max_hp": 8, "document": {}}
+        assert db.insert_character_from_ability_roll("local", roll.id, **fields) is not None
+        assert db.insert_character_from_ability_roll("local", roll.id, **fields) is None
         assert db.get_ability_roll("other", roll.id) is None
         db.close()
         ```
@@ -351,25 +375,6 @@ class Database:
         )
         return None if row is None else _ability_roll(row)
 
-    def mark_ability_roll_used(self, client: str, roll_id: str) -> bool:
-        """Mark a roll used, if it isn't already.
-
-        The check and the change are one statement, so when two requests create a character from
-        the same roll at once, only one of them gets `True`. Check the character's choices before
-        you call it, so that a refused character leaves the roll unused.
-
-        Args:
-            client: The client the roll belongs to.
-            roll_id: The roll's id.
-
-        Returns:
-            `True` if the call changed the roll from unused to used. `False` if the roll was
-            already used, or the client has no roll with that id.
-        """
-        return self._change(
-            "UPDATE ability_rolls SET used = 1 WHERE id = ? AND client = ? AND used = 0", roll_id, client
-        )
-
     # Characters
 
     def insert_character(
@@ -388,16 +393,43 @@ class Database:
         Returns:
             The stored character, with a new id.
         """
-        row = CharacterDocumentRow(
-            id=new_id("chr"),
-            name=name,
-            class_id=class_id,
-            level=level,
-            max_hp=max_hp,
-            created_at=utc_now(),
-            document=document,
-        )
-        self._insert("characters", client, _values(row) | {"document": _dumps(document)})
+        row = _character_row(name=name, class_id=class_id, level=level, max_hp=max_hp, document=document)
+        self._insert("characters", client, _character_values(row))
+        return row
+
+    def insert_character_from_ability_roll(
+        self, client: str, roll_id: str, *, name: str, class_id: str, level: int, max_hp: int, document: JsonObject
+    ) -> CharacterDocumentRow | None:
+        """Mark an unused ability roll used and store the character created from it, in one transaction.
+
+        When two requests create a character from the same roll at once, only one of them
+        stores a character. If the insert fails, the roll stays unused. So a used roll always
+        has a character behind it, across threads and across processes that share the file.
+        Check the character's choices before you call it, so that a refused character leaves
+        the roll unused.
+
+        Args:
+            client: The client the roll and the character belong to.
+            roll_id: The roll's id.
+            name: The character's name.
+            class_id: The character's class.
+            level: The character's level.
+            max_hp: The character's maximum hit points.
+            document: The character document.
+
+        Returns:
+            The stored character, with a new id. `None` if the roll was already used, or the
+            client has no roll with that id. In that case the method stores nothing.
+        """
+        row = _character_row(name=name, class_id=class_id, level=level, max_hp=max_hp, document=document)
+        insert, params = _insert_statement("characters", client, _character_values(row))
+        with self._write_transaction() as connection:
+            claimed = connection.execute(
+                "UPDATE ability_rolls SET used = 1 WHERE id = ? AND client = ? AND used = 0", (roll_id, client)
+            )
+            if claimed.rowcount == 0:
+                return None
+            connection.execute(insert, params)
         return row
 
     def get_character(self, client: str, character_id: str) -> CharacterDocumentRow | None:
@@ -706,11 +738,9 @@ class Database:
     # from a caller as a parameter.
 
     def _insert(self, table: str, client: str, values: dict[str, Any]) -> None:
-        values = {"client": client} | values
-        columns = ", ".join(values)
-        placeholders = ", ".join("?" for _ in values)
+        sql, params = _insert_statement(table, client, values)
         with self._lock:
-            self._connection.execute(f"INSERT INTO {table} ({columns}) VALUES ({placeholders})", list(values.values()))
+            self._connection.execute(sql, params)
 
     def _one(self, sql: str, *params: object) -> sqlite3.Row | None:
         with self._lock:
@@ -730,6 +760,19 @@ class Database:
                 [*params, limit, offset],
             ).fetchall()
         return rows, total
+
+    @contextmanager
+    def _write_transaction(self) -> Iterator[sqlite3.Connection]:
+        # BEGIN IMMEDIATE takes the file's write lock before the first statement, so another
+        # process can't change a row between this transaction's check and its write.
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                yield self._connection
+            except BaseException:
+                self._connection.execute("ROLLBACK")
+                raise
+            self._connection.execute("COMMIT")
 
     @contextmanager
     def _read_transaction(self) -> Iterator[sqlite3.Connection]:
