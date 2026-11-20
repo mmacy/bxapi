@@ -24,12 +24,13 @@ from bxapi.errors import forbidden
 
 __all__ = ["MAX_SEED", "Seed", "draw_seed", "referee_seed", "seed_or_draw"]
 
-MAX_SEED = 2**63 - 1
-"""The largest seed the API accepts."""
+MAX_SEED = 2**53 - 1
+"""The largest seed the API accepts. It's the largest integer that JSON parsers which read numbers as
+double-precision floats, like JavaScript's, read exactly, so a client can send back a seed it received."""
 
 Seed = Annotated[
     int,
-    Field(ge=0, le=MAX_SEED, description="The seed for the random numbers, an integer from 0 to 2^63 - 1."),
+    Field(ge=0, le=MAX_SEED, description="The seed for the random numbers, an integer from 0 to 2^53 - 1."),
 ]
 """The type of a `seed` field in a request or response model."""
 
@@ -40,7 +41,7 @@ def draw_seed() -> int:
     Returns:
         An integer from 0 to [`MAX_SEED`][bxapi.seeds.MAX_SEED].
     """
-    return secrets.randbits(63)
+    return secrets.randbits(53)
 
 
 def seed_or_draw(seed: int | None) -> int:
