@@ -1,0 +1,69 @@
+[project]
+name = "bxapi"
+version = "0.1.0"
+description = "HTTP API for the B/X rules, built with FastAPI on osrlib"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Marsh Macy" }]
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi>=0.115",
+    "osrlib>=2.4,<3",
+    "pydantic>=2",
+    "pydantic-settings>=2",
+    "uvicorn>=0.32",
+]
+
+[project.scripts]
+bxapi = "bxapi.__main__:main"
+
+[dependency-groups]
+dev = [
+    "httpx2>=2",
+    "pyright>=1.1.411",
+    "pytest>=8",
+    "ruff>=0.11",
+]
+
+[build-system]
+requires = ["uv_build>=0.8.22,<0.9.0"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 120
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "B",   # bugbear
+    "D",   # pydocstyle
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "W",   # pycodestyle warnings
+]
+# A class docstring documents the constructor's arguments, so `__init__` needs no docstring.
+ignore = ["D107"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI reads these calls in argument defaults as dependency declarations.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Body", "fastapi.Path", "fastapi.Header"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["bxapi"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.pyright]
+include = ["src", "tests"]
+typeCheckingMode = "basic"
+pythonVersion = "3.14"
