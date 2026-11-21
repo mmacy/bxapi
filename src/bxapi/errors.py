@@ -63,6 +63,7 @@ __all__ = [
     "install_error_handlers",
     "internal_error",
     "invalid",
+    "is_reported_error",
     "not_found",
     "problem_response",
     "problem_responses",
@@ -496,6 +497,49 @@ def _field_error(entry: Any) -> FieldError:
     return FieldError(loc=location, msg=shorten(_message(entry), _MAX_TEXT_SHOWN), type=str(entry["type"]))
 
 
+def _is_busy(error: BaseException) -> bool:
+    # The extended result codes, like SQLITE_BUSY_SNAPSHOT, have the primary code in the low byte.
+    # An OperationalError that Python code raises, rather than SQLite, has no code.
+    code = getattr(error, "sqlite_errorcode", None)
+    return isinstance(error, sqlite3.OperationalError) and code is not None and code & 0xFF in _BUSY_CODES
+
+
+def is_reported_error(error: BaseException) -> bool:
+    """Return whether the server reports an exception as a problem other than 500 `internal_error`.
+
+    The server raises each of these exceptions on purpose, before the request changes anything or
+    in place of the change: an [`ApiError`][bxapi.errors.ApiError], a request that fails
+    validation, an osrlib content or version error, a busy database, and Starlette's
+    `HTTPException`. Any other exception is a bug, and the request may have changed something
+    before it.
+
+    Args:
+        error: The exception an endpoint raised.
+
+    Returns:
+        `True` if one of the handlers that
+        [`install_error_handlers`][bxapi.errors.install_error_handlers] registers turns the
+        exception into a problem document with a code other than `internal_error`.
+
+    Examples:
+        ```python
+        from bxapi.errors import is_reported_error, not_found
+
+        assert is_reported_error(not_found("session", "ses_x"))
+        assert not is_reported_error(KeyError("name"))
+        ```
+    """
+    reported = (
+        ApiError,
+        RequestValidationError,
+        ContentValidationError,
+        SaveVersionError,
+        ReplayVersionError,
+        StarletteHTTPException,
+    )
+    return isinstance(error, reported) or _is_busy(error)
+
+
 def install_error_handlers(app: FastAPI) -> None:
     """Register the handlers that turn exceptions into problem documents.
 
@@ -546,10 +590,7 @@ def install_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(sqlite3.OperationalError)
     def _database_error(request: Request, error: sqlite3.OperationalError) -> JSONResponse:
-        # The extended result codes, like SQLITE_BUSY_SNAPSHOT, have the primary code in the low byte.
-        # An OperationalError that Python code raises, rather than SQLite, has no code.
-        code = getattr(error, "sqlite_errorcode", None)
-        if code is None or code & 0xFF not in _BUSY_CODES:
+        if not _is_busy(error):
             raise error
         return respond(request, database_busy())
 

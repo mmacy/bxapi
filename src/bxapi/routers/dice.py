@@ -6,12 +6,13 @@ from osrlib.core.rng import RngStreams, StreamName
 from pydantic import Field
 
 from bxapi.errors import VALIDATION_ERROR, problem_responses
+from bxapi.idempotency import IdempotentRoute
 from bxapi.models import ApiModel, RequestModel
 from bxapi.seeds import Seed, seed_or_draw
 
 __all__ = ["DiceRollRequest", "DiceRollResponse", "router"]
 
-router = APIRouter(prefix="/dice", tags=["dice"])
+router = APIRouter(prefix="/dice", tags=["dice"], route_class=IdempotentRoute)
 
 
 class DiceRollRequest(RequestModel):

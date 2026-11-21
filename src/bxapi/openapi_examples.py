@@ -40,6 +40,7 @@ from bxapi.errors import (
     unsupported_media_type,
     validation_error,
 )
+from bxapi.idempotency import key_in_progress, key_interrupted, key_reused
 from bxapi.session_manager import LOCK_TIMEOUT_SECONDS, session_busy, session_unreadable
 from bxapi.settings import Settings
 
@@ -158,6 +159,26 @@ def shared_problems() -> tuple[SharedProblem, ...]:
             "The response to `POST /v1/dice/roll` with the body `{}`. Each entry in `errors` is one part of the "
             "request that failed validation, and `loc` is the path to it.",
             validation_error([missing]),
+        ),
+        shared(
+            "idempotency_key_in_progress",
+            "Retry while the first request runs",
+            "The response to a second request with an `Idempotency-Key` while the first request with that key is "
+            "still running.",
+            key_in_progress(),
+        ),
+        shared(
+            "idempotency_key_interrupted",
+            "Retry a request the server didn't finish",
+            "The response to a request with an `Idempotency-Key` whose first request the server failed or stopped "
+            "in the middle of.",
+            key_interrupted(),
+        ),
+        shared(
+            "idempotency_key_reused",
+            "Send a key again with another request",
+            "The response to a request with an `Idempotency-Key` that your client already sent with a different body.",
+            key_reused(),
         ),
         shared(
             "session_busy",

@@ -610,9 +610,41 @@ curl -s -X POST http://127.0.0.1:8640/v1/saves/sav_E6NKZNiBl4c2jL_rkyY8Bg/restor
 
 The new session is in the same mode, with the same party, and its revision starts again at 0. Its `adventure_id` is the save's. The `adventure_id` is `null` for a save that a referee imported, and it can be the id of an adventure that you deleted after you saved. Neither changes play, because each session has a copy of its adventure.
 
-## Retry a command safely
+## Retry a request safely
 
-A request can fail after the server applied the command, for example when the connection drops before the response arrives. If your client sends the command again, the rules run it a second time. To prevent that, send the revision you last read as the `expected_revision` query parameter. The server runs the command only if the session is still at that revision.
+A request can fail after the server ran it, for example when the connection drops before the response arrives. If your client sends a `POST` again, the server runs it a second time: a second character, a second session, or a second battle round. To prevent that, choose a new value for each request, like a UUID, and send it in the `Idempotency-Key` header of the request and of every retry:
+
+```sh
+curl -si -X POST http://127.0.0.1:8640/v1/sessions/ses_69rujo4njhlTcX0L0EgfEw/saves -H "Authorization: Bearer $KEY" -H "Idempotency-Key: 0b6f7c1e-3f9a-4f0e-9f57-2d1c6e8a4b11"
+```
+
+```text
+HTTP/1.1 201 Created
+...
+{"id":"sav_YkM2nXS6Nn0JvCqk1vXh4w","session_id":"ses_69rujo4njhlTcX0L0EgfEw",...}
+```
+
+Send the same request with the same key again, and the server returns the first response without saving a second time. The header `Idempotent-Replayed: true` marks the stored response:
+
+```text
+HTTP/1.1 201 Created
+...
+idempotent-replayed: true
+
+{"id":"sav_YkM2nXS6Nn0JvCqk1vXh4w","session_id":"ses_69rujo4njhlTcX0L0EgfEw",...}
+```
+
+The key works on every `POST`, including a command. These rules apply:
+
+- The server remembers a key for 24 hours, and a key belongs to your client.
+- A request that fails with an error other than 500 `internal_error` changed nothing, so the server forgets its key. Fix the request if the error says to, and send it with the same key or a new one.
+- Use a new key for each new request. The same key with a different body gets 422 `idempotency_key_reused`.
+- While the first request still runs, a retry gets 409 `idempotency_key_in_progress`. Wait a second and send it again.
+- If the server failed or stopped in the middle of the first request, a retry gets 409 `idempotency_key_interrupted`, because the server has no record of whether the request took effect. Read the session or the list to find out.
+
+### Retry a command with the revision
+
+For a command, the session's revision gives you a second way to retry safely, with no key. Send the revision you last read as the `expected_revision` query parameter. The server runs the command only if the session is still at that revision.
 
 Send the second round to the restored session, which is at revision 0:
 
@@ -651,7 +683,7 @@ content-type: application/problem+json
 {"type":"about:blank","title":"Conflict","status":409,"detail":"The session is at revision 1, not 0. Read the view and decide whether to send the command again.","code":"revision_conflict","request_id":"req_p7XWyfcbC8hFgnPx37l7rA","revision":1}
 ```
 
-The session is at revision 1, so the server ran nothing. When you get a `revision_conflict` after a retry and nobody else sends commands to the session, the server applied the first request. Read the view to see the result. For what to do in other cases, see [Errors](errors.md#revision_conflict).
+The session is at revision 1, so the server ran nothing. When you get a `revision_conflict` after a retry and nobody else sends commands to the session, the server applied the first request. Read the view to see the result. The retry doesn't return the lost response, so to get the first response back, use an `Idempotency-Key` instead. For what to do in other cases, see [Errors](errors.md#revision_conflict).
 
 Every response to a command has the new `revision`, and `GET /v1/sessions/{session_id}/commands` has the current one, so your client has the revision to send with the next command.
 

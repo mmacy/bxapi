@@ -34,6 +34,7 @@ __all__ = [
     "CharacterRow",
     "Database",
     "DatabaseOpenError",
+    "IdempotencyRow",
     "JsonObject",
     "RowPage",
     "SaveRow",
@@ -49,10 +50,11 @@ type JsonObject = dict[str, Any]
 BUSY_TIMEOUT_SECONDS = 5.0
 """How long a statement waits for another connection's write lock before it fails."""
 
-LAYOUT_VERSION = 1
+LAYOUT_VERSION = 2
 """The version of the table layout, which the server writes to the file's `PRAGMA user_version`.
 
-A server opens only a file with this version, or an empty file."""
+A server opens a file with this version, an empty file, or a file with an earlier version, which it
+brings up to this version first. Version 2 added the `idempotency_keys` table."""
 
 
 SQLITE_INTEGER_MIN = -(2**63)
@@ -60,6 +62,19 @@ SQLITE_INTEGER_MIN = -(2**63)
 
 SQLITE_INTEGER_MAX = 2**63 - 1
 """The largest integer an `INTEGER` column stores. `sqlite3` raises `OverflowError` for a larger one."""
+
+_IDEMPOTENCY_SCHEMA = """
+CREATE TABLE IF NOT EXISTS idempotency_keys (
+    client TEXT NOT NULL,
+    key TEXT NOT NULL,
+    fingerprint TEXT NOT NULL,
+    status INTEGER,
+    body BLOB,
+    claimed_at INTEGER NOT NULL,
+    PRIMARY KEY (client, key)
+) STRICT, WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS idempotency_keys_by_age ON idempotency_keys (claimed_at);
+"""
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS ability_rolls (
@@ -127,12 +142,15 @@ CREATE INDEX IF NOT EXISTS saves_by_client ON saves (client, created_at, seq);
 CREATE INDEX IF NOT EXISTS saves_by_session ON saves (client, session_id, created_at, seq);
 """
 
+_UPGRADES = {1: _IDEMPOTENCY_SCHEMA}
+"""For each earlier layout version, the statements that change a file of that version into the next one."""
+
 
 class DatabaseOpenError(Exception):
     """The server can't use a database file.
 
     [`Database`][bxapi.db.Database] raises it when SQLite can't open the file, when the file
-    isn't a SQLite database, and when the file's table layout version isn't
+    isn't a SQLite database, and when the file's table layout version is later than
     [`LAYOUT_VERSION`][bxapi.db.LAYOUT_VERSION]. The message states the path.
     """
 
@@ -314,6 +332,22 @@ class SaveRow:
     """When the save was stored."""
 
 
+@dataclass(frozen=True, slots=True)
+class IdempotencyRow:
+    """What the server recorded for one `Idempotency-Key` of one client."""
+
+    fingerprint: str
+    """A hash of the request that claimed the key, from
+    [`request_fingerprint`][bxapi.idempotency.request_fingerprint]."""
+    status: int | None
+    """The status of the stored response. `None` while the request that claimed the key runs, and 0 when that
+    request failed in a way that leaves its effect unknown."""
+    body: bytes | None
+    """The body of the stored response, or `None` when the row has no response."""
+    claimed_at: int
+    """When the request claimed the key, in seconds since the Unix epoch."""
+
+
 type _Row = AbilityRollRow | CharacterRow | AdventureRow | SessionRow | SaveRow
 
 
@@ -374,8 +408,9 @@ class Database:
     """The server's SQLite database.
 
     The constructor opens the file, creates the tables in an empty file, and turns on write-ahead
-    logging for a file database. It refuses a file whose table layout version isn't
-    [`LAYOUT_VERSION`][bxapi.db.LAYOUT_VERSION]. One `Database` uses one connection, and a lock
+    logging for a file database. It adds the tables that a file with an earlier table layout version
+    lacks, and refuses a file whose version is later than [`LAYOUT_VERSION`][bxapi.db.LAYOUT_VERSION].
+    One `Database` uses one connection, and a lock
     lets one thread at a time run a query on it, so every endpoint thread can share it. With `":memory:"`, every thread
     sees the same data, and the data is gone when you close the database.
 
@@ -456,14 +491,20 @@ class Database:
             found = self._layout_version()
             if found == LAYOUT_VERSION:
                 return
-            if found != 0 or connection.execute("SELECT count(*) FROM sqlite_schema").fetchone()[0]:
+            if found == 0 and not connection.execute("SELECT count(*) FROM sqlite_schema").fetchone()[0]:
+                scripts = [_SCHEMA, _IDEMPOTENCY_SCHEMA]
+            elif found in _UPGRADES:
+                scripts = [_UPGRADES[version] for version in range(found, LAYOUT_VERSION)]
+            else:
                 raise DatabaseOpenError(
                     f"The database file {path!r} has table layout version {found}, and this server uses version "
-                    f"{LAYOUT_VERSION}. Point BXAPI_DATABASE at a new file, or at a file this version of bxapi created."
+                    f"{LAYOUT_VERSION}. Point BXAPI_DATABASE at a new file, or at a file that this version of bxapi "
+                    "or an earlier one created."
                 )
-            for statement in _SCHEMA.split(";"):
-                if statement.strip():
-                    connection.execute(statement)
+            for script in scripts:
+                for statement in script.split(";"):
+                    if statement.strip():
+                        connection.execute(statement)
             connection.execute(f"PRAGMA user_version = {LAYOUT_VERSION}")
 
     def _layout_version(self) -> int:
@@ -861,6 +902,67 @@ class Database:
     def delete_save(self, client: str, save_id: str) -> bool:
         """Delete a save. Return `False` if the client has no save with that id."""
         return self._change("DELETE FROM saves WHERE id = ? AND client = ?", save_id, client)
+
+    # Idempotency keys
+
+    def claim_idempotency_key(
+        self, client: str, key: str, fingerprint: str, *, now: int, retention_seconds: int
+    ) -> IdempotencyRow | None:
+        """Claim an idempotency key for a request, unless the client already used the key.
+
+        The check and the insert are one transaction, so of two requests that claim the same key at
+        once, in any thread or process, exactly one gets `None`. The method first deletes every
+        client's keys that were claimed `retention_seconds` ago or earlier.
+
+        Args:
+            client: The caller's client.
+            key: The `Idempotency-Key` the request sent.
+            fingerprint: A hash of the request.
+            now: The current time, in seconds since the Unix epoch.
+            retention_seconds: How long the server remembers a key.
+
+        Returns:
+            `None` if the method claimed the key, so the caller runs the request. Otherwise the row of
+            the earlier request with that key, and the method changes nothing.
+        """
+        with self._write_transaction() as connection:
+            connection.execute("DELETE FROM idempotency_keys WHERE claimed_at <= ?", (now - retention_seconds,))
+            row = connection.execute(
+                "SELECT fingerprint, status, body, claimed_at FROM idempotency_keys WHERE client = ? AND key = ?",
+                (client, key),
+            ).fetchone()
+            if row is not None:
+                return IdempotencyRow(**dict(row))
+            connection.execute(
+                "INSERT INTO idempotency_keys (client, key, fingerprint, claimed_at) VALUES (?, ?, ?, ?)",
+                (client, key, fingerprint, now),
+            )
+        return None
+
+    def complete_idempotency_key(self, client: str, key: str, *, status: int, body: bytes | None) -> None:
+        """Record the outcome of the request that claimed a key.
+
+        Args:
+            client: The caller's client.
+            key: The claimed key.
+            status: The status of the response to store, or 0 when the request failed in a way that leaves
+                its effect unknown.
+            body: The body of the response to store, or `None` with a status of 0.
+        """
+        self._change(
+            "UPDATE idempotency_keys SET status = ?, body = ? WHERE client = ? AND key = ?", status, body, client, key
+        )
+
+    def release_idempotency_key(self, client: str, key: str) -> None:
+        """Forget a claimed key whose request changed nothing, so the client can send the request again.
+
+        The method deletes the key only while it has no recorded outcome.
+
+        Args:
+            client: The caller's client.
+            key: The claimed key.
+        """
+        self._change("DELETE FROM idempotency_keys WHERE client = ? AND key = ? AND status IS NULL", client, key)
 
     # The methods above build SQL only from the constants in this module, and pass every value
     # from a caller as a parameter.

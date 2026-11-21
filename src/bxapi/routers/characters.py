@@ -21,6 +21,7 @@ from bxapi.creation import (
 )
 from bxapi.db import AbilityRollRow, CharacterDocumentRow, Database
 from bxapi.errors import VALIDATION_ERROR, ApiError, conflict, invalid, not_found, problem_responses
+from bxapi.idempotency import IdempotentRoute
 from bxapi.models import ApiModel, RequestModel
 from bxapi.pagination import Page, PageQuery
 from bxapi.seeds import Seed, referee_seed, seed_or_draw
@@ -36,7 +37,7 @@ __all__ = [
     "router",
 ]
 
-router = APIRouter()
+router = APIRouter(route_class=IdempotentRoute)
 
 _SEED_FORBIDDEN = (
     "`referee_required`: A player sent `seed`. Leave `seed` out and the server draws one, or send the request with "

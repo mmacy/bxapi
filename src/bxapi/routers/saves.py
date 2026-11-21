@@ -14,6 +14,7 @@ from pydantic import Field
 from bxapi.auth import CurrentPrincipal, RefereePrincipal
 from bxapi.db import Database, JsonObject, SaveRow, fits_integer_column
 from bxapi.errors import INTERNAL_ERROR, VALIDATION_ERROR, invalid, not_found, problem_responses
+from bxapi.idempotency import IdempotentRoute
 from bxapi.models import RequestModel
 from bxapi.pagination import Page, PageQuery
 from bxapi.routers.sessions import NAME_MAX_LENGTH, SaveInfo, SessionInfo, save_info, session_info
@@ -21,7 +22,7 @@ from bxapi.session_manager import SessionManager, load_stored_save, validate_loa
 
 __all__ = ["RelabelSaveRequest", "RestoreSaveRequest", "router"]
 
-router = APIRouter(prefix="/saves", tags=["saves"])
+router = APIRouter(prefix="/saves", tags=["saves"], route_class=IdempotentRoute)
 
 SaveId = Annotated[
     str,
