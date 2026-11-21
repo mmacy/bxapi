@@ -40,11 +40,11 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from osrlib.core.validation import Rejection
 from osrlib.errors import ContentValidationError, ReplayVersionError, SaveVersionError
-from pydantic import BaseModel, ConfigDict, Field, field_validator
-from pydantic.config import JsonDict
+from pydantic import BaseModel, ConfigDict, field_validator
 from pydantic.json_schema import SkipJsonSchema
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from bxapi.models import left_out_when_none
 from bxapi.request_ids import REQUEST_ID_HEADER, request_id_of
 
 __all__ = [
@@ -127,19 +127,6 @@ def shorten(text: str, limit: int) -> str:
     return text if len(text) <= limit else text[: limit - 3] + "..."
 
 
-def _leave_out_default(schema: JsonDict) -> None:
-    # The server leaves an unset member out of the document instead of sending null.
-    schema.pop("default", None)
-
-
-def _is_none(value: object) -> bool:
-    return value is None
-
-
-def _optional() -> Any:
-    return Field(default=None, exclude_if=_is_none, json_schema_extra=_leave_out_default)
-
-
 class FieldError(BaseModel):
     """One part of a request that failed validation."""
 
@@ -183,30 +170,30 @@ class Problem(BaseModel):
     code: str
     """A fixed snake_case name for the error, like `"not_found"`. It doesn't change between
     releases, so a client can branch on it."""
-    request_id: str | SkipJsonSchema[None] = _optional()
+    request_id: str | SkipJsonSchema[None] = left_out_when_none()
     """The id of the request, which the `X-Request-Id` response header has too. The server logs
     it with the request. Include it when you report the error to whoever runs the server."""
-    errors: list[FieldError] | SkipJsonSchema[None] = _optional()
+    errors: list[FieldError] | SkipJsonSchema[None] = left_out_when_none()
     """`validation_error` only: the first 20 parts of the request that failed validation."""
-    error_count: int | SkipJsonSchema[None] = _optional()
+    error_count: int | SkipJsonSchema[None] = left_out_when_none()
     """`validation_error` only: how many parts of the request failed validation, including any
     that `errors` leaves out."""
-    resource: str | SkipJsonSchema[None] = _optional()
+    resource: str | SkipJsonSchema[None] = left_out_when_none()
     """`not_found` only: the kind of resource the request asked for, like `"session"`."""
-    id: str | SkipJsonSchema[None] = _optional()
+    id: str | SkipJsonSchema[None] = left_out_when_none()
     """For `not_found`, the id in the request, or its first 128 characters followed by `...`.
     For `character_invalid`, the value of the entry that's wrong, like an item id."""
-    revision: int | SkipJsonSchema[None] = _optional()
+    revision: int | SkipJsonSchema[None] = left_out_when_none()
     """`revision_conflict` only: the session's current revision."""
-    command_type: str | SkipJsonSchema[None] = _optional()
+    command_type: str | SkipJsonSchema[None] = left_out_when_none()
     """`referee_command` only: the `command_type` of the referee command a player sent."""
-    field: str | SkipJsonSchema[None] = _optional()
+    field: str | SkipJsonSchema[None] = left_out_when_none()
     """`character_invalid` only, when osrlib reports no rejections: the request field that's
     wrong, like `"equip_item_ids"`."""
-    index: int | SkipJsonSchema[None] = _optional()
+    index: int | SkipJsonSchema[None] = left_out_when_none()
     """`character_invalid` only, when `field` is a list: the position of the entry that's
     wrong, counted from 0."""
-    rejections: list[Rejection] | SkipJsonSchema[None] = _optional()
+    rejections: list[Rejection] | SkipJsonSchema[None] = left_out_when_none()
     """`character_invalid` only, and only when osrlib reports them: osrlib's reasons for
     refusing the character, each a `code` and `params`."""
 

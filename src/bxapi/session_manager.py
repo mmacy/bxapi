@@ -40,6 +40,7 @@ from osrlib.crawl.commands import Command, CommandResult, SessionMode
 from osrlib.crawl.interpreter import Interpreter
 from osrlib.crawl.party import Party
 from osrlib.crawl.session import GameSession
+from osrlib.crawl.views import PlayerView, build_player_view
 from osrlib.data import load_equipment, load_monsters
 from osrlib.errors import OsrlibError
 from osrlib.persistence import load_game, save_game
@@ -87,6 +88,8 @@ class Executed:
     """The session's mode after the command."""
     revision: int
     """The session's revision after the command. A refused command leaves it unchanged."""
+    view: PlayerView | None = None
+    """osrlib's player view of the session after the command, when the caller asked for it."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -347,7 +350,13 @@ class SessionManager:
     # Using sessions
 
     def execute(
-        self, client: str, session_id: str, command: Command, *, expected_revision: int | None = None
+        self,
+        client: str,
+        session_id: str,
+        command: Command,
+        *,
+        expected_revision: int | None = None,
+        with_view: bool = False,
     ) -> Executed:
         """Execute one command, and write the session to the database if osrlib accepted it.
 
@@ -360,6 +369,8 @@ class SessionManager:
             command: The command to execute.
             expected_revision: The revision the caller expects the session to have, or `None` to
                 skip the check.
+            with_view: Whether to build osrlib's player view after the command, before any other
+                request can use the session.
 
         Returns:
             osrlib's result, with the session's mode and revision after the command.
@@ -387,7 +398,8 @@ class SessionManager:
             try:
                 result = game.execute(command)
                 if not result.accepted:
-                    return Executed(result=result, mode=game.mode, revision=loaded.revision)
+                    view = build_player_view(game) if with_view else None
+                    return Executed(result=result, mode=game.mode, revision=loaded.revision, view=view)
                 revision = loaded.revision + 1
                 written = self._db.update_session(
                     client,
@@ -408,7 +420,8 @@ class SessionManager:
                 self._drop(key, slot)
                 raise self._busy(key)
             self._remember(key, slot, _Loaded(game, revision))
-            return Executed(result=result, mode=game.mode, revision=revision)
+            view = build_player_view(game) if with_view else None
+            return Executed(result=result, mode=game.mode, revision=revision, view=view)
 
     def read[T](self, client: str, session_id: str, reader: Callable[[GameSession], T]) -> T:
         """Call a function on a session while no command can run on it, and return its result.

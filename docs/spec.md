@@ -234,7 +234,7 @@ A session is one game in progress. It starts in town and ends in `game_over` or 
 | `PATCH /v1/sessions/{session_id}` | player | Session info, after changing `name`. |
 | `DELETE /v1/sessions/{session_id}` | player | 204. The session's saves stay. |
 | `GET /v1/sessions/{session_id}/commands` | player | `mode`, `revision`, and `commands`: the `command_type` and `kind` of each command that's legal in the session's mode and that the caller's role may send. |
-| `POST /v1/sessions/{session_id}/commands` | player | The command outcome. |
+| `POST /v1/sessions/{session_id}/commands` | player | The command outcome, with the player view when the request has `include=view`. |
 | `GET /v1/sessions/{session_id}/view` | player | osrlib's `PlayerView`: each member's character sheet, the explored map, the encounter as the players see it, the journal, the quests, and the town's healing prices. |
 | `GET /v1/sessions/{session_id}/referee-view` | referee | osrlib's `RefereeView`. |
 | `GET /v1/sessions/{session_id}/events` | player | A page of the event log. |
@@ -274,6 +274,9 @@ The command outcome:
 | `mode` | The session's mode after the command. |
 | `ended` | Whether the session is over. |
 | `revision` | The session's revision after the command. |
+| `view` | osrlib's `PlayerView` after the command, only when the request has `include=view`. |
+
+A request with the query parameter `include=view` gets the player view in the outcome's `view`, for an accepted command and for a refused one. The server builds the view while it still has the session's lock, so it's the view at the outcome's `revision`, and it's the player view for a referee too. Without `include`, the outcome has no `view` member. Another value of `include` gets 422 `validation_error`.
 
 A caller sees the events with player visibility. A referee who passes `visibility=referee` sees every event. A player who passes it gets 403 `referee_required`, and the server doesn't execute the command. A player who sends a referee command gets 403 `referee_command`, and the server doesn't execute it. The server checks the body against the command's schema before it checks the role, so a referee command that doesn't fit its schema, like a `roll_dice` with the expression `2x7`, gets 422 `validation_error` from a player too. osrlib ignores a field that the command doesn't define.
 
