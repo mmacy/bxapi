@@ -15,9 +15,9 @@ same place as uvicorn's. Another ASGI server shows them only if you configure th
 
 import asyncio
 import logging
+import re
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
-from http import HTTPStatus
 from typing import Any
 
 from fastapi import APIRouter, Depends, FastAPI
@@ -32,7 +32,16 @@ from bxapi import __version__
 from bxapi.adventures import builtin_adventures
 from bxapi.auth import AuthMiddleware, authenticate
 from bxapi.db import Database
-from bxapi.errors import PROBLEM_MEDIA_TYPE, ApiError, install_error_handlers, problem_response, problem_responses
+from bxapi.errors import (
+    INTERNAL_ERROR,
+    PROBLEM_MEDIA_TYPE,
+    VALIDATION_ERROR,
+    ApiError,
+    install_error_handlers,
+    problem_response,
+    problem_responses,
+)
+from bxapi.openapi_examples import add_examples
 from bxapi.routers import V1_ROUTERS, meta
 from bxapi.session_manager import SessionManager
 from bxapi.settings import Settings, SettingsError
@@ -42,25 +51,280 @@ __all__ = ["BodyLimitMiddleware", "create_app"]
 _log = logging.getLogger("bxapi")
 
 _DESCRIPTION = """
-bxapi serves the rules of the 1981 B/X (Basic/Expert) fantasy adventure game over HTTP, and
-[osrlib](https://github.com/mmacy/osrlib-python) applies them.
+bxapi runs games of the 1981 B/X (Basic/Expert) fantasy adventure game over HTTP.
+[osrlib](https://github.com/mmacy/osrlib-python), a Python library, applies every rule. bxapi
+adds API keys, storage, and an error format. A client application draws the screen and reads the
+player's input. bxapi rolls the dice, applies the rules, stores the game, and returns what
+happened.
 
-Every error is a problem document (RFC 9457) with a fixed `code`. A command that osrlib refuses
-isn't an error: the command endpoint responds with status 200 and `accepted` set to `false`.
+## Play a game
+
+1. `GET /v1/meta` checks your API key and returns your client name and role.
+2. `POST /v1/ability-rolls` rolls six ability scores and lists the classes they qualify for.
+3. `POST /v1/characters` creates a character from the roll and the player's choices. Keep the
+   character's `id`.
+4. `GET /v1/adventures` lists the adventures you can play. Every server has `builtin-barrow`.
+5. `POST /v1/sessions` starts a game of an adventure with a party of stored characters. Keep the
+   session's `id`.
+6. `GET /v1/sessions/{session_id}/commands` lists the commands that are legal now.
+7. `POST /v1/sessions/{session_id}/commands` sends one command and returns what happened.
+8. `GET /v1/sessions/{session_id}/view` returns what the players can see. Draw the screen from it.
+
+Repeat steps 6 to 8 until `ended` is `true` in a command's response.
+
+## Authentication
+
+Send an API key as a bearer token in the `Authorization` header: `Authorization: Bearer <key>`.
+Whoever runs the server sets its keys in the `BXAPI_API_KEYS` setting, and gives each key a client
+name and a role. Every path under `/v1` needs a key. `GET /health`, `/docs`, `/redoc`, and
+`/openapi.json` don't. A request with no key, or with a key the server doesn't have, gets 401
+`unauthorized`.
+
+A server started with no keys and with `BXAPI_ALLOW_ANONYMOUS=true` asks for no key. It treats
+every caller as a referee of the client `local`, and `GET /v1/meta` returns `auth_enabled` set to
+`false`.
+
+A key has one of two roles:
+
+- `player`: everything a game needs. In a session, a player sees only what the players may see.
+- `referee`: everything a player can do, and also the referee view, referee events, referee
+  commands, seeds, imports, and full adventure and save documents.
+
+A player's request for something only a referee may do gets 403 `referee_required`, or 403
+`referee_command` for a referee command.
+
+A key identifies a client application, not a person. Every key of one client reads and changes
+the same characters, adventures, sessions, and saves, and a client can't read another client's.
+A request for another client's resource gets the same 404 `not_found` as an id that doesn't
+exist.
+
+## Conventions
+
+- **Ids.** A stored resource's id is a prefix and 22 random characters: `rol_` for an ability
+  roll, `chr_` for a character, `adv_` for an adventure, `ses_` for a session, and `sav_` for a
+  save. The id of an adventure that comes with the server starts with `builtin-`.
+- **Timestamps.** UTC, in RFC 3339 format with whole seconds, like `2026-11-20T22:01:05Z`.
+- **Lists.** A list operation takes `limit` (1 to 200, default 50) and `offset` (default 0), and
+  returns `items`, `total`, `limit`, and `offset`. To read the next page, add `limit` to `offset`.
+  You have read the whole list when `offset` plus `limit` is `total` or more. The server lists
+  stored resources newest first.
+- **Documents.** A *document* is osrlib's JSON format for an adventure, a character, a party, or a
+  save. It's an object with the keys `kind`, `schema_version`, `engine_version`, and `payload`.
+  The server reads a document whose `schema_version` is at most the `schema_version` that
+  `GET /v1/meta` returns.
+- **Seeds.** osrlib draws every random number from one integer, the *seed*. The operations under
+  `/v1/dice` and `/v1/generate` take an optional `seed` from any caller and return the seed they
+  used. The same request with the same seed returns the same result on the same osrlib version.
+  For ability rolls, characters, and sessions, only a referee may choose a seed, and the server
+  never returns it to a player.
+- **Unknown fields.** A request body with a field the operation doesn't define gets 422
+  `validation_error`. A command and a document are osrlib's models, and osrlib ignores a field it
+  doesn't define.
+- **Rate limits.** The server has none.
+
+## Refused commands
+
+A command that the rules don't allow isn't an error. `POST /v1/sessions/{session_id}/commands`
+returns 200 with `accepted` set to `false` and osrlib's `rejections`, and the game doesn't change.
+An HTTP error status means that the request itself failed.
+
+## Errors
+
+Every error response is a problem document (RFC 9457) with the media type
+`application/problem+json`. Branch on `code`, which doesn't change between releases. `detail` is a
+sentence for a person, at most 1,000 characters. Some codes add members, which the `Problem`
+schema lists. Each operation's responses list the codes it returns, with what to do about each.
+
+```json
+{
+  "type": "about:blank",
+  "title": "Not Found",
+  "status": 404,
+  "detail": "No session has the id 'ses_nope'.",
+  "code": "not_found",
+  "resource": "session",
+  "id": "ses_nope"
+}
+```
+
+Three codes can succeed when you send the same request again: 409 `session_busy`, 503
+`database_busy` after the one second in its `Retry-After` header, and 408 `request_timeout`. For
+any other code, change the request first. For a 500, report the request to whoever runs the
+server.
 """
 
 _TAGS = [
-    {"name": "meta", "description": "The server's versions, and who the caller is."},
-    {"name": "rules", "description": "The rules content: classes, monsters, spells, items, and the printed tables."},
-    {"name": "dice", "description": "Roll dice expressions."},
-    {"name": "generate", "description": "Roll characters, treasure, and encounters without starting a game."},
-    {"name": "characters", "description": "Create characters and store them, so you can start sessions with them."},
-    {"name": "adventures", "description": "Upload, validate, and list the adventures you can play in a session."},
-    {"name": "sessions", "description": "Start a game, send it commands, and read what the players see."},
+    {
+        "name": "meta",
+        "description": """
+The server's health check, and the versions and identity a client checks when it starts.
+
+- `GET /health` returns `{"status": "ok"}` and needs no key. Point a load balancer's health check
+  at it.
+- `GET /v1/meta` returns the versions of bxapi and osrlib, whether the server asks for a key, and
+  the client and role of your key.
+""",
+    },
+    {
+        "name": "rules",
+        "description": """
+The rules content that osrlib loads: classes, monsters, spells, equipment, magic items, languages,
+the printed tables, and the commands a session accepts. Read it to build a class picker, a shop,
+a bestiary, or a command menu.
+
+Each list operation returns a page of summaries, and each get operation returns osrlib's full
+model for one entry. Pass an entry's `id` from a list to the get operation of the same kind. On a
+list, `q` keeps the entries whose id or name contains the text, ignoring case. Every successful
+response has the header `Cache-Control: private, max-age=3600`, because the content changes only
+when the server's osrlib does. Every role can read every entry, including the ones a referee keeps
+from the players, like what a cursed item does.
+
+- `GET /v1/rules/classes` and `GET /v1/rules/classes/{class_id}`: the character classes. Pass an
+  `id` as `class_id` to `POST /v1/characters`.
+- `GET /v1/rules/equipment` and `GET /v1/rules/equipment/{item_id}`: the weapons, armour, gear,
+  and ammunition a character can buy. Pass an `id` as `item_id` in `purchases`.
+- `GET /v1/rules/spells` and `GET /v1/rules/spells/{spell_id}`: the spells. Pass an `id` in
+  `starting_spell_ids` for a magic-user or an elf.
+- `GET /v1/rules/languages`: the languages. Pass the `id` of a language whose `choosable` is
+  `true` in `extra_languages`, for a character with a high Intelligence.
+- `GET /v1/rules/monsters` and `GET /v1/rules/monsters/{monster_id}`: the monsters, with their
+  statistics.
+- `GET /v1/rules/magic-items` and `GET /v1/rules/magic-items/{item_id}`: the magic items.
+- `GET /v1/rules/tables` and `GET /v1/rules/tables/{name}`: the printed tables for abilities,
+  combat, encounters, and treasure.
+- `GET /v1/rules/commands` and `GET /v1/rules/commands/{command_type}`: every command a session
+  accepts, with the JSON Schema of its body.
+- `GET /v1/rules/license`: the Open Game License that covers the content.
+""",
+    },
+    {
+        "name": "dice",
+        "description": """
+Roll a dice expression, like `3d6` or `2d6+1x10`, outside a game. The response has every die and
+every total. Use it for a dice roller, or for a roll that a session's rules don't make for you.
+
+- `POST /v1/dice/roll`: an expression, how many times to roll it, and an optional seed. Returns
+  the results and the seed.
+""",
+    },
+    {
+        "name": "generate",
+        "description": """
+Roll characters, treasure, NPC parties, stocked rooms, and monsters from the B/X tables, outside
+a game. The server stores nothing. Use them for a referee's tools, or to prepare an adventure.
+
+Each operation takes an optional `seed` and returns the seed it used. Send the same body with that
+seed to get the same result again, on the same osrlib version.
+
+- `POST /v1/generate/character`: the choices for a first-level character. Returns the character
+  and every die rolled for it. To store a character for play, use `POST /v1/characters` instead.
+- `POST /v1/generate/treasure`: a treasure type, like `A`. Returns the coins, gems, jewellery,
+  and magic items.
+- `POST /v1/generate/npc-party`: `basic` or `expert`, and a party size. Returns NPC adventurers
+  with gear and treasure.
+- `POST /v1/generate/room`: a dungeon level. Returns what a room on that level contains.
+- `POST /v1/generate/monsters`: a monster id and a count. Returns the monsters with rolled hit
+  points.
+""",
+    },
+    {
+        "name": "characters",
+        "description": """
+A stored character is a first-level character that the server rolled and stored, so that you can
+start sessions with it. A session plays a copy, so play never changes the stored character, and
+one character can start any number of sessions.
+
+B/X players roll ability scores before they choose a class. An *ability roll* is six scores that
+the server rolls and stores before the player chooses. The server rolls them from a *seed*, the
+integer that osrlib draws every random number from, and stores the seed with the roll. The
+character created from a roll gets its hit points and gold from the same seed, so a retry after
+osrlib refuses a choice gets the same rolls.
+
+1. `POST /v1/ability-rolls` rolls the scores. Show the player `scores` and `eligible_class_ids`.
+2. `POST /v1/characters` creates the character from the roll's `id` and the player's choices.
+3. `POST /v1/sessions` starts a game with the character's `id` in `character_ids`.
+
+`GET /v1/characters` lists the stored characters, `GET /v1/characters/{character_id}` reads one,
+and `DELETE /v1/characters/{character_id}` deletes one. A referee can store a character from
+another server with `POST /v1/characters/import`. To roll a character without storing it, use
+`POST /v1/generate/character`.
+""",
+    },
+    {
+        "name": "adventures",
+        "description": """
+An adventure is the content a session plays: a town, one or more dungeons, and the triggers and
+quests that run in them. Every server has the adventure `builtin-barrow`, so you can start a game
+without uploading anything.
+
+An *adventure document* is osrlib's JSON format for an adventure. osr-forge, which converts
+adventure module PDFs, and osr-editor, a local application for writing adventures, both write
+adventure documents. They're separate projects by osrlib's author. *Adventure info* is what a
+player may know before play: the title, the description, the town, and the names of the dungeons.
+
+1. `GET /v1/adventures` lists the adventures that come with the server, then your uploads.
+2. `POST /v1/adventures/validate` checks a document and stores nothing.
+3. `POST /v1/adventures` checks a document and stores it.
+4. `POST /v1/sessions` starts a game of an adventure by its `id`.
+
+`GET /v1/adventures/{adventure_id}` returns one adventure's info.
+`GET /v1/adventures/{adventure_id}/document` returns the whole document, for a referee only.
+`DELETE /v1/adventures/{adventure_id}` deletes an upload. A session has a copy of its adventure,
+so deleting the adventure doesn't change a session.
+""",
+    },
+    {
+        "name": "sessions",
+        "description": """
+A session is one game in progress: a party playing an adventure. The party starts in town, and
+the game ends in the mode `game_over` or `victory`.
+
+- A *command* is one action, like `{"command_type": "move_party", "direction": "east"}`. osrlib
+  accepts it or refuses it.
+- A *mode* is where the party is in play: `town`, `exploring`, `encounter`, `battle`,
+  `game_over`, or `victory`. The mode decides which commands are legal.
+- An *event* is one thing that happened. Each event is visible to the players, or to the referee
+  only.
+- The *revision* counts the commands that osrlib has accepted in the session. It starts at 0.
+- The *player view* is what the players can see now. A client draws the screen from it.
+
+1. `POST /v1/sessions` starts a game and returns the session's info, at revision 0.
+2. `GET /v1/sessions/{session_id}/commands` lists the commands that are legal now.
+   `GET /v1/rules/commands/{command_type}` has the fields of each one.
+3. `POST /v1/sessions/{session_id}/commands` sends one command and returns the outcome: whether
+   osrlib accepted it, the events, one line of text for each event, and the new mode and
+   revision.
+4. `GET /v1/sessions/{session_id}/view` returns the player view. Draw the screen from it.
+5. Repeat steps 2 to 4 until `ended` is `true`.
+
+`GET /v1/sessions/{session_id}/events` reads the event log, to catch up after a reconnect.
+`POST /v1/sessions/{session_id}/saves` saves the game, and `POST /v1/saves/{save_id}/restore`
+starts a new session from a save. `GET /v1/sessions` lists the sessions,
+`GET /v1/sessions/{session_id}` reads one session's info, `PATCH /v1/sessions/{session_id}`
+renames one, and `DELETE /v1/sessions/{session_id}` deletes one. A referee can read the whole
+state with `GET /v1/sessions/{session_id}/referee-view`.
+
+The server runs one command, view, or read of the event log at a time on each session. A request
+that waits more than 5 seconds for its turn gets 409 `session_busy`. To send a command safely more
+than once, like a retry after a timeout, pass `expected_revision`.
+""",
+    },
     {
         "name": "saves",
-        "description": "List, label, restore, and delete the saves that `POST /v1/sessions/{session_id}/saves` makes, "
-        "and move save documents between servers.",
+        "description": """
+A save is a copy of a session at one moment. Restoring a save starts a new session from that
+moment, and leaves the save and the original session as they were. The save's *save document* is
+osrlib's JSON record of the whole game. It includes the session's seed and the state only a
+referee may see, so only a referee can read or import one.
+
+1. `POST /v1/sessions/{session_id}/saves` saves a session and returns the save's info.
+2. `GET /v1/saves` lists the saves, and `GET /v1/saves/{save_id}` reads one save's info.
+3. `POST /v1/saves/{save_id}/restore` starts a new session from a save.
+
+`PATCH /v1/saves/{save_id}` changes a save's label, and `DELETE /v1/saves/{save_id}` deletes a
+save. To move a game to another server, a referee reads the save document with
+`GET /v1/saves/{save_id}/document` and sends it to `POST /v1/saves/import` on the other server.
+""",
     },
 ]
 
@@ -69,6 +333,46 @@ _NO_KEYS = (
     '\'[{"client": "my-game", "key": "<at least 16 characters>", "role": "player"}]\'. To run on your own machine '
     "with no key, where every caller is a referee for the client 'local', set BXAPI_ALLOW_ANONYMOUS=true."
 )
+
+_SHARED_ERRORS = problem_responses(
+    {
+        401: [
+            "`unauthorized`: The request has no API key, or a key the server doesn't have. Send "
+            "`Authorization: Bearer <key>` with a key from whoever runs the server. The same request gets the same "
+            "error."
+        ],
+        422: [VALIDATION_ERROR],
+        500: [INTERNAL_ERROR],
+        503: [
+            "`database_busy`: Another process held the database's write lock for more than 5 seconds. Wait the one "
+            "second that the `Retry-After` header states, and send the request again."
+        ],
+    }
+)
+_SHARED_ERRORS[401]["headers"] = {
+    "WWW-Authenticate": {"description": "`Bearer`, the scheme the server accepts.", "schema": {"type": "string"}}
+}
+_SHARED_ERRORS[503]["headers"] = {
+    "Retry-After": {
+        "description": "The seconds to wait before you send the request again: `1`.",
+        "schema": {"type": "integer"},
+    }
+}
+
+_BODY_ERRORS = {
+    400: "- `bad_request`: The server can't decode the body as text, or the body has an integer with more than 4,300 "
+    "digits. Send the body as JSON in UTF-8.",
+    408: "- `request_timeout`: The whole body didn't arrive within the time the server waits, which its "
+    "`BXAPI_BODY_TIMEOUT_SECONDS` setting sets and which is 30 seconds by default. Send the request again.",
+    413: "- `content_too_large`: The body is larger than the server accepts, which its `BXAPI_MAX_BODY_BYTES` setting "
+    "sets and which is 8,388,608 bytes by default. The same body gets the same error.",
+}
+
+# osrlib's docstrings link to other code as [`Name`][osrlib.module.Name], which only osrlib's documentation site
+# can resolve. The OpenAPI document shows the name as code instead. A link followed by more code, like
+# [`load_classes`][osrlib.data.load_classes]`()`, becomes one code span.
+_DOC_LINK_THEN_CODE = re.compile(r"\[`([^`\]]+)`\]\[[\w.]*\]`([^`]*)`")
+_DOC_LINK = re.compile(r"\[`([^`\]]+)`\]\[[\w.]*\]")
 
 _SCHEMAS = "#/components/schemas/"
 _PROBLEM_REF = _SCHEMAS + "Problem"
@@ -191,10 +495,8 @@ def _describe_problems(schema: dict[str, Any]) -> None:
         for operation in path.values():
             responses = operation.setdefault("responses", {})
             if path_name.startswith("/v1/") and "requestBody" in operation:
-                for status in (408, 413):
-                    responses.setdefault(
-                        str(status), {"description": HTTPStatus(status).phrase, "content": _problem_content()}
-                    )
+                for status, description in _BODY_ERRORS.items():
+                    responses.setdefault(str(status), {"description": description, "content": _problem_content()})
             for response in responses.values():
                 json_schema = response.get("content", {}).get("application/json", {}).get("schema", {})
                 if json_schema.get("$ref") in (_PROBLEM_REF, _FASTAPI_VALIDATION_REF):
@@ -243,6 +545,18 @@ def _require_discriminators(schema: dict[str, Any]) -> None:
                     required.append(tag)
 
 
+def _plain_links(value: object) -> None:
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if key == "description" and isinstance(item, str):
+                value[key] = _DOC_LINK.sub(r"`\1`", _DOC_LINK_THEN_CODE.sub(r"`\1\2`", item))
+            else:
+                _plain_links(item)
+    elif isinstance(value, list):
+        for item in value:
+            _plain_links(item)
+
+
 def _install_openapi(app: FastAPI) -> None:
     """Make the application's OpenAPI document describe error responses as problem documents."""
 
@@ -258,6 +572,8 @@ def _install_openapi(app: FastAPI) -> None:
             )
             _describe_problems(schema)
             _require_discriminators(schema)
+            _plain_links(schema)
+            add_examples(schema)
             app.openapi_schema = schema
         return app.openapi_schema
 
@@ -348,7 +664,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             expose_headers=["WWW-Authenticate", "Retry-After"],
         )
     app.include_router(meta.health_router)
-    v1 = APIRouter(prefix="/v1", dependencies=[Depends(authenticate)], responses=problem_responses(401, 422, 500, 503))
+    v1 = APIRouter(prefix="/v1", dependencies=[Depends(authenticate)], responses=_SHARED_ERRORS)
     for router in V1_ROUTERS:
         v1.include_router(router)
     app.include_router(v1)

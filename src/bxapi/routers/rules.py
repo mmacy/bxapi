@@ -76,6 +76,10 @@ _Q = Annotated[
 ]
 
 
+def _not_found(kind: str, listing: str) -> dict[int | str, dict[str, object]]:
+    return problem_responses({404: [f"`not_found`: osrlib has no {kind} with this id. `{listing}` lists the ids."]})
+
+
 def _set_cache_control(response: Response) -> None:
     response.headers["Cache-Control"] = CACHE_CONTROL
 
@@ -92,48 +96,67 @@ class License(ApiModel):
     """The license text in Markdown, with its Section 15 notice."""
 
 
-@router.get("/classes", summary="List the character classes")
+@router.get("/classes", summary="List the character classes", response_description="A page of class summaries.")
 def list_classes(page: PageQuery) -> Page[ClassSummary]:
     """List every character class in osrlib's order, with the facts a class picker shows.
 
-    Read `/v1/rules/classes/{class_id}` for the full definition. Pass a class's `id` as `class_id` when you
-    create a character.
-
-    Returns:
-        A page of class summaries.
+    Pass a class's `id` as `class_id` to `POST /v1/characters`. To show only the classes a player's scores qualify
+    for, use `eligible_class_ids` from `POST /v1/ability-rolls`. Read `GET /v1/rules/classes/{class_id}` for the full
+    definition.
     """
     return paginate(class_summaries(), page)
 
 
-@router.get("/classes/{class_id}", summary="Get a character class", responses=problem_responses(404))
+@router.get(
+    "/classes/{class_id}",
+    summary="Get a character class",
+    response_description="osrlib's `ClassDefinition`.",
+    responses=_not_found("class", "GET /v1/rules/classes"),
+)
 def get_class(
     class_id: Annotated[str, Path(description="A class `id` from the class list, like `fighter`.")],
 ) -> ClassDefinition:
-    """Return osrlib's definition of one class: its requirements, XP tiers, abilities, and level progression."""
+    """Return osrlib's definition of one class: its requirements, XP tiers, abilities, and level progression.
+
+    `requirements` has the lowest score in each ability that the class needs, and `progression` has one entry for
+    each level, with the XP it takes, the hit dice, `thac0`, the saving throws, and the spell slots of that level.
+    """
     return lookup(load_classes().get, "class", class_id)
 
 
-@router.get("/monsters", summary="List the monsters")
+@router.get("/monsters", summary="List the monsters", response_description="A page of monster summaries.")
 def list_monsters(page: PageQuery, q: _Q = None) -> Page[MonsterSummary]:
     """List the monsters in osrlib's order, with hit dice, armour class, experience, and alignment.
 
     Pass `q` to search by id or name. Read `/v1/rules/monsters/{monster_id}` for the full template.
-
-    Returns:
-        A page of monster summaries.
     """
     return paginate(monster_summaries(q), page)
 
 
-@router.get("/monsters/{monster_id}", summary="Get a monster", responses=problem_responses(404))
+@router.get(
+    "/monsters/{monster_id}",
+    summary="Get a monster",
+    response_description="osrlib's `MonsterTemplate`.",
+    responses=_not_found("monster", "GET /v1/rules/monsters"),
+)
 def get_monster(
     monster_id: Annotated[str, Path(description="A monster `id` from the monster list, like `goblin`.")],
 ) -> MonsterTemplate:
-    """Return osrlib's template for one monster: attacks, saves, morale, treasure, and special abilities."""
+    """Return osrlib's template for one monster: attacks, saves, morale, treasure, and special abilities.
+
+    The template is the stat block every monster of the kind shares. To roll hit points for one or more of them, use
+    `POST /v1/generate/monsters`. `treasure` has the monster's treasure types, each a letter that
+    `POST /v1/generate/treasure` takes as `treasure_type`.
+    """
     return lookup(load_monsters().get, "monster", monster_id)
 
 
-@router.get("/spells", summary="List the spells", responses=problem_responses(404))
+@router.get(
+    "/spells",
+    summary="List the spells",
+    response_description="A page of spell summaries.",
+    responses=_not_found("class", "GET /v1/rules/classes"),
+)
 def list_spells(
     page: PageQuery,
     q: _Q = None,
@@ -152,15 +175,19 @@ def list_spells(
     """List the spells in osrlib's order, with each spell's level, spell list, range, and duration.
 
     A class casts the spells on one spell list. The cleric uses `cleric`, and the magic-user and the elf use
-    `magic_user`. Pass `class_id` to get the spells a class can cast, and `level` to list only one spell level.
-
-    Returns:
-        A page of spell summaries.
+    `magic_user`. Pass `class_id` to get the spells a class can cast, and `level` to list only one spell level. For
+    the first spell of a new magic-user or elf, list `class_id=magic_user&level=1`, and pass a spell's `id` in
+    `starting_spell_ids` to `POST /v1/characters`.
     """
     return paginate(spell_summaries(q, class_id, level), page)
 
 
-@router.get("/spells/{spell_id}", summary="Get a spell", responses=problem_responses(404))
+@router.get(
+    "/spells/{spell_id}",
+    summary="Get a spell",
+    response_description="osrlib's `SpellTemplate`.",
+    responses=_not_found("spell", "GET /v1/rules/spells"),
+)
 def get_spell(
     spell_id: Annotated[str, Path(description="A spell `id` from the spell list, like `magic_missile`.")],
 ) -> SpellTemplate:
@@ -168,7 +195,7 @@ def get_spell(
     return lookup(load_spells().get, "spell", spell_id)
 
 
-@router.get("/equipment", summary="List the equipment")
+@router.get("/equipment", summary="List the equipment", response_description="A page of equipment summaries.")
 def list_equipment(
     page: PageQuery,
     q: _Q = None,
@@ -176,15 +203,19 @@ def list_equipment(
 ) -> Page[EquipmentSummary]:
     """List the mundane equipment a character can buy: weapons first, then armour, gear, and ammunition.
 
-    Pass `item_type` to list only one type of item.
-
-    Returns:
-        A page of equipment summaries.
+    Pass `item_type` to list only one type of item. Pass an item's `id` as `item_id` in the `purchases` of
+    `POST /v1/characters`, or in `item_ids` of a session's `purchase_equipment` command. `cost_gp` is the price of
+    one lot. A lot is one weapon or one suit of armour, and a bundle of gear or ammunition, like six torches.
     """
     return paginate(equipment_summaries(q, item_type), page)
 
 
-@router.get("/equipment/{item_id}", summary="Get an equipment item", responses=problem_responses(404))
+@router.get(
+    "/equipment/{item_id}",
+    summary="Get an equipment item",
+    response_description="osrlib's template for the item.",
+    responses=_not_found("equipment item", "GET /v1/rules/equipment"),
+)
 def get_equipment_item(
     item_id: Annotated[str, Path(description="An equipment `id` from the equipment list, like `sword`.")],
 ) -> EquipmentItem:
@@ -195,7 +226,7 @@ def get_equipment_item(
     return EquipmentItem(lookup(load_equipment().get, "equipment item", item_id))
 
 
-@router.get("/magic-items", summary="List the magic items")
+@router.get("/magic-items", summary="List the magic items", response_description="A page of magic item summaries.")
 def list_magic_items(
     page: PageQuery,
     q: _Q = None,
@@ -203,47 +234,57 @@ def list_magic_items(
 ) -> Page[MagicItemSummary]:
     """List the magic items in osrlib's order.
 
-    Returns:
-        A page of magic item summaries.
+    Pass `category` to list only one kind of item, like `potion`. Read `GET /v1/rules/magic-items/{item_id}` for what
+    an item does.
     """
     return paginate(magic_item_summaries(q, category), page)
 
 
-@router.get("/magic-items/{item_id}", summary="Get a magic item", responses=problem_responses(404))
+@router.get(
+    "/magic-items/{item_id}",
+    summary="Get a magic item",
+    response_description="osrlib's `MagicItemTemplate`.",
+    responses=_not_found("magic item", "GET /v1/rules/magic-items"),
+)
 def get_magic_item(
     item_id: Annotated[str, Path(description="A magic item `id` from the magic item list, like `potion_of_healing`.")],
 ) -> MagicItemTemplate:
-    """Return osrlib's template for one magic item."""
+    """Return osrlib's template for one magic item.
+
+    The template includes what the players learn only when the item is identified in play, like whether it's
+    `cursed`. Show a player only what the session's player view reveals about the item.
+    """
     return lookup(load_magic_items().get, "magic item", item_id)
 
 
-@router.get("/languages", summary="List the languages")
+@router.get("/languages", summary="List the languages", response_description="A page of languages.")
 def list_languages(page: PageQuery) -> Page[Language]:
     """List the languages in osrlib's catalog, in alphabetical order by id.
 
     A character speaks the language of its alignment without choosing it, so the alignment languages aren't
     listed. When you create a character with a high Intelligence, pass the `id` of a language whose
     `choosable` is `true` in `extra_languages`.
-
-    Returns:
-        A page of languages.
     """
     return paginate(load_languages().languages, page)
 
 
-@router.get("/tables", summary="List the printed tables")
+@router.get("/tables", summary="List the printed tables", response_description="A page of table names.")
 def list_tables(page: PageQuery) -> Page[str]:
     """List the names of the printed tables: `abilities`, `combat`, `encounters`, and `treasure`.
 
     Pass a name to `/v1/rules/tables/{name}` to read that set of tables.
-
-    Returns:
-        A page of table names.
     """
     return paginate(list(_TABLES), page)
 
 
-@router.get("/tables/{name}", summary="Get a set of printed tables", responses=problem_responses(404))
+@router.get(
+    "/tables/{name}",
+    summary="Get a set of printed tables",
+    response_description="osrlib's model for the set of tables.",
+    responses=problem_responses(
+        {404: ["`not_found`: No set of tables has this name. Send `abilities`, `combat`, `encounters`, or `treasure`."]}
+    ),
+)
 def get_table(
     name: Annotated[str, Path(description="A table name: `abilities`, `combat`, `encounters`, or `treasure`.")],
 ) -> TableSet:
@@ -252,7 +293,10 @@ def get_table(
     `abilities` returns `AbilityTables`: what each ability score is worth. `combat` returns `CombatTables`:
     the attack matrix, saving throws, XP awards, turning, and reactions. `encounters` returns
     `EncounterTables`: the wandering monsters by dungeon level. `treasure` returns `TreasureTables`: the
-    treasure types. An unknown name is a 404.
+    treasure types.
+
+    In a session, osrlib rolls on these tables for you. To roll on the treasure tables outside a game, use
+    `POST /v1/generate/treasure`.
     """
     loader = _TABLES.get(name)
     if loader is None:
@@ -260,7 +304,7 @@ def get_table(
     return TableSet(loader())
 
 
-@router.get("/commands", summary="List the commands")
+@router.get("/commands", summary="List the commands", response_description="A page of command summaries.")
 def list_commands(
     page: PageQuery,
     kind: Annotated[
@@ -276,30 +320,34 @@ def list_commands(
     `allowed_modes` lists the session modes the command is legal in. osrlib has more commands than the default
     `limit`, so pass `limit=200` to read them all in one request.
 
-    Returns:
-        A page of command summaries.
+    For the commands that are legal in one session now, for your role, use `GET /v1/sessions/{session_id}/commands`.
     """
     return paginate(command_summaries(kind, mode), page)
 
 
-@router.get("/commands/{command_type}", summary="Get a command", responses=problem_responses(404))
+@router.get(
+    "/commands/{command_type}",
+    summary="Get a command",
+    response_description="The command's summary and the JSON Schema of its body.",
+    responses=problem_responses(
+        {404: ["`not_found`: osrlib has no command of this type. `GET /v1/rules/commands` lists the types."]}
+    ),
+)
 def get_command(
     command_type: Annotated[str, Path(description="A `command_type` from the command list, like `move_party`.")],
 ) -> CommandDetail:
     """Return one command's summary and the JSON Schema of its request body.
 
-    Post a body that matches `json_schema`, with `command_type` set.
-
-    Args:
-        command_type: The `command_type` of an osrlib command.
-
-    Returns:
-        The command's summary fields and `json_schema`.
+    Send a body that matches `json_schema`, with `command_type` set, to `POST /v1/sessions/{session_id}/commands`. A
+    client can build a form for the command from the schema. `json_schema` describes `source` too, but only a referee
+    may send it.
     """
     return command_detail(command_type)
 
 
-@router.get("/license", summary="Get the license of the rules content")
+@router.get(
+    "/license", summary="Get the license of the rules content", response_description="The license's name and text."
+)
 def get_license() -> License:
     """Return the Open Game License 1.0a text that covers the rules content, with its Section 15 notice."""
     text = resources.files("osrlib.data").joinpath("LICENSE-OGL.md").read_text(encoding="utf-8")

@@ -40,18 +40,28 @@ class Meta(ApiModel):
     """The caller's role."""
 
 
-@health_router.get("/health", summary="Check that the server is up")
+@health_router.get("/health", summary="Check that the server is up", response_description='`{"status": "ok"}`.')
 def get_health() -> Health:
-    """Return `{"status": "ok"}`. The endpoint needs no API key and reads no data."""
+    """Return `{"status": "ok"}` while the server can answer requests.
+
+    The endpoint needs no API key and reads no data, so a load balancer or a container's health check can call it
+    often. It doesn't check the database or the API key. To check an API key, call `GET /v1/meta`.
+    """
     return Health()
 
 
-@router.get("/meta", summary="Get the server's versions and the caller's role")
+@router.get(
+    "/meta",
+    summary="Get the server's versions and the caller's role",
+    response_description="The versions, whether the server asks for a key, and the caller's client and role.",
+)
 def get_meta(request: Request, principal: CurrentPrincipal) -> Meta:
     """Return the versions of bxapi and osrlib, and the client and role of the API key you sent.
 
-    Call it when your application starts, to check that the key works and that the server's
-    `schema_version` isn't lower than the schema version your stored documents are stamped with.
+    Call it when a client starts. A 200 means the key works, and `role` says whether the client can use the
+    operations only a referee may call. If the client keeps documents, like save documents, compare
+    `schema_version` with the `schema_version` of each document. The server refuses a document with a higher one,
+    with 409 `version_unsupported`.
     """
     return Meta(
         api_version=__version__,

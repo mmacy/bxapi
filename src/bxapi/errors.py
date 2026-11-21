@@ -27,6 +27,7 @@ and `accepted` set to `false`.
 
 import logging
 import sqlite3
+from collections.abc import Mapping, Sequence
 from http import HTTPStatus
 from typing import Any
 
@@ -41,9 +42,11 @@ from pydantic.json_schema import SkipJsonSchema
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 __all__ = [
+    "INTERNAL_ERROR",
     "MAX_DETAIL_LENGTH",
     "MAX_FIELD_ERRORS",
     "PROBLEM_MEDIA_TYPE",
+    "VALIDATION_ERROR",
     "ApiError",
     "FieldError",
     "Problem",
@@ -65,6 +68,19 @@ MAX_DETAIL_LENGTH = 1000
 
 MAX_FIELD_ERRORS = 20
 """The most entries the `errors` member of a `validation_error` lists."""
+
+VALIDATION_ERROR = (
+    "`validation_error`: The request doesn't match the operation's schema. A required field is missing, a value has "
+    "the wrong type or is out of range, or the body isn't valid JSON. `errors` lists the first 20 problems, and the "
+    "`loc` of each is the path to the value. Fix the request before you send it again."
+)
+"""The OpenAPI entry for 422 `validation_error`, which every route under `/v1` can return."""
+
+INTERNAL_ERROR = (
+    "`internal_error`: The server failed because of a bug. The response says nothing about the cause, and the server "
+    "logs it. Report the request to the server's operator."
+)
+"""The OpenAPI entry for 500 `internal_error`, which every route under `/v1` can return."""
 
 _MAX_TEXT_SHOWN = 128
 
@@ -303,29 +319,36 @@ def problem_response(problem: Problem, headers: dict[str, str] | None = None) ->
     )
 
 
-def problem_responses(*statuses: int) -> dict[int | str, dict[str, Any]]:
+def problem_responses(errors: Mapping[int, Sequence[str]]) -> dict[int | str, dict[str, Any]]:
     """Return the `responses` argument that documents an endpoint's error statuses in OpenAPI.
 
-    Pass the result to a route decorator. Every route under `/v1` can also return 401, 422,
-    500, and 503, which the router documents once for all of them.
-    [`create_app`][bxapi.app.create_app] changes the media type of each of these responses to
-    `application/problem+json` when it builds the OpenAPI document.
+    Pass the result to a route decorator. For each status, list one entry for each error code the
+    endpoint returns with that status. Start the entry with the code, then say what causes it and
+    what the caller does about it. Every route under `/v1` can also return 401, 422, 500, and 503,
+    which [`create_app`][bxapi.app.create_app] documents once for all of them. A route that lists
+    422 or 500 replaces that shared entry, so it starts its list with
+    [`VALIDATION_ERROR`][bxapi.errors.VALIDATION_ERROR] or
+    [`INTERNAL_ERROR`][bxapi.errors.INTERNAL_ERROR]. `create_app` changes the media type of each of
+    these responses to `application/problem+json` when it builds the OpenAPI document.
 
     Args:
-        *statuses: The error statuses the endpoint can return, like `404` and `409`.
+        errors: A mapping from each error status to its entries, each a line of Markdown.
 
     Returns:
-        A mapping from each status to its OpenAPI response description.
+        A mapping from each status to its OpenAPI response, with the entries as a Markdown list.
 
     Examples:
         ```python
         from bxapi.errors import problem_responses
 
-        responses = problem_responses(404)
-        assert responses[404]["description"] == "Not Found"
+        responses = problem_responses({404: ["`not_found`: No session has that id."]})
+        assert responses[404]["description"] == "- `not_found`: No session has that id."
         ```
     """
-    return {status: {"description": HTTPStatus(status).phrase, "model": Problem} for status in statuses}
+    return {
+        status: {"description": "\n".join(f"- {entry}" for entry in entries), "model": Problem}
+        for status, entries in errors.items()
+    }
 
 
 def _quoted(name: str) -> str:
