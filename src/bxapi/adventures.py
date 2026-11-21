@@ -28,6 +28,7 @@ from pydantic import ValidationError
 
 from bxapi.db import Database
 from bxapi.errors import MAX_DETAIL_LENGTH, not_found, shorten
+from bxapi.models import has_control_character
 
 __all__ = [
     "ADVENTURE_KIND",
@@ -75,7 +76,9 @@ def parse_adventure(document: Mapping[str, object]) -> Adventure:
     """Return the adventure in a document, after every check osrlib makes on one.
 
     The function checks the envelope, then the adventure's structure, then every reference the
-    adventure makes to a monster, an item, an area, or a quest. The message of the error it
+    adventure makes to a monster, an item, an area, or a quest. It also refuses a `name` with a
+    control character, because the server lists the name with every session and save of the
+    adventure. The message of the error it
     raises is at most 1,000 characters long, because osrlib's messages can repeat parts of the
     document. For a payload that isn't a valid adventure, the message lists at most 20
     problems, followed by how many more there are.
@@ -88,8 +91,8 @@ def parse_adventure(document: Mapping[str, object]) -> Adventure:
 
     Raises:
         osrlib.errors.ContentValidationError: If the envelope is malformed or of another kind,
-            if the payload isn't a valid adventure, or if the adventure refers to something that
-            doesn't exist. The API sends it as 422 `content_invalid`.
+            if the payload isn't a valid adventure, if the adventure refers to something that
+            doesn't exist, or if its name has a control character. The API sends it as 422 `content_invalid`.
         osrlib.errors.SaveVersionError: If the document is stamped with a schema version newer
             than the installed osrlib reads. The API sends it as 409 `version_unsupported`.
 
@@ -108,6 +111,8 @@ def parse_adventure(document: Mapping[str, object]) -> Adventure:
         except ValidationError as error:
             raise ContentValidationError(_invalid_message(error)) from error
         validate_adventure(adventure, load_monsters(), load_equipment())
+        if has_control_character(adventure.name):
+            raise ContentValidationError("the adventure's name has a control character, like a tab or a newline")
     except (ContentValidationError, SaveVersionError) as error:
         message = str(error)
         if len(message) <= MAX_DETAIL_LENGTH:

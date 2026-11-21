@@ -19,6 +19,7 @@ The contract below covers version 1 of the API. For how to work in the repositor
 - **Bodies.** Requests and responses are JSON. Field names are snake_case. A `POST`, `PUT`, or `PATCH` request with a body states that the body is JSON in its `Content-Type` header: `application/json`, or an `application` type whose name ends in `+json`, with or without parameters like `charset`. A body with another content type, or with none, gets 415 `unsupported_media_type`. A request with an empty body needs no `Content-Type`. A request body with a field the endpoint doesn't define gets 422 `validation_error`. A body or a field that is an osrlib model, like a command or a character's `adjustment`, is the exception: osrlib ignores unknown fields.
 - **Body size.** A request body is at most `BXAPI_MAX_BODY_BYTES`, on every path. On an operation that takes no document, a body is also at most 65,536 bytes. The operations that take a document are `POST /v1/adventures`, `POST /v1/adventures/validate`, `POST /v1/characters/import`, `POST /v1/saves/import`, and `POST /v1/sessions`, whose `party_document` is a document. A larger body gets 413 `content_too_large`. The server sets the 65,536-byte limit, and it isn't a rule of the game. It limits the time the server spends on one command or one set of character choices, and how much one accepted command adds to the session's save document.
 - **JSON values.** The server refuses a body with a value it can't store or can't send back as JSON, with 400 `bad_request`. The values are `NaN`, `Infinity`, and `-Infinity`, a number too large for a 64-bit float, like `1e400`, a string or a key with half of a UTF-16 surrogate pair, like `"\ud800"`, and arrays and objects nested more than 100 levels deep. A save document from osrlib nests 12 levels.
+- **Names.** A name or a label that the server stores in a column of its own has no control character: a character's `name`, a session's `name`, a save's `label`, and an adventure's `name`. A control character is one from U+0000 to U+001F or from U+007F to U+009F, like a tab, a newline, or an escape. In a request body that bxapi defines, a name with one gets 422 `validation_error`, with the error type `string_control_character`. An uploaded adventure, an imported character, and an imported save's adventure get 422 `content_invalid`. The rule keeps an escape sequence out of the lists a client prints. Other text can contain any character, like an adventure's description or the name of a character in a party document.
 - **Identifiers.** A stored resource has an id made of a prefix and 22 random URL-safe characters: `chr_` for a character, `rol_` for an ability roll, `adv_` for an adventure, `ses_` for a session, and `sav_` for a save. An adventure that comes with the server has an id that starts with `builtin-`.
 - **Timestamps.** UTC, in RFC 3339 format with whole seconds, like `2026-11-20T22:01:05Z`.
 - **Lists.** A list endpoint takes `limit` (1 to 200, default 50) and `offset` (0 to 2^53 - 1, default 0), and returns `{"items": [...], "total": n, "limit": n, "offset": n}`. Stored resources are listed newest first.
@@ -162,7 +163,7 @@ The body of `POST /v1/characters`:
 
 | Field | Required | Meaning |
 | --- | --- | --- |
-| `name` | yes | The character's name, 1 to 100 characters. osrlib accepts a name of spaces. |
+| `name` | yes | The character's name, 1 to 100 characters, with no control character. osrlib accepts a name of spaces. |
 | `class_id` | yes | A class id from `/v1/rules/classes`. |
 | `alignment` | yes | `lawful`, `neutral`, or `chaotic`. |
 | `ability_roll_id` | no | Create the character from the roll's scores, with the hit point and gold rolls of the roll's seed. Without it, the server rolls the scores as part of the request. |
@@ -255,7 +256,7 @@ The body of `POST /v1/sessions`:
 | `adventure_id` | yes | The adventure to play. |
 | `character_ids` | one of the two | The stored characters that form the party, in marching order, at most 20. The session uses copies, so the list can contain a character more than once. |
 | `party_document` | one of the two | Referee only. A party document, in place of stored characters, with at most 20 characters. |
-| `name` | no | A label for the session, 1 to 200 characters. Defaults to the adventure's name. |
+| `name` | no | A label for the session, 1 to 200 characters, with no control character. Defaults to the adventure's name. |
 | `ruleset` | no | osrlib's `Ruleset` fields, to change optional rules. Defaults to the rules as written. |
 | `seed` | no | Referee only. |
 

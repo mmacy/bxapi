@@ -1,14 +1,61 @@
 """The base classes for the models the API defines."""
 
-from typing import Any
+import re
+from typing import Annotated, Any
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 from pydantic.config import JsonDict
 from pydantic_core import PydanticCustomError
 
-__all__ = ["ApiModel", "RequestModel", "left_out_when_none"]
+__all__ = ["ApiModel", "NameText", "RequestModel", "has_control_character", "left_out_when_none"]
 
 _MAX_UNKNOWN_FIELDS = 20
+
+_CONTROL_CHARACTER = re.compile(r"[\x00-\x1f\x7f-\x9f]")
+
+
+def has_control_character(text: str) -> bool:
+    r"""Return whether text has a control character: one from U+0000 to U+001F or from U+007F to U+009F.
+
+    These are the characters of Unicode's category Cc, like NUL, tab, newline, and escape. A
+    client that prints a name to a terminal would run an escape sequence in it, so the server
+    refuses one in each name and label that it stores in a column of its own.
+
+    Args:
+        text: The text to check.
+
+    Returns:
+        `True` if any character of the text is a control character.
+
+    Examples:
+        ```python
+        from bxapi.models import has_control_character
+
+        assert has_control_character("Hild\x1b[2J")
+        assert not has_control_character("Hild the Bold")
+        ```
+    """
+    return _CONTROL_CHARACTER.search(text) is not None
+
+
+def _no_control_characters(text: str) -> str:
+    if has_control_character(text):
+        raise PydanticCustomError(
+            "string_control_character",
+            "The text can't contain a control character, like a tab, a newline, or an escape character.",
+        )
+    return text
+
+
+NameText = Annotated[
+    str,
+    AfterValidator(_no_control_characters),
+    Field(json_schema_extra={"pattern": r"^[^\u0000-\u001f\u007f-\u009f]*$"}),
+]
+"""The type of a name or a label in a request body: a string with no control character.
+
+Set the length limits with `Field` on the model's field. A value with a control character gets
+422 `validation_error`, with the error type `string_control_character`."""
 
 
 def _leave_out_default(schema: JsonDict) -> None:
