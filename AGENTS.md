@@ -54,7 +54,7 @@ The CI workflow's `docs` job builds the documentation site. When you change a ha
 
 ## The documentation site
 
-`website/` is a [Docusaurus](https://docusaurus.io/) site with two parts. The guides are the hand-written pages: `README.md`, every file in `docs/` except `docs/spec.md`, and `examples/README.md`. The API reference is a set of pages that [Docs MD](https://github.com/speakeasy-api/docs-md), Speakeasy's generator of reference pages, writes from the OpenAPI document. CI builds the site and doesn't publish it.
+`website/` is a [Docusaurus](https://docusaurus.io/) site with two parts. The guides are the hand-written pages: `README.md`, every file in `docs/` except `docs/spec.md`, and `examples/README.md`. The API reference is a set of pages that [Docs MD](https://github.com/speakeasy-api/docs-md), Speakeasy's generator of reference pages, writes from the OpenAPI document. On a push to `main` that passes the gate, CI publishes the site to GitHub Pages at <https://mmacy.github.io/bxapi/>.
 
 Build the site and serve it at <http://localhost:3000/bxapi/>. You need [Node.js](https://nodejs.org/) 22 or later:
 

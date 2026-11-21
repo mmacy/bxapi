@@ -25,7 +25,8 @@ jobs:
       - run: uv run pytest
 
   # Builds the documentation site in website/: the hand-written pages, and the API reference that
-  # Speakeasy's Docs MD generates from the OpenAPI document. The build fails on a broken link.
+  # Speakeasy's Docs MD generates from the OpenAPI document. The build fails on a broken link. On
+  # a push to main, the deploy-docs job publishes the build.
   docs:
     runs-on: ubuntu-latest
     steps:
@@ -41,6 +42,27 @@ jobs:
         working-directory: website
       - run: npm run build
         working-directory: website
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          path: website/build
+
+  # Publishes the site to GitHub Pages at https://mmacy.github.io/bxapi/ when a push to main
+  # passes the gate. The repository's Pages source is "GitHub Actions", so the job needs no
+  # gh-pages branch.
+  deploy-docs:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [gate, docs]
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
 
   # Installs the lowest version that pyproject.toml allows of each direct dependency, so the
   # lower bounds stay true. The sync resolves again and rewrites uv.lock in the runner's checkout
