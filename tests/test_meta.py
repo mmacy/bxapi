@@ -1,6 +1,3 @@
-import importlib
-import inspect
-import pkgutil
 import re
 from collections.abc import Callable
 
@@ -9,7 +6,6 @@ from fastapi.testclient import TestClient
 from osrlib.versioning import SCHEMA_VERSION, engine_version
 from pydantic import BaseModel
 
-import bxapi
 from bxapi import __version__
 from bxapi.app import create_app
 from bxapi.routers import V1_ROUTERS, meta
@@ -74,31 +70,22 @@ def test_operation_ids_are_the_endpoint_names_and_unique(client: TestClient) -> 
     assert len(operation_ids) == len(set(operation_ids))
 
 
-def _bxapi_model_names() -> set[str]:
-    names = set()
-    for module_info in pkgutil.walk_packages(bxapi.__path__, "bxapi."):
-        module = importlib.import_module(module_info.name)
-        for _, member in inspect.getmembers(module, inspect.isclass):
-            if issubclass(member, BaseModel) and member.__module__.startswith("bxapi."):
-                names.add(member.__name__)
-    return names
-
-
-def test_every_field_bxapi_defines_has_a_description(client: TestClient) -> None:
+def test_every_field_has_a_description(client: TestClient) -> None:
     schemas = client.get("/openapi.json").json()["components"]["schemas"]
-    ours = _bxapi_model_names()
-    checked = []
-    for name, schema in schemas.items():
-        # A generic model's schema is named like `Page_CharacterSummary_`.
-        if name.split("_")[0] not in ours and name not in ours:
-            continue
-        checked.append(name)
-        for field, field_schema in schema.get("properties", {}).items():
-            # pydantic puts the description of an annotated type, like `Seed | None`, on its non-null branch.
-            branches = [branch for branch in field_schema.get("anyOf", []) if branch.get("type") != "null"]
-            described = field_schema.get("description") or (len(branches) == 1 and branches[0].get("description"))
-            assert described, f"{name}.{field} has no description"
-    assert {"Meta", "Problem", "FieldError", "Health"} <= set(checked)
+    assert {"DiceRollRequest", "Meta", "MoveParty", "PlayerView", "Problem"} <= set(schemas)
+    undescribed = [
+        f"{name}.{field}"
+        for name, schema in schemas.items()
+        for field, field_schema in schema.get("properties", {}).items()
+        if not field_schema.get("description")
+    ]
+    assert undescribed == []
+
+
+def test_no_text_in_the_document_has_a_documentation_link(client: TestClient) -> None:
+    # A link like [`MoveParty`][osrlib.crawl.commands.MoveParty] resolves only on osrlib's documentation site.
+    text = client.get("/openapi.json").text
+    assert re.findall(r"\[`[^`\]]+`\]\[[\w.]*\]", text) == []
 
 
 def test_every_path_parameter_has_a_description(client: TestClient) -> None:

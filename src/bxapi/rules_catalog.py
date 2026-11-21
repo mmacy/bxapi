@@ -91,7 +91,8 @@ class MonsterSummary(ApiModel):
     id: str
     """The monster id, like `"goblin"`."""
     name: str
-    """The display name, like `"Goblin"`."""
+    """The name as the rules print it, like `"Goblin"` or `"Centipede, Giant"`. To name the monster in a sentence, use
+    the `display_name` of `GET /v1/rules/monsters/{monster_id}`, like `"giant centipede"`."""
     hit_dice: MonsterHitDice
     """The monster's hit dice, as osrlib's `MonsterHitDice`."""
     ac: int | None
@@ -223,7 +224,7 @@ def class_summaries() -> list[ClassSummary]:
             name=definition.name,
             race=definition.race,
             prime_requisites=definition.prime_requisites,
-            requirements=definition.requirements,
+            requirements=dict(definition.requirements),
             hit_die=definition.hit_die,
             max_level=definition.max_level,
         )

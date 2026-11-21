@@ -30,7 +30,7 @@
       "status": 200,
       "response": {
         "api_version": "0.1.0",
-        "engine_version": "2.4.0",
+        "engine_version": "2.5.0",
         "schema_version": 4,
         "auth_enabled": true,
         "client": "my-game",
@@ -595,6 +595,9 @@
       "response": {
         "id": "goblin",
         "name": "Goblin",
+        "display_name": "goblin",
+        "display_name_plural": "goblins",
+        "family_id": "goblin",
         "page": "Goblin.md",
         "intro": "Small, grotesque humanoids with pallid, earth-coloured skin and glowing, red eyes. Dwell underground.",
         "ac": 6,
@@ -1523,10 +1526,11 @@
             "command_type": "give_items",
             "kind": "play",
             "allowed_modes": [
+              "encounter",
               "exploring",
               "town"
             ],
-            "summary": "Hand items and coins from one party member to another (takes no game time)."
+            "summary": "Hand items and coins from one party member to another."
           },
           {
             "command_type": "light_source",
@@ -1575,7 +1579,7 @@
         "json_schema": {
           "$defs": {
             "Direction": {
-              "description": "The four grid directions the party faces and moves in.\n\nYou use these for the way [`MoveParty`][osrlib.crawl.commands.MoveParty] steps, the side of a\ncell [`OpenDoor`][osrlib.crawl.commands.OpenDoor] works on, and the way a transition turns the\nparty on arrival. There is no up or down. A\n[`TransitionSpec`][osrlib.crawl.dungeon.TransitionSpec] moves the party between levels.\n\nThe values are lowercase strings, like `\"north\"`, and they appear in commands, events, and saves.",
+              "description": "The four grid directions the party faces and moves in.\n\nYou use these for the way `MoveParty` steps, the side of a\ncell `OpenDoor` works on, and the way a transition turns the\nparty on arrival. There is no up or down. A\n`TransitionSpec` moves the party between levels.\n\nThe values are lowercase strings, like `\"north\"`, and they appear in commands, events, and saves.",
               "enum": [
                 "north",
                 "east",
@@ -1586,11 +1590,12 @@
               "type": "string"
             }
           },
-          "description": "Move the party one cell, turning to face the way it goes.\n\nThe party must already be in a dungeon. A new session starts in town, and\n[`EnterDungeon`][osrlib.crawl.commands.EnterDungeon] places the party at the entrance\nand switches the session to `exploring`. A step onto a cell the party hasn't explored\nuses 10 feet of the party's movement, and a step onto an explored cell uses a third of\nthat. Each time the movement adds up to the party's exploration rate, one turn passes on\nthe game clock.\n\nA passage is a [`TransitionSpec`][osrlib.crawl.dungeon.TransitionSpec] whose `kind` is\n`\"passage\"`, standing on one side of a cell. A move toward that side crosses the passage\ninstead of stopping at the wall there. The party arrives at the passage's destination,\nfacing its `to_facing`, and the move costs what a step onto that destination cell costs.\n\nModes:\n    `exploring`\n\nRejections:\n    - `session.command.wrong_mode` - the session is not exploring a dungeon.\n    - `exploration.move.cannot_move` - the party cannot move: it is overloaded,\n      or a living member is unable to walk.\n    - `exploration.move.blocked` - a wall, a closed door, an undiscovered secret\n      door, or the edge of the map is on that side, and no passage stands there.\n    - `exploration.transition.gate_refused` - the move would cross a passage\n      whose authored condition ([`GateSpec`][osrlib.crawl.gates.GateSpec]) the\n      party doesn't meet. The rejection includes the gate's authored refusal text.\n      Like every refusal, it costs no movement, no time, and no toll.\n\nEvents:\n    [`PartyMovedEvent`][osrlib.crawl.events.PartyMovedEvent] with the new position\n    and facing. Arriving in the new cell can set off more, each with a\n    separate event. A [`LocationEnteredEvent`][osrlib.crawl.events.LocationEnteredEvent]\n    follows when the party crosses into a new area, level, or dungeon. A\n    [`DoorEvent`][osrlib.crawl.events.DoorEvent] follows for each unwedged door the party\n    opened that swings shut behind it. The area's treasure roll arrives as a\n    [`HoardGeneratedEvent`][osrlib.crawl.events.HoardGeneratedEvent]. A room\n    trap's spring check produces a\n    [`DetectionRolledEvent`][osrlib.crawl.events.DetectionRolledEvent] and a\n    [`TrapEvent`][osrlib.crawl.events.TrapEvent], and a trap that springs\n    resolves at once.\n\n    A pool of burning oil or a *web* on the cell affects the party as it arrives\n    ([`DamageDealtEvent`][osrlib.core.events.DamageDealtEvent],\n    [`HitPointsReportedEvent`][osrlib.core.events.HitPointsReportedEvent],\n    [`DeathEvent`][osrlib.core.events.DeathEvent],\n    [`EffectAttachedEvent`][osrlib.core.events.EffectAttachedEvent],\n    [`ConditionGainedEvent`][osrlib.core.events.ConditionGainedEvent]). Monsters keyed to\n    the area in the adventure (a keyed encounter) meet the party the first time it enters,\n    with [`SurpriseRolledEvent`][osrlib.crawl.events.SurpriseRolledEvent]s,\n    [`EncounterStartedEvent`][osrlib.crawl.events.EncounterStartedEvent],\n    [`ReactionRolledEvent`][osrlib.core.events.ReactionRolledEvent], and\n    [`StanceChangedEvent`][osrlib.crawl.events.StanceChangedEvent]. When their reaction is\n    to attack, battle opens at once\n    ([`BattleStartedEvent`][osrlib.crawl.events.BattleStartedEvent]).\n\n    A move through a passage reports the crossing before the step, as\n    [`UseStairs`][osrlib.crawl.commands.UseStairs] does. An\n    [`ItemConsumedEvent`][osrlib.crawl.events.ItemConsumedEvent] comes first when\n    the passage's gate takes an item as a toll. A `LocationEnteredEvent` follows when the\n    level or dungeon changes, with `via` set to `\"passage\"` and `transition_ref`\n    set to the passage's cell. Then come the `DoorEvent`s for the doors that swing shut\n    on the level the party left, the `PartyMovedEvent` for the landing cell, and the\n    landing cell's events.\n\n    When the step's movement completes a turn on the game clock, the events of that turn\n    follow:\n    [`EffectExpiredEvent`][osrlib.core.events.EffectExpiredEvent] with a\n    [`LightEvent`][osrlib.crawl.events.LightEvent] for a light burning out,\n    [`FatigueEvent`][osrlib.crawl.events.FatigueEvent] when the fatigue penalty starts or ends,\n    [`ProvisionsEvent`][osrlib.crawl.events.ProvisionsEvent] on a day boundary,\n    and [`WanderingCheckEvent`][osrlib.crawl.events.WanderingCheckEvent] when a\n    wandering-monster check is due.",
+          "description": "Move the party one cell, turning to face the way it goes.\n\nThe party must already be in a dungeon. A new session starts in town, and\n`EnterDungeon` places the party at the entrance\nand switches the session to `exploring`. A step onto a cell the party hasn't explored\nuses 10 feet of the party's movement, and a step onto an explored cell uses a third of\nthat. Each time the movement adds up to the party's exploration rate, one turn passes on\nthe game clock.\n\nA passage is a `TransitionSpec` whose `kind` is\n`\"passage\"`, standing on one side of a cell. A move toward that side crosses the passage\ninstead of stopping at the wall there. The party arrives at the passage's destination,\nfacing its `to_facing`, and the move costs what a step onto that destination cell costs.\n\nModes:\n    `exploring`\n\nRejections:\n    - `session.command.wrong_mode` - the session is not exploring a dungeon.\n    - `exploration.move.cannot_move` - the party cannot move: it is overloaded,\n      or a living member is unable to walk.\n    - `exploration.move.blocked` - a wall, a closed door, an undiscovered secret\n      door, or the edge of the map is on that side, and no passage stands there.\n    - `exploration.transition.gate_refused` - the move would cross a passage\n      whose authored condition (`GateSpec`) the\n      party doesn't meet. The rejection includes the gate's authored refusal text.\n      Like every refusal, it costs no movement, no time, and no toll.\n\nEvents:\n    `PartyMovedEvent` with the new position\n    and facing. Arriving in the new cell can set off more, each with a\n    separate event. A `LocationEnteredEvent`\n    follows when the party crosses into a new area, level, or dungeon. A\n    `DoorEvent` follows for each unwedged door the party\n    opened that swings shut behind it. The area's treasure roll arrives as a\n    `HoardGeneratedEvent`. A room\n    trap's spring check produces a\n    `DetectionRolledEvent` and a\n    `TrapEvent`, and a trap that springs\n    resolves at once.\n\n    A pool of burning oil or a *web* on the cell affects the party as it arrives\n    (`DamageDealtEvent`,\n    `HitPointsReportedEvent`,\n    `DeathEvent`,\n    `EffectAttachedEvent`,\n    `ConditionGainedEvent`). Monsters keyed to\n    the area in the adventure (a keyed encounter) meet the party the first time it enters,\n    with `SurpriseRolledEvent`s,\n    `EncounterStartedEvent`,\n    `ReactionRolledEvent`, and\n    `StanceChangedEvent`. When their reaction is\n    to attack, battle opens at once\n    (`BattleStartedEvent`).\n\n    A move through a passage reports the crossing before the step, as\n    `UseStairs` does. An\n    `ItemConsumedEvent` comes first when\n    the passage's gate takes an item as a toll. A `LocationEnteredEvent` follows when the\n    level or dungeon changes, with `via` set to `\"passage\"` and `transition_ref`\n    set to the passage's cell. Then come the `DoorEvent`s for the doors that swing shut\n    on the level the party left, the `PartyMovedEvent` for the landing cell, and the\n    landing cell's events.\n\n    When the step's movement completes a turn on the game clock, the events of that turn\n    follow:\n    `EffectExpiredEvent` with a\n    `LightEvent` for a light burning out,\n    `FatigueEvent` when the fatigue penalty starts or ends,\n    `ProvisionsEvent` on a day boundary,\n    and `WanderingCheckEvent` when a\n    wandering-monster check is due.",
           "properties": {
             "command_type": {
               "const": "move_party",
               "default": "move_party",
+              "description": "The name that identifies the command class in serialized data. Each command class fixes\nit to a distinct snake_case string, like `\"move_party\"` or `\"open_door\"`, and constructing\nthe class sets it, so you never pass it yourself.\n`parse_command` and the\n`AnyCommand` union use it to rebuild the right class\nfrom a serialized mapping. A class's value never changes between releases.",
               "title": "Command Type",
               "type": "string"
             },
@@ -1605,10 +1610,12 @@
                 }
               ],
               "default": null,
+              "description": "Who or what issued the command on whose behalf: an authored trigger or quest id, or the\nname of one of your game's systems. The engine never reads it, so a command with a\n`source` does exactly what the same command without one does. The session logs and\nreplays it with the command, so the log alone shows why something happened. Leave it\n`None` when there's nothing to record. An empty string fails validation when the command\nis constructed.",
               "title": "Source"
             },
             "direction": {
-              "$ref": "#/$defs/Direction"
+              "$ref": "#/$defs/Direction",
+              "description": "Which way to step. The party turns to face that way as it goes, so a move is also a turn.\nTo change facing without moving, use `TurnParty`. A\ndirection with a wall, a closed door, an undiscovered secret door, or the edge of the map\non that side of the party's cell gets the refusal `exploration.move.blocked`, unless a\npassage stands on that side. Read\n`ExploredLevelView.edges` to find which sides\nof the cell the party can leave by."
             }
           },
           "required": [
@@ -1902,6 +1909,7 @@
               "id": "npc-0001",
               "name": "Halfling adventurer 1",
               "class_id": "halfling",
+              "custom_class": null,
               "race": "halfling",
               "level": 2,
               "xp": 2000,
@@ -2098,6 +2106,7 @@
               "id": "npc-0002",
               "name": "Elf adventurer 2",
               "class_id": "elf",
+              "custom_class": null,
               "race": "elf",
               "level": 3,
               "xp": 8000,
@@ -2369,6 +2378,9 @@
             "template": {
               "id": "goblin",
               "name": "Goblin",
+              "display_name": "goblin",
+              "display_name_plural": "goblins",
+              "family_id": "goblin",
               "page": "Goblin.md",
               "intro": "Small, grotesque humanoids with pallid, earth-coloured skin and glowing, red eyes. Dwell underground.",
               "ac": 6,
@@ -2588,6 +2600,7 @@
           "id": null,
           "name": "Brother Osric",
           "class_id": "cleric",
+          "custom_class": null,
           "race": "human",
           "level": 1,
           "xp": 0,
@@ -2763,7 +2776,7 @@
       "path": "/v1/ability-rolls",
       "status": 201,
       "response": {
-        "id": "rol_wxmqi5zFWxkAt_t10WHWvA",
+        "id": "rol_JR_fKUslBOPzLaG_QT6ddA",
         "scores": {
           "str": 9,
           "int": 9,
@@ -2782,7 +2795,7 @@
           "thief"
         ],
         "used": false,
-        "created_at": "2026-11-21T03:20:17Z"
+        "created_at": "2026-11-21T05:18:02Z"
       }
     }
   },
@@ -2806,7 +2819,7 @@
       },
       "status": 201,
       "response": {
-        "id": "rol_U5vMsvb2NMP2S5HDA7OHmQ",
+        "id": "rol_Cc6nFXXxLcCwVPNVSqe9UQ",
         "scores": {
           "str": 4,
           "int": 10,
@@ -2825,7 +2838,7 @@
           "thief"
         ],
         "used": false,
-        "created_at": "2026-11-21T03:20:17Z"
+        "created_at": "2026-11-21T05:18:02Z"
       }
     }
   },
@@ -2839,10 +2852,10 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/ability-rolls/rol_wxmqi5zFWxkAt_t10WHWvA",
+      "path": "/v1/ability-rolls/rol_JR_fKUslBOPzLaG_QT6ddA",
       "status": 200,
       "response": {
-        "id": "rol_wxmqi5zFWxkAt_t10WHWvA",
+        "id": "rol_JR_fKUslBOPzLaG_QT6ddA",
         "scores": {
           "str": 9,
           "int": 9,
@@ -2861,7 +2874,7 @@
           "thief"
         ],
         "used": false,
-        "created_at": "2026-11-21T03:20:17Z"
+        "created_at": "2026-11-21T05:18:02Z"
       }
     }
   },
@@ -2886,7 +2899,7 @@
         "name": "Wren",
         "class_id": "magic_user",
         "alignment": "neutral",
-        "ability_roll_id": "rol_wxmqi5zFWxkAt_t10WHWvA"
+        "ability_roll_id": "rol_JR_fKUslBOPzLaG_QT6ddA"
       },
       "status": 422,
       "response": {
@@ -2941,7 +2954,7 @@
         "name": "Aldric",
         "class_id": "fighter",
         "alignment": "lawful",
-        "ability_roll_id": "rol_wxmqi5zFWxkAt_t10WHWvA",
+        "ability_roll_id": "rol_JR_fKUslBOPzLaG_QT6ddA",
         "purchases": [
           {
             "item_id": "sword"
@@ -2957,15 +2970,16 @@
       },
       "status": 201,
       "response": {
-        "id": "chr_lutzmqN7jXr2G6-J2cz9eg",
+        "id": "chr_Fp0wv9V6fusTgcfUDmU9iA",
         "name": "Aldric",
         "class_id": "fighter",
         "level": 1,
-        "created_at": "2026-11-21T03:20:17Z",
+        "created_at": "2026-11-21T05:18:02Z",
         "character": {
           "id": null,
           "name": "Aldric",
           "class_id": "fighter",
+          "custom_class": null,
           "race": "human",
           "level": 1,
           "xp": 0,
@@ -3088,14 +3102,14 @@
         "name": "Aldric",
         "class_id": "fighter",
         "alignment": "lawful",
-        "ability_roll_id": "rol_wxmqi5zFWxkAt_t10WHWvA"
+        "ability_roll_id": "rol_JR_fKUslBOPzLaG_QT6ddA"
       },
       "status": 409,
       "response": {
         "type": "about:blank",
         "title": "Conflict",
         "status": 409,
-        "detail": "A character was already created from the ability roll 'rol_wxmqi5zFWxkAt_t10WHWvA'.",
+        "detail": "A character was already created from the ability roll 'rol_JR_fKUslBOPzLaG_QT6ddA'.",
         "code": "ability_roll_used"
       }
     }
@@ -3115,12 +3129,12 @@
       "response": {
         "items": [
           {
-            "id": "chr_lutzmqN7jXr2G6-J2cz9eg",
+            "id": "chr_Fp0wv9V6fusTgcfUDmU9iA",
             "name": "Aldric",
             "class_id": "fighter",
             "level": 1,
             "max_hp": 8,
-            "created_at": "2026-11-21T03:20:17Z"
+            "created_at": "2026-11-21T05:18:02Z"
           }
         ],
         "total": 1,
@@ -3139,18 +3153,19 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/characters/chr_lutzmqN7jXr2G6-J2cz9eg",
+      "path": "/v1/characters/chr_Fp0wv9V6fusTgcfUDmU9iA",
       "status": 200,
       "response": {
-        "id": "chr_lutzmqN7jXr2G6-J2cz9eg",
+        "id": "chr_Fp0wv9V6fusTgcfUDmU9iA",
         "name": "Aldric",
         "class_id": "fighter",
         "level": 1,
-        "created_at": "2026-11-21T03:20:17Z",
+        "created_at": "2026-11-21T05:18:02Z",
         "character": {
           "id": null,
           "name": "Aldric",
           "class_id": "fighter",
+          "custom_class": null,
           "race": "human",
           "level": 1,
           "xp": 0,
@@ -3273,11 +3288,12 @@
       "body": {
         "kind": "character",
         "schema_version": 4,
-        "engine_version": "2.4.0",
+        "engine_version": "2.5.0",
         "payload": {
           "id": null,
           "name": "Aldric",
           "class_id": "fighter",
+          "custom_class": null,
           "race": "human",
           "level": 1,
           "xp": 0,
@@ -3352,15 +3368,16 @@
       },
       "status": 201,
       "response": {
-        "id": "chr_VHexK5xZk8Hk9qJM742lEw",
+        "id": "chr_pblGTj15HCTNBkHd57YFFg",
         "name": "Aldric",
         "class_id": "fighter",
         "level": 1,
-        "created_at": "2026-11-21T03:20:17Z",
+        "created_at": "2026-11-21T05:18:02Z",
         "character": {
           "id": null,
           "name": "Aldric",
           "class_id": "fighter",
+          "custom_class": null,
           "race": "human",
           "level": 1,
           "xp": 0,
@@ -4541,9 +4558,9 @@
             "name": "The Old Well"
           }
         ],
-        "id": "adv_laWfZ0ZvmjurUKZ3H6w09g",
+        "id": "adv_N1LsoJnFbcJxuj0vFwdVmw",
         "builtin": false,
-        "created_at": "2026-11-21T03:20:17Z"
+        "created_at": "2026-11-21T05:18:02Z"
       }
     }
   },
@@ -4567,12 +4584,12 @@
       "body": {
         "adventure_id": "builtin-barrow",
         "character_ids": [
-          "chr_lutzmqN7jXr2G6-J2cz9eg"
+          "chr_Fp0wv9V6fusTgcfUDmU9iA"
         ]
       },
       "status": 201,
       "response": {
-        "id": "ses_LarBjnTQRxJ9Zi9chJGsAw",
+        "id": "ses_BVR2FtF3K6qhiMHldg_GuQ",
         "name": "The Barrow of the Forgotten King",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
@@ -4585,9 +4602,9 @@
           "days": 0
         },
         "schema_version": 4,
-        "engine_version": "2.4.0",
-        "created_at": "2026-11-21T03:20:17Z",
-        "updated_at": "2026-11-21T03:20:17Z"
+        "engine_version": "2.5.0",
+        "created_at": "2026-11-21T05:18:02Z",
+        "updated_at": "2026-11-21T05:18:02Z"
       }
     }
   },
@@ -4606,7 +4623,7 @@
       "response": {
         "items": [
           {
-            "id": "ses_LarBjnTQRxJ9Zi9chJGsAw",
+            "id": "ses_BVR2FtF3K6qhiMHldg_GuQ",
             "name": "The Barrow of the Forgotten King",
             "adventure_id": "builtin-barrow",
             "adventure_name": "The Barrow of the Forgotten King",
@@ -4619,9 +4636,9 @@
               "days": 0
             },
             "schema_version": 4,
-            "engine_version": "2.4.0",
-            "created_at": "2026-11-21T03:20:17Z",
-            "updated_at": "2026-11-21T03:20:17Z"
+            "engine_version": "2.5.0",
+            "created_at": "2026-11-21T05:18:02Z",
+            "updated_at": "2026-11-21T05:18:02Z"
           }
         ],
         "total": 1,
@@ -4640,10 +4657,10 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_LarBjnTQRxJ9Zi9chJGsAw",
+      "path": "/v1/sessions/ses_BVR2FtF3K6qhiMHldg_GuQ",
       "status": 200,
       "response": {
-        "id": "ses_LarBjnTQRxJ9Zi9chJGsAw",
+        "id": "ses_BVR2FtF3K6qhiMHldg_GuQ",
         "name": "The Barrow of the Forgotten King",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
@@ -4656,9 +4673,9 @@
           "days": 0
         },
         "schema_version": 4,
-        "engine_version": "2.4.0",
-        "created_at": "2026-11-21T03:20:17Z",
-        "updated_at": "2026-11-21T03:20:17Z"
+        "engine_version": "2.5.0",
+        "created_at": "2026-11-21T05:18:02Z",
+        "updated_at": "2026-11-21T05:18:02Z"
       }
     }
   },
@@ -4675,13 +4692,13 @@
     },
     "recorded": {
       "method": "PATCH",
-      "path": "/v1/sessions/ses_LarBjnTQRxJ9Zi9chJGsAw",
+      "path": "/v1/sessions/ses_BVR2FtF3K6qhiMHldg_GuQ",
       "body": {
         "name": "Aldric's first delve"
       },
       "status": 200,
       "response": {
-        "id": "ses_LarBjnTQRxJ9Zi9chJGsAw",
+        "id": "ses_BVR2FtF3K6qhiMHldg_GuQ",
         "name": "Aldric's first delve",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
@@ -4694,9 +4711,9 @@
           "days": 0
         },
         "schema_version": 4,
-        "engine_version": "2.4.0",
-        "created_at": "2026-11-21T03:20:17Z",
-        "updated_at": "2026-11-21T03:20:17Z"
+        "engine_version": "2.5.0",
+        "created_at": "2026-11-21T05:18:02Z",
+        "updated_at": "2026-11-21T05:18:02Z"
       }
     }
   },
@@ -4710,7 +4727,7 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_LarBjnTQRxJ9Zi9chJGsAw/commands",
+      "path": "/v1/sessions/ses_BVR2FtF3K6qhiMHldg_GuQ/commands",
       "status": 200,
       "response": {
         "mode": "town",
@@ -4793,7 +4810,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_LarBjnTQRxJ9Zi9chJGsAw/commands",
+      "path": "/v1/sessions/ses_BVR2FtF3K6qhiMHldg_GuQ/commands",
       "query": {
         "expected_revision": 0
       },
@@ -4854,7 +4871,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_LarBjnTQRxJ9Zi9chJGsAw/commands",
+      "path": "/v1/sessions/ses_BVR2FtF3K6qhiMHldg_GuQ/commands",
       "query": {
         "expected_revision": 1
       },
@@ -4898,7 +4915,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_LarBjnTQRxJ9Zi9chJGsAw/commands",
+      "path": "/v1/sessions/ses_BVR2FtF3K6qhiMHldg_GuQ/commands",
       "query": {
         "expected_revision": 1
       },
@@ -4947,7 +4964,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_LarBjnTQRxJ9Zi9chJGsAw/commands",
+      "path": "/v1/sessions/ses_BVR2FtF3K6qhiMHldg_GuQ/commands",
       "query": {
         "expected_revision": 1
       },
@@ -4976,7 +4993,7 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_LarBjnTQRxJ9Zi9chJGsAw/view",
+      "path": "/v1/sessions/ses_BVR2FtF3K6qhiMHldg_GuQ/view",
       "status": 200,
       "response": {
         "adventure_name": "The Barrow of the Forgotten King",
@@ -4988,6 +5005,14 @@
           "temple healing",
           "treasure buyers"
         ],
+        "town_healing_prices": {
+          "cure_light_wounds": 25,
+          "cure_serious_wounds": 100,
+          "cure_disease": 150,
+          "neutralize_poison": 150,
+          "remove_curse": 200,
+          "raise_dead": 1500
+        },
         "party": [
           {
             "id": "character-0001",
@@ -5047,7 +5072,46 @@
               "rings": []
             },
             "memorized_spells": [],
-            "encounter_rate_feet": 30
+            "encounter_rate_feet": 30,
+            "race": "human",
+            "alignment": "lawful",
+            "title": "Veteran",
+            "xp": 0,
+            "xp_next_level": 2000,
+            "scores": {
+              "str": 9,
+              "int": 9,
+              "wis": 12,
+              "dex": 15,
+              "con": 12,
+              "cha": 5
+            },
+            "effective_strength": 9,
+            "melee_modifier": 0,
+            "missile_modifier": 1,
+            "initiative_modifier": 1,
+            "hit_point_modifier": 0,
+            "magic_save_modifier": 0,
+            "npc_reaction_modifier": -1,
+            "open_doors_chance": 2,
+            "thac0": 19,
+            "attack_bonus": 0,
+            "armour_class": 6,
+            "armour_class_ascending": 13,
+            "saves": {
+              "death": 12,
+              "wands": 13,
+              "paralysis": 14,
+              "breath": 15,
+              "spells": 16
+            },
+            "movement_rate_feet": 90,
+            "languages": [
+              "alignment_lawful",
+              "common"
+            ],
+            "spell_book": [],
+            "thief_skills": {}
           }
         ],
         "location": {
@@ -5162,7 +5226,7 @@
     "role": "referee",
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_LarBjnTQRxJ9Zi9chJGsAw/referee-view",
+      "path": "/v1/sessions/ses_BVR2FtF3K6qhiMHldg_GuQ/referee-view",
       "status": 200,
       "response": {
         "ruleset": {
@@ -5186,6 +5250,7 @@
               "id": "character-0001",
               "name": "Aldric",
               "class_id": "fighter",
+              "custom_class": null,
               "race": "human",
               "level": 1,
               "xp": 0,
@@ -5276,7 +5341,8 @@
             ],
             "travel_turns": {
               "barrow": 2
-            }
+            },
+            "healing_prices": {}
           },
           "dungeons": [
             {
@@ -5692,6 +5758,7 @@
               "overrides_applied": []
             }
           ],
+          "spells": [],
           "triggers": [],
           "quests": [
             {
@@ -5958,7 +6025,7 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_LarBjnTQRxJ9Zi9chJGsAw/events",
+      "path": "/v1/sessions/ses_BVR2FtF3K6qhiMHldg_GuQ/events",
       "status": 200,
       "response": {
         "events": [
@@ -6015,14 +6082,14 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_LarBjnTQRxJ9Zi9chJGsAw/saves",
+      "path": "/v1/sessions/ses_BVR2FtF3K6qhiMHldg_GuQ/saves",
       "body": {
         "label": "Inside the barrow"
       },
       "status": 201,
       "response": {
-        "id": "sav_b39qv-IbFqIu5oPmtSvVbQ",
-        "session_id": "ses_LarBjnTQRxJ9Zi9chJGsAw",
+        "id": "sav_Ip0JPQYFaw2Md2_5tb0n1A",
+        "session_id": "ses_BVR2FtF3K6qhiMHldg_GuQ",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
         "label": "Inside the barrow",
@@ -6032,7 +6099,7 @@
           "turns": 2,
           "days": 0
         },
-        "created_at": "2026-11-21T03:20:17Z"
+        "created_at": "2026-11-21T05:18:02Z"
       }
     }
   },
@@ -6051,14 +6118,14 @@
       "method": "GET",
       "path": "/v1/saves",
       "query": {
-        "session_id": "ses_LarBjnTQRxJ9Zi9chJGsAw"
+        "session_id": "ses_BVR2FtF3K6qhiMHldg_GuQ"
       },
       "status": 200,
       "response": {
         "items": [
           {
-            "id": "sav_b39qv-IbFqIu5oPmtSvVbQ",
-            "session_id": "ses_LarBjnTQRxJ9Zi9chJGsAw",
+            "id": "sav_Ip0JPQYFaw2Md2_5tb0n1A",
+            "session_id": "ses_BVR2FtF3K6qhiMHldg_GuQ",
             "adventure_id": "builtin-barrow",
             "adventure_name": "The Barrow of the Forgotten King",
             "label": "Inside the barrow",
@@ -6068,7 +6135,7 @@
               "turns": 2,
               "days": 0
             },
-            "created_at": "2026-11-21T03:20:17Z"
+            "created_at": "2026-11-21T05:18:02Z"
           }
         ],
         "total": 1,
@@ -6087,11 +6154,11 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/saves/sav_b39qv-IbFqIu5oPmtSvVbQ",
+      "path": "/v1/saves/sav_Ip0JPQYFaw2Md2_5tb0n1A",
       "status": 200,
       "response": {
-        "id": "sav_b39qv-IbFqIu5oPmtSvVbQ",
-        "session_id": "ses_LarBjnTQRxJ9Zi9chJGsAw",
+        "id": "sav_Ip0JPQYFaw2Md2_5tb0n1A",
+        "session_id": "ses_BVR2FtF3K6qhiMHldg_GuQ",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
         "label": "Inside the barrow",
@@ -6101,7 +6168,7 @@
           "turns": 2,
           "days": 0
         },
-        "created_at": "2026-11-21T03:20:17Z"
+        "created_at": "2026-11-21T05:18:02Z"
       }
     }
   },
@@ -6118,14 +6185,14 @@
     },
     "recorded": {
       "method": "PATCH",
-      "path": "/v1/saves/sav_b39qv-IbFqIu5oPmtSvVbQ",
+      "path": "/v1/saves/sav_Ip0JPQYFaw2Md2_5tb0n1A",
       "body": {
         "label": "Past the first door"
       },
       "status": 200,
       "response": {
-        "id": "sav_b39qv-IbFqIu5oPmtSvVbQ",
-        "session_id": "ses_LarBjnTQRxJ9Zi9chJGsAw",
+        "id": "sav_Ip0JPQYFaw2Md2_5tb0n1A",
+        "session_id": "ses_BVR2FtF3K6qhiMHldg_GuQ",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
         "label": "Past the first door",
@@ -6135,7 +6202,7 @@
           "turns": 2,
           "days": 0
         },
-        "created_at": "2026-11-21T03:20:17Z"
+        "created_at": "2026-11-21T05:18:02Z"
       }
     }
   },
@@ -6150,12 +6217,12 @@
     "role": "referee",
     "recorded": {
       "method": "GET",
-      "path": "/v1/saves/sav_b39qv-IbFqIu5oPmtSvVbQ/document",
+      "path": "/v1/saves/sav_Ip0JPQYFaw2Md2_5tb0n1A/document",
       "status": 200,
       "response": {
         "kind": "save",
         "schema_version": 4,
-        "engine_version": "2.4.0",
+        "engine_version": "2.5.0",
         "payload": {
           "master_seed": 4127730658136791,
           "ruleset": {
@@ -6179,6 +6246,7 @@
                 "id": "character-0001",
                 "name": "Aldric",
                 "class_id": "fighter",
+                "custom_class": null,
                 "race": "human",
                 "level": 1,
                 "xp": 0,
@@ -6269,7 +6337,8 @@
               ],
               "travel_turns": {
                 "barrow": 2
-              }
+              },
+              "healing_prices": {}
             },
             "dungeons": [
               {
@@ -6685,6 +6754,7 @@
                 "overrides_applied": []
               }
             ],
+            "spells": [],
             "triggers": [],
             "quests": [
               {
@@ -6964,7 +7034,7 @@
       "body": {
         "kind": "save",
         "schema_version": 4,
-        "engine_version": "2.4.0",
+        "engine_version": "2.5.0",
         "payload": {
           "master_seed": 4127730658136791,
           "ruleset": {
@@ -6988,6 +7058,7 @@
                 "id": "character-0001",
                 "name": "Aldric",
                 "class_id": "fighter",
+                "custom_class": null,
                 "race": "human",
                 "level": 1,
                 "xp": 0,
@@ -7078,7 +7149,8 @@
               ],
               "travel_turns": {
                 "barrow": 2
-              }
+              },
+              "healing_prices": {}
             },
             "dungeons": [
               {
@@ -7494,6 +7566,7 @@
                 "overrides_applied": []
               }
             ],
+            "spells": [],
             "triggers": [],
             "quests": [
               {
@@ -7757,7 +7830,7 @@
       },
       "status": 201,
       "response": {
-        "id": "sav_xPLEjj1cU43ya-h60Vg4JQ",
+        "id": "sav_fsCYdOh54R0-9jYCOvVK3w",
         "session_id": null,
         "adventure_id": null,
         "adventure_name": "The Barrow of the Forgotten King",
@@ -7768,7 +7841,7 @@
           "turns": 2,
           "days": 0
         },
-        "created_at": "2026-11-21T03:20:17Z"
+        "created_at": "2026-11-21T05:18:02Z"
       }
     }
   },
@@ -7785,13 +7858,13 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/saves/sav_b39qv-IbFqIu5oPmtSvVbQ/restore",
+      "path": "/v1/saves/sav_Ip0JPQYFaw2Md2_5tb0n1A/restore",
       "body": {
         "name": "Aldric, second try"
       },
       "status": 201,
       "response": {
-        "id": "ses_BeNiFwF0ae15yvmNHgPTCA",
+        "id": "ses_jTNKiX7Xr7gzE-wV9J3dTA",
         "name": "Aldric, second try",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
@@ -7804,9 +7877,9 @@
           "days": 0
         },
         "schema_version": 4,
-        "engine_version": "2.4.0",
-        "created_at": "2026-11-21T03:20:17Z",
-        "updated_at": "2026-11-21T03:20:17Z"
+        "engine_version": "2.5.0",
+        "created_at": "2026-11-21T05:18:02Z",
+        "updated_at": "2026-11-21T05:18:02Z"
       }
     }
   },
@@ -7820,7 +7893,7 @@
     },
     "recorded": {
       "method": "DELETE",
-      "path": "/v1/saves/sav_xPLEjj1cU43ya-h60Vg4JQ",
+      "path": "/v1/saves/sav_fsCYdOh54R0-9jYCOvVK3w",
       "status": 204,
       "response": null
     }
@@ -7835,7 +7908,7 @@
     },
     "recorded": {
       "method": "DELETE",
-      "path": "/v1/sessions/ses_BeNiFwF0ae15yvmNHgPTCA",
+      "path": "/v1/sessions/ses_jTNKiX7Xr7gzE-wV9J3dTA",
       "status": 204,
       "response": null
     }
@@ -7850,7 +7923,7 @@
     },
     "recorded": {
       "method": "DELETE",
-      "path": "/v1/adventures/adv_laWfZ0ZvmjurUKZ3H6w09g",
+      "path": "/v1/adventures/adv_N1LsoJnFbcJxuj0vFwdVmw",
       "status": 204,
       "response": null
     }
@@ -7865,7 +7938,7 @@
     },
     "recorded": {
       "method": "DELETE",
-      "path": "/v1/characters/chr_VHexK5xZk8Hk9qJM742lEw",
+      "path": "/v1/characters/chr_pblGTj15HCTNBkHd57YFFg",
       "status": 204,
       "response": null
     }
