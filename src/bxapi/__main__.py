@@ -1,11 +1,13 @@
 """The `bxapi` command, which serves the API with uvicorn."""
 
 import copy
+import json
 import sys
 
 import uvicorn
 from pydantic import ValidationError
 from pydantic_core import ErrorDetails
+from pydantic_settings import SettingsError as EnvironmentSettingsError
 from uvicorn.config import LOGGING_CONFIG
 
 from bxapi.app import create_app
@@ -15,6 +17,13 @@ from bxapi.settings import Settings, SettingsError
 __all__ = ["main"]
 
 _VALUE_ERROR_PREFIX = "Value error, "
+
+_NOT_JSON = (
+    "bxapi: a BXAPI_ variable that takes a list isn't valid JSON, and an empty value isn't valid JSON either. "
+    "BXAPI_API_KEYS takes a JSON list, like "
+    """'[{"client": "my-game", "key": "<at least 16 characters>", "role": "player"}]', and """
+    """BXAPI_CORS_ORIGINS takes a JSON list, like '["https://game.example"]'."""
+)
 
 
 def _describe(problem: ErrorDetails) -> str:
@@ -45,7 +54,8 @@ def main() -> None:
     and `BXAPI_ALLOW_ANONYMOUS` isn't set, the command prints why and exits with status 1. For an
     invalid setting, it prints one line for each problem, like
     `bxapi: BXAPI_SESSION_CACHE_SIZE: Input should be greater than or equal to 1`, and never
-    prints the value.
+    prints the value. For a list variable that isn't valid JSON, it prints one line that names
+    `BXAPI_API_KEYS` and `BXAPI_CORS_ORIGINS` with an example of each.
     """
     try:
         settings = Settings()
@@ -53,6 +63,13 @@ def main() -> None:
     except ValidationError as error:
         for problem in error.errors(include_url=False, include_context=False, include_input=False):
             print(f"bxapi: {_describe(problem)}", file=sys.stderr)
+        raise SystemExit(1) from None
+    except EnvironmentSettingsError as error:
+        # pydantic-settings puts the field's name only in the error's text, so the line names both list variables
+        # instead of parsing that text. The cause is the JSON error, which never contains the value.
+        if not isinstance(error.__cause__, json.JSONDecodeError):
+            raise
+        print(_NOT_JSON, file=sys.stderr)
         raise SystemExit(1) from None
     except (SettingsError, DatabaseOpenError) as error:
         raise SystemExit(f"bxapi: {error}") from None

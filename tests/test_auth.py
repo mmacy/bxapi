@@ -257,3 +257,22 @@ def test_a_server_with_no_keys_exits_with_its_reason(monkeypatch: pytest.MonkeyP
     assert isinstance(exited.code, str)
     assert exited.code.startswith("bxapi: ")
     assert "BXAPI_ALLOW_ANONYMOUS=true" in exited.code
+
+
+@pytest.mark.parametrize("variable", ["BXAPI_API_KEYS", "BXAPI_CORS_ORIGINS"])
+@pytest.mark.parametrize("value", ["not json", "", "[1, 2", "{'client': 'x'}"])
+def test_a_list_that_is_not_json_gets_one_line_naming_both_list_variables(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str], variable: str, value: str
+) -> None:
+    exited = _run_main_with(monkeypatch, tmp_path, **{variable: value})
+    assert exited.code == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    [line] = captured.err.splitlines()
+    assert line.startswith("bxapi: a BXAPI_ variable that takes a list isn't valid JSON")
+    assert 'BXAPI_API_KEYS takes a JSON list, like \'[{"client": "my-game"' in line
+    assert "BXAPI_CORS_ORIGINS takes a JSON list, like '[\"https://game.example\"]'" in line
+    assert "Traceback" not in captured.err
+    if value:
+        assert value not in captured.err
+    assert not (tmp_path / "bxapi.db").exists()
