@@ -452,7 +452,9 @@ def get_character(request: Request, principal: CurrentPrincipal, character_id: C
 def delete_character(request: Request, principal: CurrentPrincipal, character_id: CharacterId) -> Response:
     """Delete a stored character. A session that started with the character has a copy and isn't affected.
 
-    Deleting the character doesn't free the ability roll it was created from.
+    Deleting the character doesn't free the ability roll it was created from. The character's bytes no longer count
+    toward your client's storage, which `GET /v1/meta` reports. A retry of a delete that succeeded gets 404
+    `not_found`.
     """
     if not _db(request).delete_character(principal.client, character_id):
         raise not_found("character", character_id)

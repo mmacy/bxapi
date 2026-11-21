@@ -16,6 +16,7 @@ configure the `bxapi` logger.
 
 import asyncio
 import logging
+import re
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -63,12 +64,41 @@ COMPRESSION_MINIMUM_BYTES = 1024
 
 _log = logging.getLogger("bxapi")
 
-_DESCRIPTION = """
+# The members that some error codes add to a problem document, as a Markdown table. Its rows are longer than a line
+# of code, so they can't be in the triple-quoted description.
+_PROBLEM_MEMBERS = "\n".join(
+    (
+        "| Code | Added members |",
+        "| --- | --- |",
+        "| `validation_error` | `errors`: the first 20 parts of the request that failed validation, each "
+        "with `loc`, the path to the value, `msg`, and `type`. `error_count`: how many parts failed, "
+        "including any that `errors` leaves out. |",
+        "| `not_found` | `resource`: the kind of resource the request asked for, like `session`. `id`: the "
+        "id in the request, or its first 128 characters followed by `...`. |",
+        "| `revision_conflict` and `session_busy` | `revision`: the session's current revision. |",
+        "| `referee_command` | `command_type`: the `command_type` of the referee command a player sent. |",
+        "| `character_invalid` | `rejections`: osrlib's reasons for refusing the character, each a `code` "
+        "and `params`. When osrlib reports no rejections, `field` and `id` instead: the request field that's "
+        "wrong and the value of the wrong entry, with `index`, its position from 0, when `field` is a list. |",
+        "| `storage_full` | `used_bytes`: the bytes of documents the server stores for your client. "
+        "`max_bytes`: the most bytes the server stores for one client. |",
+    )
+)
+
+_DESCRIPTION = (
+    """
 bxapi runs games of the 1981 B/X (Basic/Expert) fantasy adventure game over HTTP.
 [osrlib](https://github.com/mmacy/osrlib-python), a Python library, applies every rule. bxapi
 adds API keys, storage, and an error format. A client application draws the screen and reads the
 player's input. bxapi rolls the dice, applies the rules, stores the game, and returns what
 happened.
+
+## Base URL
+
+Each bxapi server runs at its own address. The `bxapi` command listens on
+`http://127.0.0.1:8640` unless the server's `BXAPI_HOST` and `BXAPI_PORT` settings specify another
+address, and the examples in this reference use that address. Every path in this reference is
+relative to the server's address. Every operation except `GET /health` is under `/v1`.
 
 ## Play a game
 
@@ -137,7 +167,8 @@ exist.
   `validation_error`. A command and a document are osrlib's models, and osrlib ignores a field it
   doesn't define.
 - **osrlib's descriptions.** The descriptions of osrlib's models, like the commands and the player
-  view, were written for osrlib's Python API. Read `None` as JSON `null`, and a tuple as an array.
+  view, come from osrlib's Python documentation. Read `None` as JSON `null`, `True` and `False` as
+  `true` and `false`, and a tuple as an array.
   Where a description says that a model raises `ValueError` or `ValidationError`, the server refuses
   the request: a command or another request body gets 422 `validation_error`, and an uploaded or
   imported document, like an adventure, gets 422 `content_invalid`.
@@ -174,8 +205,8 @@ exist.
   `GET /v1/meta` returns the count and the limit, which the server's `BXAPI_MAX_CLIENT_BYTES`
   setting sets and which is 1,073,741,824 bytes by default. When the count reaches the limit, each
   request that would store more gets 507 `storage_full`, until you delete something.
-- **Rate limits.** Each client may send as many requests a minute as the server's
-  `BXAPI_RATE_LIMIT_PER_MINUTE` setting allows, which is 600 by default. You can send that many at
+- **Rate limits.** Each client may send each server process as many requests a minute as the
+  server's `BXAPI_RATE_LIMIT_PER_MINUTE` setting allows, which is 600 by default. You can send that many at
   once, and you regain them at a steady rate. A request over the limit gets 429 `rate_limited`,
   with the seconds to wait in the `Retry-After` header.
 
@@ -189,8 +220,8 @@ An HTTP error status means that the request itself failed.
 
 Every error response is a problem document (RFC 9457) with the media type
 `application/problem+json`. Branch on `code`, which doesn't change between releases. `detail` is a
-sentence for a person, at most 1,000 characters. Some codes add members, which the `Problem`
-schema lists. Each operation's responses list the codes it returns, with what to do about each.
+sentence for a person, at most 1,000 characters. Each operation's responses list the codes it
+returns, with what to do about each.
 
 ```json
 {
@@ -205,7 +236,13 @@ schema lists. Each operation's responses list the codes it returns, with what to
 }
 ```
 
-`request_id` is the id in the response's `X-Request-Id` header.
+Every problem document has `type`, `title`, `status`, `detail`, `code`, and `request_id`.
+`request_id` is the id in the response's `X-Request-Id` header. Some codes add members:
+
+"""
+    + _PROBLEM_MEMBERS
+    + """
+A later release can add members, so ignore any member you don't recognize.
 
 Five codes can succeed when you send the same request again: 409 `session_busy`, 409
 `idempotency_key_in_progress`, 429 `rate_limited`, and 503 `database_busy` after the seconds in
@@ -213,6 +250,7 @@ their `Retry-After` headers, and 408 `request_timeout`. For any other code, chan
 response arrives at all, send the same `POST` again with the same `Idempotency-Key`. For a 500,
 report the `request_id` to whoever runs the server.
 """
+)
 
 _TAGS = [
     {
@@ -279,8 +317,8 @@ seed to get the same result again, on the same osrlib version.
 
 - `POST /v1/generate/character`: the choices for a first-level character. Returns the character
   and every die rolled for it. To store a character for play, use `POST /v1/characters` instead.
-- `POST /v1/generate/treasure`: a treasure type, like `A`. Returns the coins, gems, jewellery,
-  and magic items.
+- `POST /v1/generate/treasure`: a treasure type, like `A`, and the magic item tier. Returns the
+  coins, gems, jewellery, and magic items.
 - `POST /v1/generate/npc-party`: `basic` or `expert`, and a party size. Returns NPC adventurers
   with gear and treasure.
 - `POST /v1/generate/room`: a dungeon level. Returns what a room on that level contains.
@@ -781,6 +819,75 @@ def _require_discriminators(schema: dict[str, Any]) -> None:
                     required.append(tag)
 
 
+_QUERY_VALIDATION_ERROR = (
+    "- `validation_error`: A query parameter has the wrong type or is out of range. `errors` lists the first 20 "
+    "problems, and the `loc` of each is the path to the value. Fix the request before you send it again."
+)
+
+
+def _can_fail_validation(parameter: dict[str, Any]) -> bool:
+    if parameter["in"] == "query":
+        return True
+    if parameter["in"] == "path":
+        # A path parameter that takes any string matches every request that reaches the route.
+        constraints = set(parameter["schema"]) - {"type", "title", "description"}
+        return parameter["schema"].get("type") != "string" or bool(constraints)
+    return False
+
+
+def _describe_validation_errors(schema: dict[str, Any]) -> None:
+    # The shared 422 entry describes a request body. An operation without a body fails validation only on a query
+    # parameter or a constrained path parameter, and an operation with neither never returns `validation_error`.
+    shared = f"- {VALIDATION_ERROR}"
+    for path in schema.get("paths", {}).values():
+        for operation in path.values():
+            responses = operation.get("responses", {})
+            response = responses.get("422")
+            if response is None or "requestBody" in operation:
+                continue
+            entries = response["description"].split("\n")
+            if shared not in entries:
+                continue
+            if any(_can_fail_validation(parameter) for parameter in operation.get("parameters", [])):
+                entries[entries.index(shared)] = _QUERY_VALIDATION_ERROR
+            else:
+                entries.remove(shared)
+            if entries:
+                response["description"] = "\n".join(entries)
+            else:
+                del responses["422"]
+
+
+# A Google-style `Examples:` section: the heading, then lines that are blank or indented.
+_EXAMPLES_SECTION = re.compile(r"^Examples:\n(?:(?: {4}.*)?\n)*(?: {4}.*)?", re.MULTILINE)
+_PYTHON_BLOCK = re.compile(r"^`{3}python\n.*?^`{3}$", re.MULTILINE | re.DOTALL)
+_BLANK_LINES = re.compile(r"\n{3,}")
+_PYTHON_LITERALS = {"`None`": "`null`", "`True`": "`true`", "`False`": "`false`"}
+# Keys whose values are data, not schemas, so a `description` key inside them isn't a description.
+_DATA_KEYS = frozenset({"default", "enum", "example", "examples", "const"})
+
+
+def _json_description(text: str) -> str:
+    text = _BLANK_LINES.sub("\n\n", _PYTHON_BLOCK.sub("", _EXAMPLES_SECTION.sub("", text))).strip()
+    for python, json_value in _PYTHON_LITERALS.items():
+        text = text.replace(python, json_value)
+    return text
+
+
+def _describe_in_json_terms(value: object) -> None:
+    # osrlib's docstrings become the descriptions of its models. Their examples are Python code that a client of the
+    # HTTP API can't run, and they write `None`, `True`, and `False` where a client reads JSON.
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if key == "description" and isinstance(item, str):
+                value[key] = _json_description(item)
+            elif key not in _DATA_KEYS:
+                _describe_in_json_terms(item)
+    elif isinstance(value, list):
+        for item in value:
+            _describe_in_json_terms(item)
+
+
 def _install_openapi(app: FastAPI) -> None:
     """Make the application's OpenAPI document describe error responses as problem documents."""
 
@@ -801,11 +908,13 @@ def _install_openapi(app: FastAPI) -> None:
                 if isinstance(route, APIRoute) and body_limit(route.endpoint) is not None
             )
             _describe_problems(schema, small_body_operations)
+            _describe_validation_errors(schema)
             _describe_idempotency(schema)
             _describe_storage(schema)
             _describe_conditional_gets(schema)
             _describe_request_ids(schema)
             _require_discriminators(schema)
+            _describe_in_json_terms(schema.get("components", {}).get("schemas", {}))
             add_examples(schema)
             app.openapi_schema = schema
         return app.openapi_schema

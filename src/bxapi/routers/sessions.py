@@ -530,7 +530,9 @@ def rename_session(
 def delete_session(request: Request, principal: CurrentPrincipal, session_id: SessionId) -> Response:
     """Delete a session. The saves made from it stay, and you can still restore them.
 
-    The saves keep the deleted session's id in `session_id`, so `GET /v1/saves?session_id=` still finds them.
+    The saves keep the deleted session's id in `session_id`, so `GET /v1/saves?session_id=` still finds them. The
+    session's bytes no longer count toward your client's storage, which `GET /v1/meta` reports. A retry of a delete
+    that succeeded gets 404 `not_found`.
     """
     if not _db(request).delete_session(principal.client, session_id):
         raise not_found("session", session_id)

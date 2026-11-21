@@ -128,7 +128,7 @@ def get_class(
 def list_monsters(page: PageQuery, q: _Q = None) -> Page[MonsterSummary]:
     """List the monsters in osrlib's order, with hit dice, armour class, experience, and alignment.
 
-    Pass `q` to search by id or name. Read `/v1/rules/monsters/{monster_id}` for the full template.
+    Pass `q` to search by id or name. Read `GET /v1/rules/monsters/{monster_id}` for the full template.
     """
     return paginate(monster_summaries(q), page)
 
@@ -277,7 +277,7 @@ def list_languages(page: PageQuery) -> Page[Language]:
 def list_tables(page: PageQuery) -> Page[str]:
     """List the names of the printed tables: `abilities`, `combat`, `encounters`, and `treasure`.
 
-    Pass a name to `/v1/rules/tables/{name}` to read that set of tables.
+    Pass a name to `GET /v1/rules/tables/{name}` to read that set of tables.
     """
     return paginate(list(_TABLES), page)
 

@@ -5,6 +5,8 @@ import path from "node:path";
 import { themes as prismThemes } from "prism-react-renderer";
 
 import curlSamples from "./src/remark/curl-samples.mjs";
+import docsMdFixes from "./src/remark/docs-md-fixes.mjs";
+import operationLinks from "./src/remark/operation-links.mjs";
 import repoLinks from "./src/remark/repo-links.mjs";
 import unescapeCodeBraces from "./src/remark/unescape-code-braces.mjs";
 
@@ -59,6 +61,11 @@ const config = {
           beforeDefaultRemarkPlugins: [
             [repoLinks, { contentRoot, repoRoot: path.resolve(siteDir, ".."), blobUrl: `${repoUrl}/blob/main` }],
             [unescapeCodeBraces, { generatedRoot: referenceRoot }],
+            [docsMdFixes, { generatedRoot: referenceRoot }],
+            [
+              operationLinks,
+              { generatedRoot: referenceRoot, openapiFile: path.resolve(siteDir, "generated/openapi.json") },
+            ],
             [
               curlSamples,
               { generatedRoot: referenceRoot, samplesFile: path.resolve(siteDir, "generated/curl-samples.json") },

@@ -90,7 +90,11 @@ VALIDATION_ERROR = (
     "the wrong type or is out of range, or the body isn't valid JSON. `errors` lists the first 20 problems, and the "
     "`loc` of each is the path to the value. Fix the request before you send it again."
 )
-"""The OpenAPI entry for 422 `validation_error`, which every route under `/v1` can return."""
+"""The OpenAPI entry for 422 `validation_error`, which every route under `/v1` that takes a body can return.
+
+[`create_app`][bxapi.app.create_app] replaces it with an entry about query parameters on a route
+that takes no body, and leaves it out on a route where every request matches the schema.
+"""
 
 INTERNAL_ERROR = (
     "`internal_error`: The server failed because of a bug. The response says nothing about the cause, and the server "
@@ -152,7 +156,7 @@ class Problem(BaseModel):
 
     - `validation_error` adds `errors` and `error_count`.
     - `not_found` adds `resource` and `id`.
-    - `revision_conflict` adds `revision`.
+    - `revision_conflict` and `session_busy` add `revision`.
     - `referee_command` adds `command_type`.
     - `character_invalid` adds `rejections` when osrlib reports them. Otherwise it adds `field`
       and `id`, and `index` when `field` is a list.
@@ -188,7 +192,7 @@ class Problem(BaseModel):
     """For `not_found`, the id in the request, or its first 128 characters followed by `...`.
     For `character_invalid`, the value of the entry that's wrong, like an item id."""
     revision: int | SkipJsonSchema[None] = left_out_when_none()
-    """`revision_conflict` only: the session's current revision."""
+    """`revision_conflict` and `session_busy` only: the session's current revision."""
     command_type: str | SkipJsonSchema[None] = left_out_when_none()
     """`referee_command` only: the `command_type` of the referee command a player sent."""
     field: str | SkipJsonSchema[None] = left_out_when_none()
@@ -466,8 +470,9 @@ def problem_responses(errors: Mapping[int, Sequence[str]]) -> dict[int | str, di
 
     Pass the result to a route decorator. For each status, list one entry for each error code the
     endpoint returns with that status. Start the entry with the code, then say what causes it and
-    what the caller does about it. Every route under `/v1` can also return 401, 422, 500, and 503,
-    which [`create_app`][bxapi.app.create_app] documents once for all of them. A route that lists
+    what the caller does about it. Every route under `/v1` can also return 401, 500, and 503, and
+    most can return 422, which [`create_app`][bxapi.app.create_app] documents once for all of them.
+    A route that lists
     422 or 500 replaces that shared entry, so it starts its list with
     [`VALIDATION_ERROR`][bxapi.errors.VALIDATION_ERROR] or
     [`INTERNAL_ERROR`][bxapi.errors.INTERNAL_ERROR]. `create_app` changes the media type of each of

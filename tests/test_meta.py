@@ -54,7 +54,7 @@ def test_openapi_documents_the_bearer_scheme(client: TestClient) -> None:
 
 def test_openapi_describes_errors_as_problem_documents(client: TestClient) -> None:
     schema = client.get("/openapi.json").json()
-    responses = schema["paths"]["/v1/meta"]["get"]["responses"]
+    responses = schema["paths"]["/v1/sessions"]["get"]["responses"]
     for status in ("401", "422"):
         assert list(responses[status]["content"]) == ["application/problem+json"]
         assert responses[status]["content"]["application/problem+json"]["schema"] == {
@@ -63,6 +63,27 @@ def test_openapi_describes_errors_as_problem_documents(client: TestClient) -> No
     assert "application/json" in responses["200"]["content"]
     assert "HTTPValidationError" not in schema["components"]["schemas"]
     assert "Problem" in schema["components"]["schemas"]
+
+
+def test_openapi_lists_validation_error_only_where_a_request_can_cause_it(client: TestClient) -> None:
+    paths = client.get("/openapi.json").json()["paths"]
+    assert "422" not in paths["/v1/meta"]["get"]["responses"]
+    assert "422" not in paths["/v1/sessions/{session_id}"]["get"]["responses"]
+    assert "A query parameter" in paths["/v1/sessions"]["get"]["responses"]["422"]["description"]
+    assert "the body isn't valid JSON" in paths["/v1/sessions"]["post"]["responses"]["422"]["description"]
+    # The operations the document lists without a 422 accept any query string and any id.
+    assert client.get("/v1/meta", params={"limit": "many"}).status_code == 200
+    assert client.get("/v1/sessions/%20").status_code == 404
+
+
+def test_openapi_describes_osrlib_models_in_json_terms(client: TestClient) -> None:
+    schemas = client.get("/openapi.json").json()["components"]["schemas"]
+    descriptions = str(schemas)
+    assert "`" * 3 + "python" not in descriptions
+    assert "Examples:" not in descriptions
+    assert "`None`" not in descriptions
+    assert "`null` outside a battle" in schemas["EncounterView"]["properties"]["battle_round"]["description"]
+    assert schemas["Rejection"]["description"].startswith("One reason a validator refused an input")
 
 
 def test_operation_ids_are_the_endpoint_names_and_unique(client: TestClient) -> None:
