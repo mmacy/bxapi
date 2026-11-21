@@ -37,6 +37,7 @@ from bxapi.errors import (
     database_busy,
     internal_error,
     request_timeout,
+    storage_full,
     unsupported_media_type,
     validation_error,
 )
@@ -116,6 +117,7 @@ def shared_problems() -> tuple[SharedProblem, ...]:
     max_bytes: int = Settings.model_fields["max_body_bytes"].default
     timeout_seconds: float = Settings.model_fields["body_timeout_seconds"].default
     per_minute: int = Settings.model_fields["rate_limit_per_minute"].default
+    max_client_bytes: int = Settings.model_fields["max_client_bytes"].default
     missing = {"type": "missing", "loc": ("body", "expression"), "msg": "Field required"}
 
     def shared(name: str, summary: str, description: str, error: ApiError, *operations: str) -> SharedProblem:
@@ -222,6 +224,13 @@ def shared_problems() -> tuple[SharedProblem, ...]:
             "The response when the server's osrlib can't load the save's stored document.",
             session_unreadable("save"),
             "restore_save",
+        ),
+        shared(
+            "storage_full",
+            "Store more than the server allows one client",
+            f"The response to a request that would store a document, from a client for which the server already "
+            f"stores {max_client_bytes} bytes or more, the server's default limit.",
+            storage_full(max_client_bytes + 20_480, max_client_bytes),
         ),
         shared(
             "database_busy",

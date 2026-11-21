@@ -27,6 +27,7 @@ def test_meta_reports_versions_and_local_referee(client: TestClient) -> None:
         "auth_enabled": False,
         "client": "local",
         "role": "referee",
+        "storage": {"used_bytes": 0, "max_bytes": 1024**3},
     }
 
 
@@ -38,6 +39,7 @@ def test_meta_reports_the_key_owner(player: TestClient, referee: TestClient, oth
         "auth_enabled": True,
         "client": "game",
         "role": "player",
+        "storage": {"used_bytes": 0, "max_bytes": 1024**3},
     }
     assert referee.get("/v1/meta").json()["role"] == "referee"
     assert other.get("/v1/meta").json()["client"] == "other"

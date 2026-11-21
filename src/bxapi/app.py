@@ -169,6 +169,11 @@ exist.
   `req_Zk3uY0mWq1x8Jr5cTt2aLw`, and the server logs the id with the request. To choose the id,
   send `X-Request-Id` with 1 to 128 letters, digits, and the characters `.`, `_`, `~`, and `-`.
   The server replaces any other value with an id it draws.
+- **Storage.** The server counts the bytes of the documents it stores for your client: characters,
+  ability rolls, adventures, sessions, saves, and the responses it stores for idempotency keys.
+  `GET /v1/meta` returns the count and the limit, which the server's `BXAPI_MAX_CLIENT_BYTES`
+  setting sets and which is 1,073,741,824 bytes by default. When the count reaches the limit, each
+  request that would store more gets 507 `storage_full`, until you delete something.
 - **Rate limits.** Each client may send as many requests a minute as the server's
   `BXAPI_RATE_LIMIT_PER_MINUTE` setting allows, which is 600 by default. You can send that many at
   once, and you regain them at a steady rate. A request over the limit gets 429 `rate_limited`,
@@ -682,6 +687,23 @@ def _describe_idempotency(schema: dict[str, Any]) -> None:
         }
 
 
+_STORAGE_FULL = (
+    "- `storage_full`: The server stores as many bytes of documents for your client as it allows, which its "
+    "`BXAPI_MAX_CLIENT_BYTES` setting sets and which is 1,073,741,824 by default. `used_bytes` and `max_bytes` state "
+    "the count and the limit. The request stored nothing. Delete sessions, saves, adventures, or characters you no "
+    "longer need, and send the request again. An operation that stores nothing, like a dice roll, returns this code "
+    "only for a request with an `Idempotency-Key`, because the server stores the response."
+)
+
+
+def _describe_storage(schema: dict[str, Any]) -> None:
+    # Every operation that stores a document is a POST, and any POST with an idempotency key stores its response.
+    for path_name, path in schema.get("paths", {}).items():
+        operation = path.get("post")
+        if operation is not None and path_name.startswith("/v1/"):
+            operation.setdefault("responses", {})["507"] = {"description": _STORAGE_FULL, "content": _problem_content()}
+
+
 def _describe_conditional_gets(schema: dict[str, Any]) -> None:
     if_none_match = {
         "name": "If-None-Match",
@@ -780,6 +802,7 @@ def _install_openapi(app: FastAPI) -> None:
             )
             _describe_problems(schema, small_body_operations)
             _describe_idempotency(schema)
+            _describe_storage(schema)
             _describe_conditional_gets(schema)
             _describe_request_ids(schema)
             _require_discriminators(schema)
@@ -859,7 +882,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         install_docs_pages(app, openapi_url=_OPENAPI_URL)
     _install_openapi(app)
     app.state.settings = settings
-    app.state.db = Database(settings.database)
+    app.state.db = Database(settings.database, max_client_bytes=settings.max_client_bytes)
     app.state.sessions = SessionManager(app.state.db, cache_size=settings.session_cache_size)
     install_error_handlers(app)
     # Each middleware added wraps the ones before it. A request gets its id first, and every

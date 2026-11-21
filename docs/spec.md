@@ -38,6 +38,7 @@ The contract below covers version 1 of the API. For how to work in the repositor
   - The server forgets a key 24 hours after the first request with it.
 
   The server writes the request's change and the stored response in two transactions. If the server stops between them, or the database refuses the second one, the change is in the database and the key has no stored response. A retry then gets `idempotency_key_in_progress` for 60 seconds and `idempotency_key_interrupted` afterward, and never runs the request a second time. Other methods ignore the header: `GET`, `PATCH`, and `DELETE` requests have the same effect however many times a client sends them.
+- **Storage.** The server counts, for each client, the bytes of the documents it stores: ability scores, character documents, adventure documents and their info, session documents, save documents, and the response bodies it stores for idempotency keys. `GET /v1/meta` returns the count as `storage.used_bytes` and the limit as `storage.max_bytes`, which is `BXAPI_MAX_CLIENT_BYTES`, 1,073,741,824 by default, or `null` when the setting is 0. While a client's count is at the limit or over it, each request that would store a document gets 507 `storage_full` and stores nothing: a `POST` that creates an ability roll, a character, an adventure, a session, or a save, every command, and every `POST` with an `Idempotency-Key` the client hasn't sent before. A command gets it before osrlib executes anything. The check doesn't include the document that the request would store, so a client can pass the limit by one document. Reads, deletes, renames, and a `POST` that stores nothing, like a dice roll with no key, still work. Deleting a session, a save, an adventure, or a character lowers the count, and so does the server when it forgets an idempotency key after 24 hours. The API can't delete an ability roll, and a roll is at most 55 bytes.
 - **Rate limits.** Each client has a budget of `BXAPI_RATE_LIMIT_PER_MINUTE` requests, which is 600 by default. The budget starts full. Every request under `/v1` with one of the client's keys takes one request from it, whatever the response, and the budget regains requests at a steady rate, up to full: `BXAPI_RATE_LIMIT_PER_MINUTE` of them in a minute. So a client can send that many requests at once, and that many a minute after that. A request that finds the budget empty gets 429 `rate_limited`, takes nothing from the budget, and has no effect. Its `Retry-After` header states the whole seconds until the budget has one request, at least 1. Requests under `/v1` with no valid key share one budget of the same size, and one that finds it empty gets 429 in place of 401, which limits how fast a caller can guess keys. A CORS preflight request, and a request that gets 421 `misdirected_request`, take nothing. The paths outside `/v1` have no limit. The server counts in the memory of one process, so each process that shares a database file gives a client the whole budget. `BXAPI_RATE_LIMIT_PER_MINUTE=0` turns the limit off.
 - **Browser security headers.** Every response has `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, and `Referrer-Policy: no-referrer`. Every response except the pages at `/docs` and `/redoc` also has `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`. A browser that loads a response as a page runs nothing from it, and no page can show a response in a frame. The two pages have the policies that **OpenAPI** above describes. The `bxapi` command sends no `Server` header.
 - **Request ids.** The server gives every request an id and returns it in the `X-Request-Id` response header, on every response, including an error and the answer to a CORS preflight request. A request can choose its id by sending `X-Request-Id` with 1 to 128 letters, digits, and the characters `.`, `_`, `~`, and `-`. For a request with no such header, or with any other value, the server draws an id made of `req_` and 22 random URL-safe characters. A problem document repeats the id as `request_id`. The server logs one line for each request to the `bxapi.access` logger when the response is sent: the id, the method, the path without the query string, the status, the time taken in milliseconds, and the client name of the request's API key, or `-` for a request with no valid key. The traceback the server logs for 500 `internal_error` has the id too.
@@ -92,6 +93,7 @@ Every error response is an RFC 9457 problem document with the media type `applic
 | 429 | `rate_limited` | The client sent more requests in a minute than `BXAPI_RATE_LIMIT_PER_MINUTE`, or the server got that many with no valid API key. The response has the header `Retry-After`, with the seconds to wait. | |
 | 500 | `internal_error` | A bug. The response says nothing about the cause, and the server logs the traceback. | |
 | 500 | `session_unreadable` | The server's osrlib can't load a stored session, or a stored save to restore. The `detail` says whether it's the session's or the save's stored state. The response contains nothing else from the stored state, and the server logs the cause with the id. | |
+| 507 | `storage_full` | The server stores `BXAPI_MAX_CLIENT_BYTES` or more of documents for the client, and the request would store another. | `used_bytes`, `max_bytes` |
 | 503 | `database_busy` | Another process held the database's write lock for longer than the 5 seconds the server waits. The response has the header `Retry-After: 1`. Send the request again. | |
 
 ## Endpoints
@@ -101,7 +103,7 @@ Every error response is an RFC 9457 problem document with the media type `applic
 | Method and path | Role | Returns |
 | --- | --- | --- |
 | `GET /health` | none | `{"status": "ok"}`. A load balancer can call it with no key. |
-| `GET /v1/meta` | player | `api_version`, `engine_version`, `schema_version`, `auth_enabled`, `client`, `role` |
+| `GET /v1/meta` | player | `api_version`, `engine_version`, `schema_version`, `auth_enabled`, `client`, `role`, and `storage`, which is `{used_bytes, max_bytes}` as **Storage** under **Conventions** describes |
 
 ### Rules reference
 
@@ -337,7 +339,7 @@ An import loads the document and checks its adventure the same way before it sto
 
 One SQLite database file, opened with Python's `sqlite3` module. No ORM. The `Database` class in `bxapi.db` is the only code that runs SQL. It uses one connection, write-ahead logging for a file database, and works with `":memory:"` for tests.
 
-The server creates a new database file readable and writable only by the user that runs it (mode 0600), and SQLite gives the `-wal` and `-shm` files it creates the same mode. In an empty file, the server creates the tables and sets `PRAGMA user_version` to the version of the table layout, which is 2. The server refuses to start with a file of another version, or with a file that has tables and no version, and its message states the path, the version found, and the version expected. It also refuses a path it can't open, and states the path. The server has no migrations. A change to the tables changes the version, so the server refuses a file that a bxapi with other tables created.
+The server creates a new database file readable and writable only by the user that runs it (mode 0600), and SQLite gives the `-wal` and `-shm` files it creates the same mode. In an empty file, the server creates the tables and sets `PRAGMA user_version` to the version of the table layout, which is 3. The server refuses to start with a file of another version, or with a file that has tables and no version, and its message states the path, the version found, and the version expected. It also refuses a path it can't open, and states the path. The server has no migrations. A change to the tables changes the version, so the server refuses a file that a bxapi with other tables created.
 
 | Table | Columns |
 | --- | --- |
@@ -347,12 +349,15 @@ The server creates a new database file readable and writable only by the user th
 | `sessions` | `seq`, `id`, `client`, `name`, `adventure_id` (can be null), `adventure_name`, `mode`, `revision`, `clock_rounds`, `schema_version`, `engine_version`, `document` (JSON), `created_at`, `updated_at` |
 | `saves` | `seq`, `id`, `client`, `session_id` (can be null), `adventure_id` (can be null), `adventure_name`, `label` (can be null), `mode`, `clock_rounds`, `document` (JSON), `created_at` |
 | `idempotency_keys` | `client`, `key`, `fingerprint`, `status` (can be null), `body` (can be null), `claimed_at` |
+| `client_usage` | `client`, `bytes` |
 
 Every query that reads or changes a row filters on `client`.
 
 `seq` is each table's integer primary key, which SQLite assigns in the order the rows are inserted. `id` is unique. A list sorts by `created_at` and then by `seq`, both descending, so two rows created in the same second are always listed in the same order.
 
 The primary key of `idempotency_keys` is `client` and `key`. `fingerprint` is a hash of the request's method, path, query string, role, and body. `status` and `body` are the stored response. `status` is null while the first request runs, and 0 after a request that failed with 500 `internal_error`. `claimed_at` is the time of the first request, in seconds since the Unix epoch. Each request with a key first deletes every row claimed 24 hours ago or earlier.
+
+`client_usage` has one row for each client, with the bytes of the documents the other tables store for it: `scores` in `ability_rolls`, `document` in `characters`, `sessions`, and `saves`, `info` and `document` in `adventures`, and `body` in `idempotency_keys`. Three triggers on each of those tables change the count when a row is inserted, when one of those columns is updated, and when a row is deleted, in the transaction of the statement itself. So the count stays right in every process that shares the file. Each method of the `Database` class that stores a document first reads the count, and refuses when it's at `BXAPI_MAX_CLIENT_BYTES` or over.
 
 `schema_version` and `engine_version` in `sessions` are copies of the keys of the same names in the session's document. The `Database` class writes them each time it writes the document, so the server can return session info without reading the document.
 
@@ -366,6 +371,7 @@ The primary key of `idempotency_keys` is `client` and `key`. `fingerprint` is a 
 | `BXAPI_CORS_ORIGINS` | `[]` | A JSON list of the web origins whose pages may call the API. Each is a scheme, a host, and an optional port, like `https://game.example`, with no path and no trailing slash. `*` isn't allowed. Cross-origin responses expose the `WWW-Authenticate`, `Retry-After`, `ETag`, `Idempotent-Replayed`, and `X-Request-Id` headers. |
 | `BXAPI_RATE_LIMIT_PER_MINUTE` | `600` | How many requests under `/v1` each client may send in a minute, in each server process. 0 turns the limit off. |
 | `BXAPI_SESSION_CACHE_SIZE` | `256` | How many sessions stay loaded in memory. |
+| `BXAPI_MAX_CLIENT_BYTES` | `1073741824` | The most bytes of documents the server stores for one client. 0 turns the limit off. |
 | `BXAPI_MAX_BODY_BYTES` | `8388608` | The largest request body. On an operation that takes no document, the limit is 65,536 bytes when this setting is larger. |
 | `BXAPI_BODY_TIMEOUT_SECONDS` | `30` | How long the server waits for a request's whole body to arrive. |
 | `BXAPI_DOCS_ENABLED` | `true` | Whether the server serves `/docs`, `/redoc`, and `/openapi.json`. |
@@ -382,7 +388,7 @@ The server limits how long a request's body may take to arrive, but it can't lim
 - Moving a session's characters back into the stored characters, to play them in another adventure.
 - Adding a party member to a session, or replacing one, with a player key. A referee can with the `add_member` command.
 - A step-by-step character builder beyond the ability roll.
-- Rate limits and usage quotas.
+- A rate limit for each network address. The limit is for each client. A reverse proxy can limit addresses.
 - WebSockets or server-sent events.
 - A database other than SQLite.
 - Narration, or any call to a language model.

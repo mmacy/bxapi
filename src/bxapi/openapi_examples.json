@@ -34,7 +34,11 @@
         "schema_version": 4,
         "auth_enabled": true,
         "client": "my-game",
-        "role": "player"
+        "role": "player",
+        "storage": {
+          "used_bytes": 0,
+          "max_bytes": 1073741824
+        }
       }
     }
   },

@@ -145,6 +145,11 @@ class Settings(BaseSettings):
     """How many sessions the server keeps loaded in memory. When the count passes this number,
     the server drops the session that was used longest ago and loads it from the database the
     next time a request needs it."""
+    max_client_bytes: int = Field(default=1024**3, ge=0)
+    """The most bytes of documents the server stores for one client: its characters, adventures,
+    sessions, and saves, and the responses it stores for idempotency keys. A client at the limit
+    gets a 507 for each request that would store more, until it deletes something. 0 turns the
+    limit off."""
     max_body_bytes: int = Field(default=8 * 1024 * 1024, ge=1024)
     """The largest request body the server accepts, in bytes. A larger request gets a 413."""
     body_timeout_seconds: float = Field(default=30, gt=0)

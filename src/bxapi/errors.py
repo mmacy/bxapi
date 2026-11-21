@@ -44,6 +44,7 @@ from pydantic import BaseModel, ConfigDict, field_validator
 from pydantic.json_schema import SkipJsonSchema
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from bxapi.db import StorageFull
 from bxapi.models import left_out_when_none
 from bxapi.request_ids import REQUEST_ID_HEADER, request_id_of
 from bxapi.security_headers import API_HEADERS
@@ -70,6 +71,7 @@ __all__ = [
     "problem_responses",
     "request_timeout",
     "shorten",
+    "storage_full",
     "unsupported_media_type",
     "validation_error",
 ]
@@ -154,6 +156,7 @@ class Problem(BaseModel):
     - `referee_command` adds `command_type`.
     - `character_invalid` adds `rejections` when osrlib reports them. Otherwise it adds `field`
       and `id`, and `index` when `field` is a list.
+    - `storage_full` adds `used_bytes` and `max_bytes`.
 
     A later release can add members, so ignore any member you don't know.
     """
@@ -194,6 +197,10 @@ class Problem(BaseModel):
     index: int | SkipJsonSchema[None] = left_out_when_none()
     """`character_invalid` only, when `field` is a list: the position of the entry that's
     wrong, counted from 0."""
+    used_bytes: int | SkipJsonSchema[None] = left_out_when_none()
+    """`storage_full` only: the bytes of documents the server stores for your client."""
+    max_bytes: int | SkipJsonSchema[None] = left_out_when_none()
+    """`storage_full` only: the most bytes the server stores for one client."""
     rejections: list[Rejection] | SkipJsonSchema[None] = left_out_when_none()
     """`character_invalid` only, and only when osrlib reports them: osrlib's reasons for
     refusing the character, each a `code` and `params`."""
@@ -360,6 +367,27 @@ def database_busy() -> ApiError:
     )
 
 
+def storage_full(used_bytes: int, max_bytes: int) -> ApiError:
+    """Build the 507 for a request that would store more for a client that has reached its limit.
+
+    Args:
+        used_bytes: The bytes of documents the server stores for the client.
+        max_bytes: The most bytes the server stores for one client.
+
+    Returns:
+        An [`ApiError`][bxapi.errors.ApiError] with the code `storage_full`, and `used_bytes` and
+        `max_bytes` as extra members.
+    """
+    return ApiError(
+        507,
+        "storage_full",
+        f"The server stores {used_bytes} bytes for your client, and the limit is {max_bytes}. The request stored "
+        "nothing. Delete sessions, saves, adventures, or characters you no longer need, and send the request again.",
+        used_bytes=used_bytes,
+        max_bytes=max_bytes,
+    )
+
+
 def content_too_large(max_bytes: int, *, for_document: bool = True) -> ApiError:
     """Build the 413 for a request body over a size limit.
 
@@ -501,8 +529,8 @@ def is_reported_error(error: BaseException) -> bool:
 
     The server raises each of these exceptions on purpose, before the request changes anything or
     in place of the change: an [`ApiError`][bxapi.errors.ApiError], a request that fails
-    validation, an osrlib content or version error, a busy database, and Starlette's
-    `HTTPException`. Any other exception is a bug, and the request may have changed something
+    validation, an osrlib content or version error, a busy database, a client at its storage
+    limit, and Starlette's `HTTPException`. Any other exception is a bug, and the request may have changed something
     before it.
 
     Args:
@@ -528,6 +556,7 @@ def is_reported_error(error: BaseException) -> bool:
         SaveVersionError,
         ReplayVersionError,
         StarletteHTTPException,
+        StorageFull,
     )
     return isinstance(error, reported) or _is_busy(error)
 
@@ -545,6 +574,8 @@ def install_error_handlers(app: FastAPI) -> None:
     - osrlib's `ContentValidationError`, sent as 422 `content_invalid`.
     - osrlib's `SaveVersionError` and `ReplayVersionError`, sent as 409
       `version_unsupported`.
+    - [`StorageFull`][bxapi.db.StorageFull], raised when a client has reached the limit on its
+      stored bytes, sent as 507 `storage_full`.
     - SQLite's busy and locked errors, raised when another process holds the database's write
       lock for longer than [`BUSY_TIMEOUT_SECONDS`][bxapi.db.BUSY_TIMEOUT_SECONDS], sent as
       503 `database_busy` with the header `Retry-After: 1`.
@@ -579,6 +610,10 @@ def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(ReplayVersionError)
     def _version_error(request: Request, error: Exception) -> JSONResponse:
         return respond(request, ApiError(409, "version_unsupported", str(error)))
+
+    @app.exception_handler(StorageFull)
+    def _storage_full(request: Request, error: StorageFull) -> JSONResponse:
+        return respond(request, storage_full(error.used_bytes, error.max_bytes))
 
     @app.exception_handler(sqlite3.OperationalError)
     def _database_error(request: Request, error: sqlite3.OperationalError) -> JSONResponse:
