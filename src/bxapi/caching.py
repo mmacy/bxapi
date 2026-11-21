@@ -106,10 +106,14 @@ class ConditionalGetMiddleware:
 
     Args:
         app: The ASGI application to wrap.
+        vary: A request header to list in the `Vary` header of each 304, or `None` to add none.
+            Pass `"Accept-Encoding"` when a compression middleware wraps this one: that middleware
+            adds the header to a 200 it compresses, and a 304 has no body for it to compress.
     """
 
-    def __init__(self, app: ASGIApp) -> None:
+    def __init__(self, app: ASGIApp, vary: str | None = None) -> None:
         self.app = app
+        self.vary = vary
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         """Pass the request to the wrapped application, and send 304 in place of a response the client has."""
@@ -139,6 +143,8 @@ class ConditionalGetMiddleware:
             if etag_matches(Headers(scope=scope).get("if-none-match"), etag):
                 for name in ("content-length", "content-type"):
                     del headers[name]
+                if self.vary is not None and self.vary.lower() not in headers.get("vary", "").lower():
+                    headers.add_vary_header(self.vary)
                 start["status"] = 304
                 body = b""
             await send(start)

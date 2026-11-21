@@ -29,6 +29,8 @@ from typing import Any
 from fastapi import Request, Response
 from fastapi.routing import APIRoute
 from starlette.concurrency import run_in_threadpool
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.requests import ClientDisconnect
 
 from bxapi.db import Database, IdempotencyRow
 from bxapi.errors import ApiError, invalid, is_reported_error, validation_error
@@ -57,8 +59,10 @@ RETENTION_SECONDS = 24 * 60 * 60
 IN_PROGRESS_SECONDS = 60
 """How long the server treats a key with no recorded outcome as a request that's still running.
 
-No request runs that long, so an older key with no outcome belongs to a request that the server
-stopped in the middle of."""
+A request takes that long only on a server too overloaded to give it a worker thread, so an
+older key with no outcome almost always belongs to a request that the server stopped in the
+middle of. A retry of a request that's still running after this time gets
+`idempotency_key_interrupted`, and never runs the request itself."""
 
 _KEY = re.compile(r"[\x21-\x7e]{1,255}")
 
@@ -218,7 +222,11 @@ class IdempotentRoute(APIRoute):
             db: Database = request.app.state.db
             principal = request.state.principal
             client: str = principal.client
-            body = await request.body()
+            try:
+                body = await request.body()
+            except ClientDisconnect:
+                # FastAPI answers a client that disconnects in the middle of the body the same way.
+                raise StarletteHTTPException(status_code=400, detail="There was an error parsing the body") from None
             fingerprint = request_fingerprint(
                 request.method, request.url.path, request.scope["query_string"], principal.role, body
             )

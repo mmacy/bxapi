@@ -1,3 +1,4 @@
+import asyncio
 import json
 import sqlite3
 import threading
@@ -6,6 +7,7 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 from osrlib.crawl.session import GameSession
+from starlette.types import Message
 
 from bxapi.app import create_app
 from bxapi.db import LAYOUT_VERSION, Database
@@ -416,3 +418,39 @@ def test_the_openapi_document_describes_the_key_on_every_post(client: TestClient
         for method in ("get", "patch", "delete"):
             names = [parameter["name"] for parameter in item.get(method, {}).get("parameters", [])]
             assert IDEMPOTENCY_KEY_HEADER not in names
+
+
+def test_a_client_that_disconnects_in_the_body_gets_400_and_claims_no_key(settings: Settings) -> None:
+    app = create_app(settings)
+    sent: list[Message] = []
+
+    async def receive() -> Message:
+        return {"type": "http.disconnect"}
+
+    async def send(message: Message) -> None:
+        sent.append(message)
+
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": "POST",
+        "scheme": "http",
+        "path": "/v1/dice/roll",
+        "raw_path": b"/v1/dice/roll",
+        "query_string": b"",
+        "root_path": "",
+        "headers": [
+            (b"content-type", b"application/json"),
+            (b"content-length", b"100"),
+            (b"idempotency-key", b"roll"),
+        ],
+        "client": ("127.0.0.1", 1),
+        "server": ("127.0.0.1", 8640),
+    }
+    asyncio.run(app(scope, receive, send))
+    assert sent[0]["status"] == 400
+    body = b"".join(message.get("body", b"") for message in sent if message["type"] == "http.response.body")
+    assert json.loads(body)["code"] == "bad_request"
+    assert app.state.db._connection.execute("SELECT count(*) FROM idempotency_keys").fetchone()[0] == 0
+    app.state.db.close()
