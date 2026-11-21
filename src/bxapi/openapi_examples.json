@@ -7906,6 +7906,571 @@
     }
   },
   {
+    "name": "enter_battle",
+    "operation": "send_command",
+    "summary": "Walk into a monster encounter and get the battle view",
+    "request": {
+      "method": "POST",
+      "path": "/v1/sessions/{restore.id}/commands",
+      "query": {
+        "include": "view"
+      },
+      "body": {
+        "command_type": "move_party",
+        "direction": "east"
+      }
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/sessions/ses_HZ-2mzL2ONk7HyLw7VEqWA/commands",
+      "query": {
+        "include": "view"
+      },
+      "body": {
+        "command_type": "move_party",
+        "direction": "east"
+      },
+      "status": 200,
+      "response": {
+        "accepted": true,
+        "rejections": [],
+        "events": [
+          {
+            "code": "exploration.party.moved",
+            "visibility": "player",
+            "event_type": "party_moved",
+            "x": 2,
+            "y": 0,
+            "facing": "east",
+            "narrative": null
+          },
+          {
+            "code": "exploration.location.entered",
+            "visibility": "player",
+            "event_type": "location_entered",
+            "location_kind": "area",
+            "location_id": "guard_room",
+            "level_number": 1,
+            "dungeon_id": "barrow",
+            "narrative": null,
+            "via": null,
+            "transition_ref": null
+          },
+          {
+            "code": "encounter.started",
+            "visibility": "player",
+            "event_type": "encounter_started",
+            "monster_name": "goblin",
+            "monster_name_plural": "goblins",
+            "count": 2,
+            "distance_feet": 20,
+            "party_surprised": true,
+            "monsters_surprised": false
+          },
+          {
+            "code": "encounter.stance.changed",
+            "visibility": "player",
+            "event_type": "stance_changed",
+            "stance": "hostile"
+          },
+          {
+            "code": "battle.started",
+            "visibility": "player",
+            "event_type": "battle_started"
+          },
+          {
+            "code": "battle.group.moved",
+            "visibility": "player",
+            "event_type": "group_moved",
+            "group_id": "group-0001",
+            "distance_feet": 5
+          },
+          {
+            "code": "combat.attack.missed",
+            "visibility": "player",
+            "event_type": "attack_rolled",
+            "attacker_id": "monster-0001",
+            "defender_id": "character-0001",
+            "attack_name": "weapon",
+            "roll": 4,
+            "modifier": 0,
+            "total": 4,
+            "required": 13,
+            "defender_ac": 6,
+            "natural": null,
+            "back_stab": false
+          },
+          {
+            "code": "combat.attack.missed",
+            "visibility": "player",
+            "event_type": "attack_rolled",
+            "attacker_id": "monster-0002",
+            "defender_id": "character-0001",
+            "attack_name": "weapon",
+            "roll": 8,
+            "modifier": 0,
+            "total": 8,
+            "required": 13,
+            "defender_ac": 6,
+            "natural": null,
+            "back_stab": false
+          }
+        ],
+        "messages": [
+          "The party moves to (2, 0), facing east.",
+          "The party enters area guard_room (level 1).",
+          "Encounter: 2 goblins at 20' — the party is surprised.",
+          "The monsters' bearing: hostile.",
+          "Battle is joined!",
+          "group-0001 is now 5' away.",
+          "monster-0001 misses character-0001 with weapon: rolled 4+0 = 4, needing 13.",
+          "monster-0002 misses character-0001 with weapon: rolled 8+0 = 8, needing 13."
+        ],
+        "mode": "battle",
+        "ended": false,
+        "revision": 1,
+        "view": {
+          "adventure_name": "The Barrow of the Forgotten King",
+          "adventure_description": "A plundered barrow outside town, and the idol the temple wants back.",
+          "town_name": "Threshold",
+          "town_description": "A walled market town at the edge of the moors.",
+          "town_services": [
+            "equipment",
+            "temple healing",
+            "treasure buyers"
+          ],
+          "town_healing_prices": {
+            "cure_light_wounds": 25,
+            "cure_serious_wounds": 100,
+            "cure_disease": 150,
+            "neutralize_poison": 150,
+            "remove_curse": 200,
+            "raise_dead": 1500
+          },
+          "party": [
+            {
+              "id": "character-0001",
+              "name": "Aldric",
+              "class_id": "fighter",
+              "level": 1,
+              "current_hp": 8,
+              "max_hp": 8,
+              "conditions": [],
+              "inventory": {
+                "items": [],
+                "purse": {
+                  "pp": 0,
+                  "gp": 80,
+                  "ep": 0,
+                  "sp": 0,
+                  "cp": 0
+                },
+                "valuables": [],
+                "worn_armour": {
+                  "instance_type": "item",
+                  "template": {
+                    "item_type": "armour",
+                    "id": "leather",
+                    "name": "Leather",
+                    "cost_gp": 20,
+                    "weight_coins": 200,
+                    "ac": 7,
+                    "ac_ascending": 12,
+                    "ac_bonus": null,
+                    "category": "light",
+                    "overrides_applied": []
+                  },
+                  "quantity": 1
+                },
+                "shield": null,
+                "wielded": [
+                  {
+                    "instance_type": "item",
+                    "template": {
+                      "item_type": "weapon",
+                      "id": "sword",
+                      "name": "Sword",
+                      "cost_gp": 10,
+                      "weight_coins": 60,
+                      "damage": "1d8",
+                      "qualities": [
+                        "melee"
+                      ],
+                      "missile_ranges": null,
+                      "material": "standard",
+                      "overrides_applied": []
+                    },
+                    "quantity": 1
+                  }
+                ],
+                "rings": []
+              },
+              "memorized_spells": [],
+              "encounter_rate_feet": 30,
+              "race": "human",
+              "alignment": "lawful",
+              "title": "Veteran",
+              "xp": 0,
+              "xp_next_level": 2000,
+              "scores": {
+                "str": 9,
+                "int": 9,
+                "wis": 12,
+                "dex": 15,
+                "con": 12,
+                "cha": 5
+              },
+              "effective_strength": 9,
+              "melee_modifier": 0,
+              "missile_modifier": 1,
+              "initiative_modifier": 1,
+              "hit_point_modifier": 0,
+              "magic_save_modifier": 0,
+              "npc_reaction_modifier": -1,
+              "open_doors_chance": 2,
+              "thac0": 19,
+              "attack_bonus": 0,
+              "armour_class": 6,
+              "armour_class_ascending": 13,
+              "saves": {
+                "death": 12,
+                "wands": 13,
+                "paralysis": 14,
+                "breath": 15,
+                "spells": 16
+              },
+              "movement_rate_feet": 90,
+              "languages": [
+                "alignment_lawful",
+                "common"
+              ],
+              "spell_book": [],
+              "thief_skills": {}
+            }
+          ],
+          "location": {
+            "kind": "dungeon",
+            "dungeon_id": "barrow",
+            "level_number": 1,
+            "position": [
+              2,
+              0
+            ],
+            "facing": "east"
+          },
+          "clock_rounds": 122,
+          "mode": "battle",
+          "explored": [
+            {
+              "dungeon_id": "barrow",
+              "level_number": 1,
+              "cells": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  1,
+                  0
+                ],
+                [
+                  2,
+                  0
+                ]
+              ],
+              "edges": {
+                "0,0:north": {
+                  "kind": "wall",
+                  "door_open": null,
+                  "door_wedged": null
+                },
+                "1,0:west": {
+                  "kind": "open",
+                  "door_open": null,
+                  "door_wedged": null
+                },
+                "0,1:north": {
+                  "kind": "wall",
+                  "door_open": null,
+                  "door_wedged": null
+                },
+                "0,0:west": {
+                  "kind": "wall",
+                  "door_open": null,
+                  "door_wedged": null
+                },
+                "1,0:north": {
+                  "kind": "wall",
+                  "door_open": null,
+                  "door_wedged": null
+                },
+                "2,0:west": {
+                  "kind": "open",
+                  "door_open": null,
+                  "door_wedged": null
+                },
+                "1,1:north": {
+                  "kind": "wall",
+                  "door_open": null,
+                  "door_wedged": null
+                },
+                "2,0:north": {
+                  "kind": "wall",
+                  "door_open": null,
+                  "door_wedged": null
+                },
+                "3,0:west": {
+                  "kind": "open",
+                  "door_open": null,
+                  "door_wedged": null
+                },
+                "2,1:north": {
+                  "kind": "wall",
+                  "door_open": null,
+                  "door_wedged": null
+                }
+              }
+            }
+          ],
+          "piles": {},
+          "emptied_caches": [],
+          "effects": [],
+          "fatigued": false,
+          "exhausted": false,
+          "deprivation": {},
+          "journal": [
+            {
+              "text": "The temple wants the Jade Idol off the barrow king's altar and back on its own.",
+              "rounds": 120
+            }
+          ],
+          "quests": [
+            {
+              "id": "the-idol",
+              "name": "The Jade Idol",
+              "narrative": "The temple wants the Jade Idol off the barrow king's altar and back on its own.",
+              "speaker": "the temple almoner",
+              "objectives": [
+                {
+                  "id": "recover-idol",
+                  "name": "Recover the idol",
+                  "state": "incomplete"
+                },
+                {
+                  "id": "return-home",
+                  "name": "Bring it home",
+                  "state": "incomplete"
+                }
+              ]
+            }
+          ],
+          "encounter": {
+            "groups": [
+              {
+                "id": "group-0001",
+                "label": "goblin",
+                "label_plural": "goblins",
+                "family_id": "goblin",
+                "categories": [
+                  "person"
+                ],
+                "count": 2,
+                "distance_feet": 5,
+                "visible_conditions": [],
+                "condition_counts": {},
+                "fled": false,
+                "member_distance_feet": {
+                  "character-0001": 5
+                },
+                "front_rank": [
+                  "character-0001"
+                ],
+                "lit": false,
+                "seen_by": []
+              }
+            ],
+            "stance": "hostile",
+            "in_battle": true,
+            "battle_round": 1,
+            "pursuit_gap_feet": null,
+            "declarers": [
+              "character-0001"
+            ],
+            "front_rank": [
+              "character-0001"
+            ],
+            "immobile": [],
+            "reloading": [],
+            "advance_feet": {
+              "character-0001": 0
+            },
+            "formation_width": 2,
+            "party_free_round": false
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "resolve_battle_round",
+    "operation": "send_command",
+    "summary": "Resolve a battle round from encounter.declarers and groups",
+    "request": {
+      "method": "POST",
+      "path": "/v1/sessions/{restore.id}/commands",
+      "body": {
+        "command_type": "resolve_battle_round",
+        "declarations": [
+          {
+            "character_id": "character-0001",
+            "action": "attack",
+            "target_group_id": "group-0001"
+          }
+        ]
+      }
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/sessions/ses_HZ-2mzL2ONk7HyLw7VEqWA/commands",
+      "body": {
+        "command_type": "resolve_battle_round",
+        "declarations": [
+          {
+            "character_id": "character-0001",
+            "action": "attack",
+            "target_group_id": "group-0001"
+          }
+        ]
+      },
+      "status": 200,
+      "response": {
+        "accepted": true,
+        "rejections": [],
+        "events": [
+          {
+            "code": "battle.round.started",
+            "visibility": "player",
+            "event_type": "battle_round",
+            "round": 2
+          },
+          {
+            "code": "combat.initiative.rolled",
+            "visibility": "player",
+            "event_type": "initiative_rolled",
+            "mode": "side",
+            "entries": [
+              {
+                "key": "party",
+                "rolls": [
+                  1
+                ],
+                "modifier": 0,
+                "total": 1
+              },
+              {
+                "key": "monsters",
+                "rolls": [
+                  6
+                ],
+                "modifier": 0,
+                "total": 6
+              }
+            ],
+            "order": [
+              "group-0001",
+              "character-0001"
+            ]
+          },
+          {
+            "code": "combat.attack.missed",
+            "visibility": "player",
+            "event_type": "attack_rolled",
+            "attacker_id": "monster-0001",
+            "defender_id": "character-0001",
+            "attack_name": "weapon",
+            "roll": 4,
+            "modifier": 0,
+            "total": 4,
+            "required": 13,
+            "defender_ac": 6,
+            "natural": null,
+            "back_stab": false
+          },
+          {
+            "code": "combat.attack.missed",
+            "visibility": "player",
+            "event_type": "attack_rolled",
+            "attacker_id": "monster-0002",
+            "defender_id": "character-0001",
+            "attack_name": "weapon",
+            "roll": 6,
+            "modifier": 0,
+            "total": 6,
+            "required": 13,
+            "defender_ac": 6,
+            "natural": null,
+            "back_stab": false
+          },
+          {
+            "code": "combat.attack.hit",
+            "visibility": "player",
+            "event_type": "attack_rolled",
+            "attacker_id": "character-0001",
+            "defender_id": "monster-0001",
+            "attack_name": "Sword",
+            "roll": 17,
+            "modifier": 0,
+            "total": 17,
+            "required": 13,
+            "defender_ac": 6,
+            "natural": null,
+            "back_stab": false
+          },
+          {
+            "code": "combat.damage.dealt",
+            "visibility": "player",
+            "event_type": "damage_dealt",
+            "target_id": "monster-0001",
+            "attacker_id": "character-0001",
+            "amount": 8,
+            "rolls": [
+              8
+            ],
+            "keys": [],
+            "non_regenerable": false
+          },
+          {
+            "code": "effects.condition.gained",
+            "visibility": "player",
+            "event_type": "condition_gained",
+            "target_id": "monster-0001",
+            "condition": "dead",
+            "effect_id": null
+          },
+          {
+            "code": "combat.death.died",
+            "visibility": "player",
+            "event_type": "death",
+            "target_id": "monster-0001"
+          }
+        ],
+        "messages": [
+          "Battle round 2 begins.",
+          "Initiative (side): party 1, monsters 6. Order: group-0001, character-0001.",
+          "monster-0001 misses character-0001 with weapon: rolled 4+0 = 4, needing 13.",
+          "monster-0002 misses character-0001 with weapon: rolled 6+0 = 6, needing 13.",
+          "character-0001 hits monster-0001 with Sword: rolled 17+0 = 17, needing 13.",
+          "monster-0001 takes 8 damage from character-0001.",
+          "monster-0001 is dead.",
+          "monster-0001 is killed."
+        ],
+        "mode": "battle",
+        "ended": false,
+        "revision": 2
+      }
+    }
+  },
+  {
     "name": "delete_session",
     "operation": "delete_session",
     "summary": "Delete the restored session",
@@ -11021,6 +11586,104 @@
           ],
           "encounter": null
         }
+      }
+    }
+  },
+  {
+    "name": "travel_to_town",
+    "operation": "send_command",
+    "summary": "Return from the dungeon entrance to town",
+    "request": {
+      "method": "POST",
+      "path": "/v1/sessions/{create_session.id}/commands",
+      "body": {
+        "command_type": "travel_to_town"
+      }
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/sessions/ses_mMf_uw8nBilpF93Q9yj_DQ/commands",
+      "body": {
+        "command_type": "travel_to_town"
+      },
+      "status": 200,
+      "response": {
+        "accepted": true,
+        "rejections": [],
+        "events": [
+          {
+            "code": "exploration.location.entered",
+            "visibility": "player",
+            "event_type": "location_entered",
+            "location_kind": "town",
+            "location_id": "town",
+            "level_number": null,
+            "dungeon_id": null,
+            "narrative": null,
+            "via": null,
+            "transition_ref": null
+          }
+        ],
+        "messages": [
+          "The party enters town town."
+        ],
+        "mode": "town",
+        "ended": false,
+        "revision": 4
+      }
+    }
+  },
+  {
+    "name": "purchase_equipment",
+    "operation": "send_command",
+    "summary": "Buy two lots of torches in town for character-0001",
+    "request": {
+      "method": "POST",
+      "path": "/v1/sessions/{create_session.id}/commands",
+      "body": {
+        "command_type": "purchase_equipment",
+        "character_id": "character-0001",
+        "item_ids": [
+          "torch",
+          "torch"
+        ]
+      }
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/sessions/ses_mMf_uw8nBilpF93Q9yj_DQ/commands",
+      "body": {
+        "command_type": "purchase_equipment",
+        "character_id": "character-0001",
+        "item_ids": [
+          "torch",
+          "torch"
+        ]
+      },
+      "status": 200,
+      "response": {
+        "accepted": true,
+        "rejections": [],
+        "events": [
+          {
+            "code": "exploration.item.acquired",
+            "visibility": "player",
+            "event_type": "item_acquired",
+            "character_id": "character-0001",
+            "item_ids": [
+              "torch",
+              "torch"
+            ],
+            "coins_gp_value": 0,
+            "origin": "purchase"
+          }
+        ],
+        "messages": [
+          "character-0001 acquires torch, torch."
+        ],
+        "mode": "town",
+        "ended": false,
+        "revision": 5
       }
     }
   }

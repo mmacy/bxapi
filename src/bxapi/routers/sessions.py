@@ -645,7 +645,26 @@ def send_command(
     Select the command variant with `command_type` (up to 65,536 bytes). `GET /v1/sessions/{session_id}/commands`
     lists commands legal in the current mode for your role, and `GET /v1/rules/commands/{command_type}` returns each
     command's JSON Schema. Command models ignore unknown fields. Display `messages` to the player and update your UI
-    from `view` (pass `include=view` to receive it in this response, or call `GET /v1/sessions/{session_id}/view`).
+    from `view` (pass `include=view` to receive `PlayerView` alongside `revision` in one atomic response, or call
+    `GET /v1/sessions/{session_id}/view`).
+
+    Mapping `PlayerView` fields into common multi-field commands:
+
+    - **Town purchases (`purchase_equipment`):** Pass a party member's `party[i].id` (such as `"character-0001"`) as
+      `character_id` and repeat equipment `id` values in `item_ids` once per purchase lot (unlike `purchases` on
+      `POST /v1/characters`, which takes `{item_id, quantity}` objects).
+    - **Out-of-battle spells (`cast_spell`):** Pass `character_id`, `spell_id`, and `mode` set to a `SpellMode.key`
+      from `GET /v1/rules/spells/{spell_id}` (such as `"heal"` on `cure_light_wounds`, not the session's
+      `SessionMode`), plus target IDs in `targets` (such as `["character-0001"]` or `"cell:barrow:1:0,0"`).
+    - **Battle rounds (`resolve_battle_round`):** Include exactly one `BattleDeclaration` in `declarations` for each
+      member ID in `encounter.declarers`. Pass `target_group_id` from `encounter.groups[i].id` (such as
+      `"group-0001"`) for `attack`, `close`, thrown splash items, and `area` or `hd_budget` spells (such as
+      `fire_ball` or `sleep` with `spell_mode: "hd_budget"`). In battle, spell casts set `spell_mode` rather than
+      `mode`. Spells with `single` or `up_to_n` targeting (such as `magic_missile` with `spell_mode: "missiles"`)
+      require individual creature IDs in `targets`: `PlayerView` hides `group.monster_ids`, so a `player`-only
+      client knows a monster's `"monster-NNNN"` ID only after that monster appears in a player-visible combat event
+      (`attacker_id` or `target_id`), whereas a `referee` backend can read `group.monster_ids` from
+      `GET /v1/sessions/{session_id}/referee-view`.
 
     When osrlib refuses a command under the B/X rules, this operation still returns HTTP 200 with `accepted` set to
     `false` and rule `rejections`, leaving the session and `revision` unchanged. When accepted, the server persists
@@ -692,8 +711,9 @@ def get_player_view(request: Request, principal: CurrentPrincipal, session_id: S
     """Return osrlib's `PlayerView`: everything the players may see at the session's current revision.
 
     Render your game screen from this object (or pass `include=view` to `POST /v1/sessions/{session_id}/commands` to
-    receive the same `PlayerView` inline with each command). Acquires the session lock so the snapshot always
-    reflects state between commands, and never includes unexplored cells, monster hit points, or referee rolls.
+    receive `PlayerView` alongside `revision` in one response, because standalone `PlayerView` omits `revision`).
+    Acquires the session lock so the snapshot always reflects state between commands, and never includes unexplored
+    cells, monster hit points, or referee rolls.
 
     Key fields for rendering a client UI:
 
@@ -705,9 +725,12 @@ def get_player_view(request: Request, principal: CurrentPrincipal, session_id: S
       `movement_rate_feet`, and `thief_skills`. Combat stats include bonuses and curses from worn unidentified magic
       items while `inventory` masks unidentified names (such as `"a shield with a faint aura"`).
     - `explored`: visited cells and known `x,y:side` edges (such as `"0,0:north"`) per explored dungeon level.
-    - `encounter`: active encounter state, or `null`. Pass a group's `id` as `target_group_id` in battle
-      declarations, and display `label` or `label_plural`. Individual `monster_ids` appear only on
-      `GET /v1/sessions/{session_id}/referee-view`. To find catalog templates matching a group's `family_id`, search
+    - `encounter`: active encounter state, or `null`. Pass `declarers` to build `resolve_battle_round`, and pass a
+      group's `id` as `target_group_id` for attacks, `close`, thrown splash items, and `area` or `hd_budget` spells
+      (such as `fire_ball` and `sleep`). `PlayerView` omits individual `monster_ids` (only
+      `GET /v1/sessions/{session_id}/referee-view` lists them), so `single` and `up_to_n` spells (such as
+      `magic_missile`) can target a monster from a `player` client only after that monster's `"monster-NNNN"` ID
+      appears in a player-visible combat event. To find catalog templates matching a group's `family_id`, search
       `GET /v1/rules/monsters` with `q` and check `family_id` on `GET /v1/rules/monsters/{monster_id}`.
     - `journal` and `quests`: discovered journal entries and active or completed quests.
     - `town_healing_prices`: gold-piece prices for temple services accepted by `purchase_healing`.
@@ -780,8 +803,10 @@ def list_events(
     the log when `next_after` equals `total`.
 
     Because `POST /v1/sessions/{session_id}/commands` already returns the events caused by each command, you only
-    need this endpoint when reconnecting, rebuilding message history, or inspecting events inherited from before a
-    save was restored.
+    need this endpoint when reconnecting, syncing across multiple clients, or reading events from before a save was
+    restored. `CommandOutcome` omits `next_after`, and one command can emit zero or several events, so persist
+    `next_after` from this endpoint rather than adding `len(CommandOutcome.events)` when other callers may also act
+    on the session.
     """
     _require_visibility(visibility, principal)
 

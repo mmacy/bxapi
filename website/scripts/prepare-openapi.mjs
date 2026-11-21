@@ -174,6 +174,26 @@ function keepValidRequestExamples(holder) {
   }
 }
 
+// Docs MD 0.2.37 ignores `response.headers` and omits any response that lacks an object body
+// schema (such as 204 on DELETE and 304 on GET). Format operational response headers into
+// `response.description` (`X-Request-Id` is on every response and covered on About), and give
+// bodyless responses an empty object schema so Docs MD renders their status tabs.
+function describeResponseHeaders(response, root) {
+  const entries = [];
+  for (const [name, rawHeader] of Object.entries(response.headers ?? {})) {
+    if (name === "X-Request-Id") {
+      continue;
+    }
+    const header = rawHeader?.$ref ? resolvePointer(root, rawHeader.$ref) : rawHeader;
+    if (header?.description) {
+      entries.push(`- \`${name}\`: ${header.description}`);
+    }
+  }
+  if (entries.length > 0) {
+    response.description = `${response.description ?? ""}\n\n**Response headers:**\n\n${entries.join("\n")}`.trim();
+  }
+}
+
 // The ids of the operations that need an API key.
 const keyed = new Set();
 for (const pathItem of Object.values(document.paths)) {
@@ -191,10 +211,17 @@ for (const pathItem of Object.values(document.paths)) {
       inlineRefsInExamples(media);
     }
     for (const [status, response] of Object.entries(operation.responses ?? {})) {
-      for (const media of Object.values(response.content ?? {})) {
-        inlineRefsInExamples(media);
-        summarizeProblem(response, media, operation.operationId, status);
-        separateSchema(media, operation.operationId, status);
+      describeResponseHeaders(response, document);
+      if (!response.content) {
+        response.content = {
+          "application/json": { schema: { type: "object", title: `${operation.operationId}_${status}` } },
+        };
+      } else {
+        for (const media of Object.values(response.content)) {
+          inlineRefsInExamples(media);
+          summarizeProblem(response, media, operation.operationId, status);
+          separateSchema(media, operation.operationId, status);
+        }
       }
     }
   }

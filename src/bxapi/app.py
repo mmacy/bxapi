@@ -115,7 +115,9 @@ reference is relative to the server's address. Every operation except `GET /heal
 8. `GET /v1/sessions/{session_id}/view` returns what the players can see, so your client can draw
    the screen. Pass `include=view` in step 7 to get the view in the command's response instead.
 
-Repeat steps 6 to 8 until `ended` is `true` in a command's response.
+Repeat steps 6 to 8 until `ended` is `true` in a command's response. For a runnable end-to-end
+walkthrough with shell variables, see [Play a game](https://mmacy.github.io/bxapi/docs/play-a-game/)
+and [`examples/play_barrow.py`](https://github.com/mmacy/bxapi/blob/main/examples/play_barrow.py).
 
 ## Authentication
 
@@ -153,10 +155,12 @@ doesn't exist.
   `sav_` for a save. Built-in adventure ids start with `builtin-`.
 - **Timestamps.** UTC timestamps in RFC 3339 format with whole seconds, such as
   `2026-11-20T22:01:05Z`.
-- **Lists.** Every list operation accepts `limit` (1 to 200, default 50) and `offset` (0 to
-  2^53 - 1, default 0), and returns `items`, `total`, `limit`, and `offset`. Add `limit` to
-  `offset` for the next page, and stop when `offset` plus `limit` is `total` or greater. The
-  server lists stored resources newest first.
+- **Lists.** Every list operation except `GET /v1/sessions/{session_id}/events` accepts `limit` (1
+  to 200, default 50) and `offset` (0 to 2^53 - 1, default 0), and returns `items`, `total`,
+  `limit`, and `offset`. Add `limit` to `offset` for the next page, and stop when `offset` plus
+  `limit` is `total` or greater. The server lists stored resources newest first. The session event
+  log (`GET /v1/sessions/{session_id}/events`) uses `after` and `next_after` (`limit` 1 to 500,
+  default 100) per `visibility` instead.
 - **Documents.** A *document* is osrlib's JSON envelope for an adventure, a character, a party, or
   a save. It is an object with `kind`, `schema_version`, `engine_version`, and `payload`. The
   server accepts documents whose `schema_version` is at most the `schema_version` that
@@ -430,8 +434,25 @@ progress: a party of characters playing a copy of an adventure from `town` until
 session, and `DELETE /v1/sessions/{session_id}` deletes a session while keeping its saves.
 
 The server runs one command, view read, or event-log read at a time per session. A request that
-waits longer than 5 seconds for the session lock gets 409 `session_busy`. Pass `Idempotency-Key`
-or `expected_revision` when retrying a command so a network retry never executes the move twice.
+waits longer than 5 seconds for the session lock gets 409 `session_busy`.
+
+**Syncing, retries, and reconnects:**
+
+- **Lost `POST` response:** Send a fresh `Idempotency-Key` with each new `POST` and reuse that key
+  on retries so the server replays the stored 2xx outcome instead of running the move twice.
+- **Guarding against concurrent moves:** Track `revision` from `POST /v1/sessions`,
+  `GET /v1/sessions/{session_id}`, `GET /v1/sessions/{session_id}/commands`, or `CommandOutcome`
+  (standalone `PlayerView` omits `revision`, so pass `include=view` on commands or pair view reads
+  with `GET /v1/sessions/{session_id}`). Pass `expected_revision` on commands. On 409
+  `revision_conflict`, refresh `GET /v1/sessions/{session_id}/view` before deciding your next
+  move. On 409 `session_busy`, check `GET /v1/sessions/{session_id}` first if you sent
+  `expected_revision`, or retry directly if you didn't.
+- **Polling:** Send the previous `ETag` in `If-None-Match` on `GET /v1/sessions/{session_id}` or
+  `GET /v1/sessions/{session_id}/view` to receive 304 with no body while state is unchanged.
+- **Catching up on events:** `after` and `next_after` on `GET /v1/sessions/{session_id}/events`
+  count events for the requested `visibility` and advance independently of `revision`. Persist
+  `next_after` from `/events` rather than adding `len(CommandOutcome.events)` whenever another
+  client or referee might also act on the session.
 """,
     },
     {

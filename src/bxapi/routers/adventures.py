@@ -38,7 +38,9 @@ AdventureId = Annotated[
 _DOCUMENT_BODY = Body(
     description='Adventure document envelope (`kind` set to `"adventure"`, `schema_version`, `engine_version`, and '
     "osrlib's `Adventure` model in `payload`), up to `BXAPI_MAX_BODY_BYTES` (8,388,608 bytes by default). Produced by "
-    "[osr-forge](https://github.com/mmacy/osr-forge), [osr-editor](https://github.com/mmacy/osr-editor), or osrlib."
+    "[osr-forge](https://github.com/mmacy/osr-forge), [osr-editor](https://github.com/mmacy/osr-editor), or osrlib. "
+    "See `adventure` on `GET /v1/sessions/{session_id}/referee-view` (`components.schemas.Adventure` in "
+    "`/openapi.json`) for every field of `payload`."
 )
 
 
