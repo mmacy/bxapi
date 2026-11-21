@@ -1,18 +1,21 @@
 # Adventures
 
-Upload your own adventure so a session can play it, and check a document before you store it.
+Upload your own adventure so a session can play it, and check an adventure document before you store it.
 
-An *adventure* is the content a session plays: a town, dungeons with maps, monsters and treasure, and the triggers and quests that drive them. An *adventure document* is an adventure written as JSON. The document has four members:
+An *adventure* is the content that a *session*, one game in progress, plays: a town, dungeons with maps, monsters and treasure, and the triggers and quests that drive them. An *adventure document* is an adventure written as JSON.
+
+You don't need to write a document by hand. Two tools write adventure documents: [osr-forge](https://github.com/mmacy/osr-forge) converts a tabletop adventure module PDF into a document, and [osr-editor](https://github.com/mmacy/osr-editor) is a graphical editor for creating and changing one. Both write the `adventure.json` file that bxapi accepts as a request body. A program that uses [osrlib](https://mmacy.github.io/osrlib-python/), the Python rules engine that bxapi runs, can also write one.
+
+The document has four members:
 
 - `kind` is `adventure`.
-- `schema_version` and `engine_version` are the versions of the rules engine that wrote it.
-- `payload` is the adventure itself, in the format of the `Adventure` model of [osrlib](https://mmacy.github.io/osrlib-python/), the rules engine that bxapi runs.
+- `schema_version` is the version of the document format.
+- `engine_version` is the release of the rules engine that wrote the document.
+- `payload` is the adventure itself, in the format of osrlib's `Adventure` model.
 
-You don't write a document by hand. Two tools write them: [osr-forge](https://github.com/mmacy/osr-forge) converts a tabletop adventure module PDF into a document, and [osr-editor](https://github.com/mmacy/osr-editor) is a graphical editor for creating and changing one. Both write the `adventure.json` file that bxapi accepts as a request body. A program that uses osrlib can also write one.
+The server comes with one adventure, `builtin-barrow`, so a new *client*, an application that the server identifies by its API keys, can start a game without uploading anything. Its id starts with `builtin-`. Every client can list it and start a session with it, and no client can delete it.
 
-The server comes with one adventure, `builtin-barrow`, so a new client can start a game without uploading anything. Its id starts with `builtin-`, and every client can read it and none can delete it.
-
-The examples use a key in the shell variable `KEY`, as [Play a game](play-a-game.md#start-a-server-with-a-player-key) sets up. A player key can upload, validate, list, and delete adventures. To follow along you need a document, and the built-in adventure's document is one you can read with a referee key, as [Run games as a referee](referee.md) describes. Save it as `barrow.json`:
+Start the server with a player key and a referee key for the same client, as [Authentication](authentication.md#configure-api-keys) shows. Each example sends a key in the shell variable `KEY`. A player key can upload, validate, list, and delete adventures. To follow along, you need a document. You can read the built-in adventure's document with the referee key, a key with the *referee* role, which is for software that runs games and may see their hidden state, as [Run games as a referee](referee.md) describes. Save the document as `barrow.json`:
 
 ```sh
 export KEY=referee-key-0123456789
@@ -38,7 +41,7 @@ export KEY=player-key-0123456789
 
 ## Validate a document
 
-Send a document to `POST /v1/adventures/validate` to check it without storing it. The server runs every check that the rules engine makes on an adventure: the document's structure, and every reference the adventure makes to a monster, an item, an area, or a quest. An adventure that passes can start a session.
+Send a document to `POST /v1/adventures/validate` to check it without storing it. The server runs every check that the rules engine makes on an adventure: the document's structure, and every reference the adventure makes to a monster, an item, an area, or a quest. After you upload an adventure that passes, a session can play it.
 
 ```sh
 curl -s -X POST http://127.0.0.1:8640/v1/adventures/validate -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d @barrow.json
@@ -63,7 +66,7 @@ curl -s -X POST http://127.0.0.1:8640/v1/adventures/validate -H "Authorization: 
 
 The response is 200 whether or not the document is valid. When it's valid, `adventure` is the adventure's info, described below, with `id` and `created_at` set to `null` because nothing was stored.
 
-To see a document that fails, change the goblins' monster id in a copy of the file to one that doesn't exist:
+The built-in adventure has goblins in its guard room. To see a document that fails, change the goblins' monster id in a copy of the file to one that doesn't exist:
 
 ```sh
 sed 's/"goblin"/"gobbin"/' barrow.json > broken.json
@@ -81,7 +84,7 @@ curl -s -X POST http://127.0.0.1:8640/v1/adventures/validate -H "Authorization: 
 }
 ```
 
-`code` is the error code that an upload of the same document returns, and `detail` says what's wrong. A document written by a newer release of the rules engine than the server runs gets `version_unsupported` instead. The `detail` lists at most 20 problems.
+`code` is the error code that an upload of the same document returns, and `detail` describes what's wrong. A document with a newer `schema_version` than the server's rules engine reads gets `version_unsupported` instead. The `detail` is one string that lists at most 20 problems, one on each line.
 
 ## Upload an adventure
 
@@ -139,7 +142,7 @@ Each upload stores a new adventure, even when the document is one you uploaded b
 | `town` | The name and description of the town where a session starts. |
 | `dungeons` | The `id` and `name` of each dungeon. A session's `enter_dungeon` command takes a dungeon's `id`. |
 
-The info has what a player may know before play and nothing else, whatever the key's role. It leaves out the maps, monsters, treasure, triggers, and quests, and it doesn't say how many levels a dungeon has, because the player view shows only the levels a party has explored. A game that lists adventures for its players can show the info as it is.
+The info contains only what a player may know before play, whatever the key's role. It leaves out the maps, monsters, treasure, triggers, and quests, and it doesn't say how many levels a dungeon has, because the player view shows only the levels a party has explored. A game that lists adventures for its players can show the info as it is. In the commands below, replace the adventure's id with the one your upload returned.
 
 ```sh
 curl -s http://127.0.0.1:8640/v1/adventures/adv_OYCL9qF0YhQ0HVyLdsBthw -H "Authorization: Bearer $KEY"
@@ -159,7 +162,7 @@ HTTP/1.1 403 Forbidden
 
 ## Play an uploaded adventure
 
-Start a session with the adventure's id. Everything else is the same as with the built-in adventure:
+Start a session with the adventure's id and the id of a character you created, as [Play a game](play-a-game.md#create-a-character) shows. The rest of play is the same as with the built-in adventure:
 
 ```sh
 curl -s -X POST http://127.0.0.1:8640/v1/sessions -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"adventure_id": "adv_OYCL9qF0YhQ0HVyLdsBthw", "character_ids": ["chr_XSWUBj-UjQauxKNeDtopIg"]}'
@@ -176,8 +179,6 @@ curl -s -X POST http://127.0.0.1:8640/v1/sessions -H "Authorization: Bearer $KEY
 }
 ```
 
-The character id is one you created. See [Play a game](play-a-game.md#create-a-character).
-
 ## Delete an adventure
 
 Delete an adventure you uploaded:
@@ -191,7 +192,7 @@ HTTP/1.1 204 No Content
 ...
 ```
 
-A session that already started with the adventure keeps playing, because a session has its own copy. After the delete, a request for the adventure gets 404 `not_found`, and so do new sessions. An attempt to delete a built-in adventure gets 403 `adventure_read_only`:
+A session that already started with the adventure keeps playing, because each session has a copy of its adventure. After the delete, a request for the adventure gets 404 `not_found`, and so does a request to start a session with it. An attempt to delete a built-in adventure gets 403 `adventure_read_only`:
 
 ```sh
 curl -si -X DELETE http://127.0.0.1:8640/v1/adventures/builtin-barrow -H "Authorization: Bearer $KEY"

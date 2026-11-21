@@ -1,13 +1,13 @@
 # Authentication
 
-Set up API keys so only your application can call the server, and give each key the role it needs.
+When you run a bxapi server, set up API keys so only your application can call it. Give each key a *role*, `player` (the default) or `referee`, which determines what the key may do.
 
 ## Configure API keys
 
-The server reads its keys from the `BXAPI_API_KEYS` environment variable, a JSON list. Each entry has a `client`, a `key`, and a `role`:
+The server reads its keys from the `BXAPI_API_KEYS` environment variable, a JSON list. Each entry has a `client` and a `key`, and it can have a `role`:
 
 - `client` is the name of your application, like `my-game`. It can have letters, digits, dots, underscores, and hyphens, up to 64 characters, and it starts with a letter or a digit.
-- `key` is the secret your application sends. It has at least 16 printable ASCII characters and no spaces. Every key in the list must be different.
+- `key` is a secret that you choose and your application sends. It has at least 16 printable ASCII characters and no spaces. Every key in the list must be different.
 - `role` is `player` or `referee`. It defaults to `player`.
 
 Generate a key with a random-number generator, not by hand:
@@ -20,7 +20,7 @@ python3 -c "import secrets; print(secrets.token_urlsafe(24))"
 I2xREiV099R-y8OEwT_Xb7FFZuP4vWrK
 ```
 
-Your key differs. The examples on this page use short keys that are easy to read, which you shouldn't use on a server that other people can reach. Start the server with a player key and a referee key for the application `my-game`, and a player key for a second application, `other-game`:
+Your key differs. The examples on this page use short keys that are easy to read, which you shouldn't use on a server that other people can reach. If you haven't set up bxapi yet, follow [Get it running](../README.md#get-it-running) in the README first. Start the server with a player key and a referee key for the application `my-game`, and a player key for a second application, `other-game`:
 
 ```sh
 BXAPI_API_KEYS='[{"client": "my-game", "key": "player-key-0123456789", "role": "player"}, {"client": "my-game", "key": "referee-key-0123456789", "role": "referee"}, {"client": "other-game", "key": "other-key-0123456789ab", "role": "player"}]' uv run bxapi
@@ -36,7 +36,7 @@ A server with no keys doesn't start, unless `BXAPI_ALLOW_ANONYMOUS` is `true`. [
 
 ## Send a key
 
-Send the key as a bearer token in the `Authorization` header of every request under `/v1`. The word `Bearer` can be in any case. In a second terminal, put the player key in a shell variable and ask the server who you are:
+Send the key as a bearer token in the `Authorization` header of every request under `/v1`. The word `Bearer` can be in any case. In a second terminal, put the player key of `my-game` in a shell variable and ask the server who you are:
 
 ```sh
 export KEY=player-key-0123456789
@@ -63,7 +63,7 @@ Only `GET /health`, `/docs`, `/redoc`, and `/openapi.json` need no key.
 
 ## Handle a 401
 
-A request with no key, a key the server doesn't know, or a malformed `Authorization` header gets status 401 and the code `unauthorized`. The server checks the key before it reads the request, so every path under `/v1` gives the same answer, whether or not the path exists.
+A request with no key, a key the server doesn't know, or a malformed `Authorization` header gets status 401 and the code `unauthorized`. The server checks the key before it reads the request, so a request without a valid key gets the same answer at every path under `/v1`, whether or not the path exists.
 
 ```sh
 curl -si http://127.0.0.1:8640/v1/meta
@@ -78,18 +78,18 @@ content-type: application/problem+json
 {"type":"about:blank","title":"Unauthorized","status":401,"detail":"Send a valid API key as a bearer token in the Authorization header.","code":"unauthorized"}
 ```
 
-A client can't fix a 401 by trying again. Check the key your application sends.
+Your application can't fix a 401 by trying again. Check the key your application sends.
 
 ## Roles
 
-A key's role decides what the holder may do in a game.
+A key's role determines what the holder may do in a *session*, a game in progress on the server.
 
 | Role | May do |
 | --- | --- |
-| `player` | Everything a game client needs: read the rules, roll dice, create characters, upload adventures, start and play sessions, and save and restore. A player sees only what the players of a game may see. |
+| `player` | Everything a game client needs: read the rules, roll dice, create characters, upload adventures, start and play sessions, and save and restore. The server shows a player only what the players of a game may see. |
 | `referee` | Everything a player may do, and also: read the referee view and referee events, send referee commands, choose seeds, import characters and saves, and read full adventure and save documents. |
 
-A player who asks for something only a referee may do gets status 403 and the code `referee_required`:
+A player who asks for something only a referee may do gets status 403 and the code `referee_required`. This request and the ones below use the id of a session that the player key of `my-game` started, as [Play a game](play-a-game.md#start-a-session) shows. Replace the id with one of yours:
 
 ```sh
 curl -si http://127.0.0.1:8640/v1/sessions/ses_eqeMc3BaPn-ii_2kKiCJWw/referee-view -H "Authorization: Bearer $KEY"
@@ -117,18 +117,18 @@ curl -s http://127.0.0.1:8640/v1/sessions/ses_eqeMc3BaPn-ii_2kKiCJWw/referee-vie
 {"ruleset":{"hp_reroll_at_first_level":false,"encumbrance":"basic","variable_weapon_damage":true,"individual_initiative":false,"thac0_arithmetic":false,"weapon_reload":false,"hd5_counts_as_magical":false,"magic_item_death_save":tr
 ```
 
-A client can't fix a 403 either. Give your application a referee key only if it needs one. [Run games as a referee](referee.md) describes what the role adds. Give a referee key only to software that runs on a server you trust, like your game's backend. Don't put one in a web page or an app that your players can read.
+Trying again doesn't fix a 403 either. Give your application a referee key only if it needs one. [Run games as a referee](referee.md) describes what the role adds. Give a referee key only to software that runs on a server you trust, like your game's backend. Don't put a referee key in a web page or an app that your players can read.
 
 ## Know whose data a key reaches
 
-bxapi has no user accounts. A key identifies a client application, not a person. The server stores every character, adventure, session, and save with the client name of the key that created it, and it applies four rules:
+bxapi has no user accounts. A key identifies a client application, not a person. The server stores every character, adventure, session, and save with the client name of the key that created it, and it applies these four rules:
 
-- A request can read and change only the data of its own client. A request for another client's resource gets the same 404 as a request for an id that doesn't exist.
+- A request can read and change only the data of the client that its key belongs to. A request for another client's resource gets the same 404 as a request for an id that doesn't exist.
 - Everyone who has one of a client's keys shares that client's data, whatever the key's role. Both keys of `my-game` can read, command, rename, and delete all of the application's characters, adventures, sessions, and saves.
 - Two keys with the same client name share data too, so you can add a new key, switch your application to it, and remove the old one without losing anything.
 - The role limits what a key's holder can see and do inside a game, not whose data the holder can reach.
 
-The referee key of `my-game` can read the session that the player key of `my-game` created:
+The referee key of `my-game`, still in `KEY`, can read the session that the player key of `my-game` created:
 
 ```sh
 curl -s http://127.0.0.1:8640/v1/sessions/ses_eqeMc3BaPn-ii_2kKiCJWw -H "Authorization: Bearer $KEY"
@@ -179,12 +179,12 @@ curl -s http://127.0.0.1:8640/v1/sessions -H "Authorization: Bearer $KEY"
 
 ### An application with many users
 
-If your application has many users, bxapi can't tell them apart. Every one of your application's requests carries one of your keys, so the server sees all of them as your application, and every list endpoint returns the data of all your users. There are two ways to keep one user from reaching another user's data:
+If your application has many users, bxapi can't tell them apart. Every request from your application includes one of your keys, so the server treats every request as your application's, and every list endpoint returns the data of all your users. There are two ways to keep one user from reaching another user's data:
 
-- Your server calls bxapi on behalf of your users. Your server keeps the key, remembers which user owns which ids, and refuses a request for an id that isn't the user's. The users never see the key.
-- Your clients call bxapi directly. Each client keeps only the ids of its own user's characters, sessions, and saves. The ids have 22 random characters and nobody can guess one, but a client has the key, so it can also list everything with `GET /v1/sessions`. Use this only when you don't mind a user who inspects the client's traffic reading the other users' data.
+- Your server calls bxapi on behalf of your users. Your server keeps the key, records which ids belong to which user, and refuses a request for an id that isn't the user's. The users never see the key.
+- Your clients call bxapi directly. Each client stores only the ids of its user's characters, sessions, and saves. Each id ends in 22 random characters, so a user can't guess another user's ids. But a client has the key, so it can also list everything with `GET /v1/sessions`. Use this only when you don't mind a user who inspects the client's traffic reading the other users' data.
 
-The first way is the one we recommend for a game that has user accounts.
+We recommend the first way for a game that has user accounts.
 
 ## Run without keys on your own machine
 

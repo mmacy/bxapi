@@ -2,11 +2,11 @@
 
 Look up the rules content your game shows its players, and roll dice or generate treasure and monsters without starting a game.
 
-The examples use a key in the shell variable `KEY`, as [Play a game](play-a-game.md#start-a-server-with-a-player-key) sets up. Every role can use every endpoint on this page.
+The examples use a key in the shell variable `KEY`, as [Play a game](play-a-game.md#start-a-server-with-a-player-key) sets up. Keys of both roles, `player` and `referee`, can use every endpoint on this page.
 
 ## Look up rules content
 
-The rules reference serves the content of the B/X rules that the server's rules engine loads: classes, monsters, spells, equipment, magic items, languages, and the printed tables. All of it is read-only.
+The rules reference serves the content of the B/X rules that the server's rules engine loads: classes, monsters, spells, equipment, magic items, languages, and the tables printed in the rules. All of it is read-only.
 
 | Path | Lists |
 | --- | --- |
@@ -16,14 +16,14 @@ The rules reference serves the content of the B/X rules that the server's rules 
 | `/v1/rules/equipment` | Weapons, armour, gear, and ammunition. |
 | `/v1/rules/magic-items` | Magic items. |
 | `/v1/rules/languages` | Languages. |
-| `/v1/rules/tables` | The names of the printed tables: `abilities`, `combat`, `encounters`, and `treasure`. |
+| `/v1/rules/tables` | The names of the sets of printed tables: `abilities`, `combat`, `encounters`, and `treasure`. |
 | `/v1/rules/commands` | The commands a game accepts. |
 
 Add an id to a path to get one entry, like `/v1/rules/monsters/goblin`. `GET /v1/rules/license` returns the license of all this content.
 
 ### Search a list
 
-A list endpoint returns one page of summaries. Search by name with `q`, which matches part of an entry's id or name and ignores case. The monster, spell, equipment, and magic item lists take `q`:
+A list endpoint returns one page of summaries. To search by name, use `q`, which matches part of an entry's id or name and ignores case. The monster, spell, equipment, and magic item lists take `q`:
 
 ```sh
 curl -s "http://127.0.0.1:8640/v1/rules/monsters?q=gob&limit=2" -H "Authorization: Bearer $KEY"
@@ -63,12 +63,12 @@ Some lists have more filters:
 
 | Path | Filters |
 | --- | --- |
-| `/v1/rules/spells` | `class_id` keeps the spells on one class's spell list, and `level` keeps one spell level. |
+| `/v1/rules/spells` | `class_id` limits the list to the spells on one class's spell list, and `level` limits it to one spell level. |
 | `/v1/rules/equipment` | `item_type` is `weapon`, `armour`, `gear`, or `ammunition`. |
 | `/v1/rules/magic-items` | `category` is one of `armour`, `misc`, `potion`, `ring`, `rod`, `staff`, `wand`, `scroll`, `sword`, or `weapon`. |
-| `/v1/rules/commands` | `kind` is `play` or `referee`, and `mode` keeps the commands that are legal in one session mode. |
+| `/v1/rules/commands` | `kind` is `play` or `referee`, and `mode` limits the list to the commands that are legal in one session mode. |
 
-Filters combine. The first-level spells of the cleric class:
+Filters combine. For example, to list the first-level spells of the cleric class:
 
 ```sh
 curl -s "http://127.0.0.1:8640/v1/rules/spells?class_id=cleric&level=1" -H "Authorization: Bearer $KEY"
@@ -109,7 +109,7 @@ curl -s "http://127.0.0.1:8640/v1/rules/monsters?limit=2&offset=2" -H "Authoriza
 }
 ```
 
-Add `limit` to `offset` for the next page, and stop when the result is at or past `total`. Lists of your own data, like `GET /v1/characters`, page the same way, and the newest items come first.
+Add `limit` to `offset` for the next page, and stop when the new offset is at or past `total`. Lists of your own data, like `GET /v1/characters`, page the same way, and the newest items come first.
 
 The rules content changes only when the server's rules engine does, so every successful response under `/v1/rules` has the header `Cache-Control: private, max-age=3600`, and your client can cache it for an hour.
 
@@ -144,11 +144,11 @@ curl -s http://127.0.0.1:8640/v1/rules/monsters/goblin -H "Authorization: Bearer
 
 An id that doesn't exist gets a 404.
 
-The rules reference is the whole rulebook, so it includes what a player's character wouldn't know in play, like what a cursed magic item does. What a party has learned about an item in a game is in that session's [player view](play-a-game.md#read-the-player-view).
+The rules reference contains everything in the rules, including what a player's character wouldn't know in play, like what a cursed magic item does. What a party has learned about an item in a game is in that session's [player view](play-a-game.md#read-the-player-view).
 
 ## Read a command's JSON schema
 
-You play a session by sending it commands. `GET /v1/rules/commands` lists them. A command has a `command_type`, a `kind` (`play` for a command a player may send, `referee` for one only a referee may send), the `allowed_modes` in which it's legal, and a one-line `summary`. The server has more commands than the default `limit`, so ask for all of them with `limit=200`. The commands that are legal in a battle:
+You play a *session*, one game in progress, by sending commands to `POST /v1/sessions/{session_id}/commands`. `GET /v1/rules/commands` lists every command. A command has a `command_type`, a `kind` (`play` for a command a player may send, `referee` for one only a referee may send), the `allowed_modes` in which it's legal, and a one-line `summary`. The server has more commands than the default `limit` of 50, so ask for all of them with `limit=200`. For example, to list the play commands that are legal in a battle:
 
 ```sh
 curl -s "http://127.0.0.1:8640/v1/rules/commands?kind=play&mode=battle" -H "Authorization: Bearer $KEY"
@@ -170,7 +170,7 @@ curl -s "http://127.0.0.1:8640/v1/rules/commands?kind=play&mode=battle" -H "Auth
 }
 ```
 
-This list is about modes in general. To see what a particular session accepts now, read `GET /v1/sessions/{session_id}/commands`, which also leaves out the commands your role may not send.
+This list shows the modes in which each command is legal, for any session. To see what a particular session accepts now, read `GET /v1/sessions/{session_id}/commands`, which also leaves out the commands your role may not send.
 
 A command's detail adds `json_schema`, the JSON Schema that describes the command's body:
 
@@ -204,11 +204,11 @@ To build a request from a schema:
 - Send `command_type` with the value in the schema's `const`.
 - Send each field in `required`. Leave out the others to use their defaults.
 - A `$ref` points at a definition in `$defs`. Here, `direction` is one of the four directions in the `enum`.
-- Read `description` for the rules of the command. It documents the modes the command works in, the `rejections` it can return, and the events it causes.
+- Read `description` for the rules of the command. It describes the modes the command works in, the `rejections` it can return, and the events it causes.
 
 A command's `source` field is for referees. A player who sets it gets 403 `referee_required`.
 
-A game can generate its forms from the schemas, or it can hard-code the few commands it uses and read the schema when it adds one. The OpenAPI document at `/openapi.json` describes every command in the body of the commands endpoint too.
+A game can generate its forms from the schemas, or it can hard-code the few commands it uses and read the schema when it adds one. The OpenAPI document at `/openapi.json` describes every command in the body of `POST /v1/sessions/{session_id}/commands` too.
 
 ## Roll dice
 
@@ -233,7 +233,7 @@ Each result has the value of each die in `rolls`, the `modifier` and `multiplier
 
 ## Choose a seed to get the same result again
 
-A *seed* is a number that decides every random roll in a request. Every dice and generator request accepts an optional `seed`, an integer from 0 to 9,007,199,254,740,991 (2^53 - 1, the largest integer that a JavaScript client reads exactly). When you leave it out, the server picks a random seed, and every response includes the seed it used. The same request with the same seed returns the same result:
+A *seed* is a number that determines every random roll in a request. Every dice and generator request accepts an optional `seed`, an integer from 0 to 9,007,199,254,740,991 (2^53 - 1, the largest integer that a JavaScript client reads exactly). When you leave it out, the server picks a random seed, and every response includes the seed it used. The same request with the same seed returns the same result:
 
 ```sh
 curl -s -X POST http://127.0.0.1:8640/v1/dice/roll -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"expression": "3d6"}'
@@ -243,15 +243,15 @@ curl -s -X POST http://127.0.0.1:8640/v1/dice/roll -H "Authorization: Bearer $KE
 {"expression":"3d6","seed":4905287810713684,"rolls":[{"rolls":[3,3,6],"modifier":0,"multiplier":1,"total":12}]}
 ```
 
-The seed and the roll differ for you. Send the same body with the seed from the response, and the server rolls 3, 3, and 6 again. Store the seed to be able to show a roll again later. A request with `times` set to 3 gives the first three results of the same request with `times` set to 5.
+Your seed and roll differ from these. Send the same body with the seed from your response, and the server returns the same dice again. With the seed above, it rolls 3, 3, and 6. To show a roll again later, store its seed. A request with `times` set to 3 returns the first three results of the same request with `times` set to 5.
 
-The seeds on this page are for stateless requests. A session's own seed is different: the server picks it, never returns it, and only a referee can choose one. See [Run games as a referee](referee.md#start-a-repeatable-session).
+The seeds on this page are for requests that store nothing. A session has a separate seed. The server picks a random seed for each session unless a referee chooses one. The only response that contains a session's seed is a save's document, which only a referee can read. For more information, see [Run games as a referee](referee.md#start-a-repeatable-session).
 
 ## Generate treasure, monsters, rooms, and characters
 
-The generators roll content with the same rules as a game and store nothing. Each takes a seed and returns it. Use them for a loot screen, a random encounter, or a character preview.
+The generators roll content with the same rules as a game and store nothing. Each takes an optional seed and returns the seed it used. Use them for a loot screen, a random encounter, or a character preview.
 
-Treasure of a type from `A` to `V` takes a `tier`: `basic` for a party of levels 1 to 3 and `expert` from level 4. The tier decides which magic item table to roll on.
+To generate treasure, pass a treasure type from `A` to `V` and a `tier`: `basic` for a party whose highest level is 1 to 3, and `expert` from level 4. The tier determines which magic item table the server rolls on.
 
 ```sh
 curl -s -X POST http://127.0.0.1:8640/v1/generate/treasure -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"treasure_type": "C", "tier": "basic", "seed": 7}'
@@ -271,7 +271,7 @@ curl -s -X POST http://127.0.0.1:8640/v1/generate/treasure -H "Authorization: Be
 }
 ```
 
-Monsters, by id from `/v1/rules/monsters`, with `count` from 1 to 100. Each monster has its own rolled hit points, and `template` is the monster's full entry:
+To generate monsters, pass a monster id from `/v1/rules/monsters` and a `count` from 1 to 100. The server rolls hit points for each monster separately, and `template` is the monster's full entry:
 
 ```sh
 curl -s -X POST http://127.0.0.1:8640/v1/generate/monsters -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"monster_id": "goblin", "count": 2, "seed": 7}'
@@ -287,7 +287,7 @@ curl -s -X POST http://127.0.0.1:8640/v1/generate/monsters -H "Authorization: Be
 }
 ```
 
-A room on a dungeon level, counting from 1. The server rolls what the room holds:
+To generate a room, pass the number of a dungeon level, counting from 1. The server rolls what the room contains:
 
 ```sh
 curl -s -X POST http://127.0.0.1:8640/v1/generate/room -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"level_number": 1, "seed": 7}'
@@ -306,7 +306,7 @@ curl -s -X POST http://127.0.0.1:8640/v1/generate/room -H "Authorization: Bearer
 }
 ```
 
-A party of non-player adventurers, `basic` for levels 1 to 3 or `expert` for a higher-level party, with `count` members from 1 to 100:
+To generate a party of adventurers who aren't player characters, pass a `kind`, `basic` for levels 1 to 3 or `expert` for a party of higher levels, and a `count` of members from 1 to 100:
 
 ```sh
 curl -s -X POST http://127.0.0.1:8640/v1/generate/npc-party -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"kind": "basic", "count": 3, "seed": 7}'
@@ -328,7 +328,7 @@ curl -s -X POST http://127.0.0.1:8640/v1/generate/npc-party -H "Authorization: B
 }
 ```
 
-A character, from the choices that `POST /v1/characters` takes except `ability_roll_id`. The server rolls the ability scores, so the same body with the same seed returns the same character:
+To generate a character, pass the choices that `POST /v1/characters` takes, except `ability_roll_id`. The server rolls the ability scores, so the same body with the same seed returns the same character:
 
 ```sh
 curl -s -X POST http://127.0.0.1:8640/v1/generate/character -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"name": "Garr", "class_id": "dwarf", "alignment": "lawful", "seed": 7}'

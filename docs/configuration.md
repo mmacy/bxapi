@@ -1,6 +1,6 @@
 # Configuration
 
-Set the server's settings with environment variables, and run a server that other people use.
+You run bxapi yourself, as a server. Set the server's settings with environment variables, and prepare a server that other people, like the players of your game, can reach over a network.
 
 ## Set a setting
 
@@ -10,7 +10,7 @@ Every setting is an environment variable that starts with `BXAPI_`. Set it in th
 BXAPI_PORT=8700 BXAPI_ALLOW_ANONYMOUS=true uv run bxapi
 ```
 
-The server reads a `.env` file in its working directory too, with one `NAME=value` per line, and an environment variable overrides the file:
+The server reads a `.env` file in its working directory too, with one `NAME=value` per line, and an environment variable overrides the same setting in the file:
 
 ```text
 BXAPI_PORT=8700
@@ -18,7 +18,7 @@ BXAPI_DATABASE=/var/lib/bxapi/game.db
 BXAPI_API_KEYS=[{"client": "my-game", "key": "player-key-0123456789", "role": "player"}]
 ```
 
-The server reads each setting once, when it starts. To change one, stop the server and start it again. A setting that holds a list is written as JSON. A value the server can't accept stops it from starting, and the message names the setting and the problem but doesn't repeat the value, so a key doesn't end up in a log:
+The server reads each setting once, when it starts. To change one, stop the server and start it again. Write a setting that has a list value as JSON. A value the server can't accept stops it from starting. The message states the setting and the problem but doesn't repeat the value, so an API key doesn't end up in a log:
 
 ```sh
 BXAPI_SESSION_CACHE_SIZE=0 BXAPI_ALLOW_ANONYMOUS=true uv run bxapi
@@ -41,7 +41,7 @@ The server exits with status 1.
 | `BXAPI_API_KEYS` | none | A JSON list of API keys. See [Authentication](authentication.md#configure-api-keys). |
 | `BXAPI_ALLOW_ANONYMOUS` | `false` | Whether a server with no API keys may start. |
 | `BXAPI_CORS_ORIGINS` | none | A JSON list of the web origins whose pages may call the API from a browser. |
-| `BXAPI_SESSION_CACHE_SIZE` | `256` | How many sessions the server keeps loaded in memory, at least 1. |
+| `BXAPI_SESSION_CACHE_SIZE` | `256` | How many sessions (games in progress) the server keeps loaded in memory, at least 1. |
 | `BXAPI_MAX_BODY_BYTES` | `8388608` | The largest request body, in bytes, at least 1,024. |
 | `BXAPI_BODY_TIMEOUT_SECONDS` | `30` | How long the server waits for a request's whole body to arrive, in seconds. |
 | `BXAPI_DOCS_ENABLED` | `true` | Whether the server serves `/docs`, `/redoc`, and `/openapi.json`. |
@@ -62,15 +62,13 @@ Examples:
 
 ## Run it for other people
 
-A server that other people can reach needs more than the settings above. This section covers what to decide before you expose one.
-
 ### Require API keys
 
-Never run a shared server with `BXAPI_ALLOW_ANONYMOUS=true`. Give each application its own client name and keys, and give a referee key only to software you trust. See [Authentication](authentication.md).
+Never run a shared server with `BXAPI_ALLOW_ANONYMOUS=true`. Give each application a separate client name and separate keys, and give a referee key only to software you trust. See [Authentication](authentication.md).
 
 ### Allow browser clients
 
-A page in a browser can call the API only from an origin that the server lists in `BXAPI_CORS_ORIGINS`. Without the setting, the server sends no cross-origin headers, and a browser blocks every call from another origin. Start a server that allows one origin:
+A page in a browser can call the API only from an origin that the server lists in `BXAPI_CORS_ORIGINS`. Without the setting, the server sends no cross-origin headers, and a browser blocks every call from another origin. The setting affects only calls from pages in a browser. Start a server that allows one origin:
 
 ```sh
 BXAPI_API_KEYS='[{"client": "my-game", "key": "player-key-0123456789", "role": "player"}]' BXAPI_CORS_ORIGINS='["https://game.example"]' uv run bxapi
@@ -82,7 +80,7 @@ The server logs the origins at startup:
 INFO:     bxapi requires an API key. Keys: 1. Clients: my-game. CORS origins: https://game.example.
 ```
 
-A browser first sends a *preflight* request, an `OPTIONS` request that asks whether the real request is allowed. It carries no key, and the server answers it:
+A browser first sends a *preflight* request, an `OPTIONS` request that asks whether the real request is allowed. A preflight request has no key, and the server answers it without one:
 
 ```sh
 curl -si -X OPTIONS http://127.0.0.1:8640/v1/sessions -H "Origin: https://game.example" -H "Access-Control-Request-Method: POST" -H "Access-Control-Request-Headers: authorization,content-type"
@@ -102,15 +100,15 @@ The server lists `WWW-Authenticate` and `Retry-After` in `access-control-expose-
 
 ### Choose where the database lives and back it up
 
-The server stores everything in one SQLite file, `bxapi.db` in its working directory by default. Set `BXAPI_DATABASE` to a path on a disk that's backed up. The server creates the file readable and writable only by its user, because it contains the master seed of every game. While the server runs, SQLite also keeps `-wal` and `-shm` files beside it, with the same permissions.
+The server stores everything in one SQLite file, `bxapi.db` in its working directory by default. Set `BXAPI_DATABASE` to a path on a disk that's backed up. The server creates the file readable and writable only by its user, because it contains the *master seed* of every session, the number that determines the session's dice rolls. While the server runs, SQLite also keeps `-wal` and `-shm` files beside it, with the same permissions.
 
-Don't copy the file with `cp` while the server runs, because some committed data can still be in the `-wal` file. Back it up with the `.backup` command of the `sqlite3` command-line tool, which makes a consistent copy while the server runs:
+Don't copy the file with `cp` while the server runs, because some committed data can still be in the `-wal` file. Back it up with the `.backup` command of the `sqlite3` command-line tool, which makes a consistent copy while the server runs. If you set `BXAPI_DATABASE`, use that path in place of `bxapi.db`:
 
 ```sh
 sqlite3 bxapi.db ".backup bxapi-backup.db"
 ```
 
-The backup is a normal SQLite file. The command gives it your user's default permissions, which can let other users on the machine read it, so restrict it:
+The backup is a normal SQLite file. The `.backup` command creates it with your user's default permissions, which can let other users on the machine read it, so restrict the file's permissions:
 
 ```sh
 chmod 600 bxapi-backup.db
@@ -124,13 +122,13 @@ The server limits how long a request's body takes to arrive, with `BXAPI_BODY_TI
 
 ### Run more than one process
 
-The `bxapi` command runs one process. You can start several against one database file, on different ports behind your proxy. They coordinate through the database: each process checks the session's revision in the database before it uses a loaded session, and writes a command only if the revision hasn't changed since it read it. Two processes can serve the same session without losing or repeating a command.
+The `bxapi` command runs one process. You can start several against one database file, on different ports behind your proxy. They coordinate through the database: each process checks the session's *revision*, the count of commands the session has accepted, in the database before it uses a loaded session, and writes a command only if the revision hasn't changed since it read it. Two processes can serve the same session without losing or repeating a command.
 
-When a request loses that race, the command had no effect, and the client gets 409 `session_busy` with the session's current `revision`. Your client handles it as [Errors](errors.md#session_busy) describes: it reads the session if it sent `expected_revision`, and sends the command again if it didn't. A client that sends `expected_revision` with every command never repeats a command by mistake.
+When another process writes the session after a request reads it and before the request writes it, the command has no effect, and the client gets 409 `session_busy` with the session's current `revision`. A client handles it as [Errors](errors.md#session_busy) describes: it reads the session if it sent `expected_revision`, and sends the command again if it didn't. A client that sends `expected_revision` with every command never repeats a command by mistake.
 
-Processes also take turns writing to the database. A process that waits more than 5 seconds for the write lock answers with 503 `database_busy` and the header `Retry-After: 1`, and the client sends the request again.
+Processes also take turns writing to the database. A process that waits more than 5 seconds for the write lock answers with 503 `database_busy` and the header `Retry-After: 1`. Have your client wait the number of seconds in `Retry-After` and send the request again.
 
-All processes need the same keys, so give them the same `BXAPI_API_KEYS`. Run them from the same version of bxapi. A process that can't load a session that a process with another rules engine release wrote answers 500 `session_unreadable`.
+All processes need the same keys, so give them the same `BXAPI_API_KEYS`. Run them from the same version of bxapi. If a process with a different release of the rules engine wrote a session, a process that can't load that session answers 500 `session_unreadable`.
 
 ### Turn off the documentation pages
 
