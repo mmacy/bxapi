@@ -101,18 +101,6 @@ npm run serve
 - Write docstrings in Markdown, in Google style, with `Args:`, `Returns:`, `Raises:`, and `Examples:` sections where they apply. Link to other code as ``[`Name`][package.module.Name]``. An example in a docstring must run as written, and the gate runs it.
 - Each module defines `__all__`.
 
-## Writing
-
-These rules apply to docstrings, comments, Markdown files, OpenAPI descriptions, commit messages, and pull request descriptions.
-
-- Plain declarative sentences, one idea each, in the present tense and active voice. Address the reader as *you*. Use contractions.
-- No em dashes or en dashes. No semicolons in prose. Sentence-case headings. Never hard-wrap a Markdown paragraph.
-- State facts, and leave judgments like *simple*, *powerful*, or *robust* out.
-- Name who acts. Software can do what it does (the server returns, osrlib rolls). A file or an object doesn't *want*, *know*, *own*, *carry*, or *hold* anything.
-- Define a term the first time you use it.
-- Never open with a sentence about the document (*This module provides ...*), and never end with a summary.
-- Read `~/.claude/skills/clauterize/references/tells.md` before you write prose, if the file exists. It lists the habits and stock words to avoid, with before-and-after examples.
-
 ## Pull requests
 
 - Cut every branch from `origin/main`, and work in the worktree you were given. Never check out `main` in a worktree.
