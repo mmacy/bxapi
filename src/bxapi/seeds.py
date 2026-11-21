@@ -25,8 +25,9 @@ from bxapi.errors import forbidden
 __all__ = ["MAX_SEED", "Seed", "draw_seed", "referee_seed", "seed_or_draw"]
 
 MAX_SEED = 2**53 - 1
-"""The largest seed the API accepts. It's the largest integer that JSON parsers which read numbers as
-double-precision floats, like JavaScript's, read exactly, so a client can send back a seed it received."""
+"""The largest seed the API accepts. It's 2^53 - 1, JavaScript's `Number.MAX_SAFE_INTEGER`: the largest
+integer that every JSON parser that reads numbers as double-precision floats reads exactly, with no
+gaps between it and 0. So a client can send back any seed it received."""
 
 Seed = Annotated[
     int,

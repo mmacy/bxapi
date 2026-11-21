@@ -1,6 +1,6 @@
 # bxapi specification
 
-bxapi is an HTTP API for the 1981 B/X (Basic/Expert) rules. Other applications call it as their backend: games that run a dungeon crawl, and utilities that look up a monster or roll a treasure. [osrlib](https://github.com/mmacy/osrlib-python) applies every rule. bxapi adds what a network service needs around it: authentication, storage, one-at-a-time access to each game, and an error format.
+bxapi is an HTTP API for the 1981 B/X (Basic/Expert) rules. Other applications call it as their backend: games that run a dungeon crawl, and utilities that look up a monster or roll a treasure. [osrlib](https://github.com/mmacy/osrlib-python), a Python library, implements the rules. bxapi adds what a network service needs around it: authentication, storage, one-at-a-time access to each game, and an error format.
 
 This file is the contract for version 1 of the API. `AGENTS.md` is the guide for working in the repository.
 
@@ -15,34 +15,37 @@ This file is the contract for version 1 of the API. `AGENTS.md` is the guide for
 
 ## Conventions
 
-- **Base path.** Every endpoint except `GET /health` is under `/v1`.
+- **Base path.** Every endpoint except `GET /health` is under `/v1`, and every request under `/v1` needs an API key.
 - **Bodies.** Requests and responses are JSON. Field names are snake_case. A request body with a field the endpoint doesn't define gets 422 `validation_error`. A body or a field that is an osrlib model, like a command or a character's `adjustment`, is the exception: osrlib ignores unknown fields.
 - **Identifiers.** A stored resource has an id made of a prefix and 22 random URL-safe characters: `chr_` for a character, `rol_` for an ability roll, `adv_` for an adventure, `ses_` for a session, and `sav_` for a save. An adventure that comes with the server has an id that starts with `builtin-`.
 - **Timestamps.** UTC, in RFC 3339 format with whole seconds, like `2026-11-20T22:01:05Z`.
-- **Lists.** A list endpoint takes `limit` (1 to 200, default 50) and `offset` (default 0), and returns `{"items": [...], "total": n, "limit": n, "offset": n}`. Stored resources are listed newest first.
+- **Lists.** A list endpoint takes `limit` (1 to 200, default 50) and `offset` (0 to 2^53 - 1, default 0), and returns `{"items": [...], "total": n, "limit": n, "offset": n}`. Stored resources are listed newest first.
 - **Documents.** osrlib wraps each serialized adventure, character, party, and save in an envelope with the keys `kind`, `schema_version`, `engine_version`, and `payload`. This specification calls the envelope a *document*. An endpoint that imports a document accepts the document as the whole request body.
-- **OpenAPI.** `GET /openapi.json` describes every endpoint. Each operation's `operationId` is a short snake_case name, like `roll_dice`, that doesn't change between releases.
+- **OpenAPI.** `GET /openapi.json` describes every endpoint. Each operation's `operationId` is a short snake_case name, like `roll_dice`, that doesn't change between releases. The interactive documentation is at `/docs` and `/redoc`. The three paths need no API key, so anyone who can reach the server can read the API's description. `BXAPI_DOCS_ENABLED=false` turns all three off.
 - **Creation.** A request that creates a stored resource returns 201 and the resource. A delete returns 204 with no body.
 
 ### Authentication and roles
 
-A client sends an API key as a bearer token: `Authorization: Bearer <key>`. The server's `BXAPI_API_KEYS` setting lists each key with a client name and a role.
+A client sends an API key as a bearer token: `Authorization: Bearer <key>`. The scheme name `Bearer` is case-insensitive. The server's `BXAPI_API_KEYS` setting lists each key with a client name and a role. A key is at least 16 printable ASCII characters, with no spaces.
+
+bxapi has no user accounts. A key identifies a client application, not a person. Everyone who has one of an application's keys shares that application's data: they can read, command, rename, and delete all of its characters, adventures, sessions, and saves. An application with many users gives each user only the ids of that user's own resources, which nobody can guess, or sends its users' requests to bxapi through a server of its own. The role limits what the holder of a key can see and do in a game, not whose data they can reach.
 
 | Role | May do |
 | --- | --- |
 | `player` | Everything a game client needs: read the rules, roll dice, create characters, start and play sessions, save and restore. |
 | `referee` | Everything a player may do, and also: read the referee view and referee events, send referee commands, choose seeds, import characters and saves, and read full adventure and save documents. |
 
-When `BXAPI_API_KEYS` is empty, the server asks for no key and treats every caller as a referee for the client `local`.
+A server with no keys doesn't start, unless `BXAPI_ALLOW_ANONYMOUS` is `true`. With that setting, the server asks for no key and treats every caller as a referee for the client `local`. Use it only on your own machine. With keys, `BXAPI_ALLOW_ANONYMOUS` has no effect. At startup, the server logs the number of keys, the client names, and the CORS origins, as a warning when it asks for no key.
 
-A request with no key or an unknown key gets 401 `unauthorized`. A player's request for something only a referee may do gets 403 `referee_required`.
+The server checks the key before it reads the request's body. A request under `/v1` with no key or an unknown key gets 401 `unauthorized`, whatever its path, method, or body. A CORS preflight request needs no key. A player's request for something only a referee may do gets 403 `referee_required`.
 
 ### Errors
 
-Every error response is an RFC 9457 problem document with the media type `application/problem+json`. `type` is always `about:blank`. A client reads `code`.
+Every error response is an RFC 9457 problem document with the media type `application/problem+json`. `type` is always `about:blank`. A client reads `code`. `detail` is a short description for a person, at most 1,000 characters. A document has only the extra members its code uses, and a client ignores any member it doesn't know.
 
 | Status | `code` | When | Extra members |
 | --- | --- | --- | --- |
+| 400 | `bad_request` | The server can't decode the body: it isn't UTF-8, or it has an integer with more than 4,300 digits. | |
 | 401 | `unauthorized` | The key is missing or unknown. | |
 | 403 | `referee_required` | A player asked for something only a referee may do, including a field like `seed`. | |
 | 403 | `referee_command` | A player sent a referee command. | `command_type` |
@@ -53,12 +56,14 @@ Every error response is an RFC 9457 problem document with the media type `applic
 | 409 | `session_busy` | Another server process changed the session while this one executed the command. Send the command again. | |
 | 409 | `ability_roll_used` | A character was already created from that ability roll. | |
 | 409 | `version_unsupported` | A document is stamped with a schema version newer than the server's osrlib. | |
+| 408 | `request_timeout` | The request body didn't arrive within `BXAPI_BODY_TIMEOUT_SECONDS`. | |
 | 413 | `content_too_large` | The request body is larger than `BXAPI_MAX_BODY_BYTES`. | |
-| 422 | `validation_error` | The request doesn't match the endpoint's schema. | `errors`, pydantic's list |
+| 422 | `validation_error` | The request doesn't match the endpoint's schema. | `errors`, the first 20 of pydantic's errors. Each has `loc`, `msg`, and `type`, and no copy of the value sent. The server cuts each name in `loc` and each `msg` to 128 characters. `error_count` is how many errors there are. An object with more than 20 fields the endpoint doesn't define gets one error, whose `msg` states how many there are. |
 | 422 | `content_invalid` | osrlib refused a document or a value as malformed, or the server refused an imported character. | |
 | 422 | `character_invalid` | The choices for a new character break a rule, or name a class or an item osrlib doesn't have. | `rejections`, when osrlib reports them. Otherwise `field`, the request field that's wrong, like `equip_item_ids`, `index`, the entry's position when `field` is a list, and `id`, the value of that entry. |
 | 422 | `party_invalid` | The characters named for a new session can't form a party: osrlib refused the party, or two members have the same id. | |
 | 500 | `internal_error` | A bug. The response says nothing about the cause, and the server logs the traceback. | |
+| 503 | `database_busy` | Another process held the database's write lock for longer than the 5 seconds the server waits. The response has the header `Retry-After: 1`. Send the request again. | |
 
 ## Endpoints
 
@@ -66,7 +71,7 @@ Every error response is an RFC 9457 problem document with the media type `applic
 
 | Method and path | Role | Returns |
 | --- | --- | --- |
-| `GET /health` | none | `{"status": "ok"}` |
+| `GET /health` | none | `{"status": "ok"}`. A load balancer can call it with no key. |
 | `GET /v1/meta` | player | `api_version`, `engine_version`, `schema_version`, `auth_enabled`, `client`, `role` |
 
 ### Rules reference
@@ -288,11 +293,13 @@ A restored session plays on from the save as the original session would have: th
 
 ## Storage
 
-One SQLite database file, opened with Python's `sqlite3` module. No ORM. The `Database` class in `bxapi.db` is the only code that runs SQL. It creates the tables when it opens the file, uses write-ahead logging for a file database, and works with `":memory:"` for tests.
+One SQLite database file, opened with Python's `sqlite3` module. No ORM. The `Database` class in `bxapi.db` is the only code that runs SQL. It uses one connection, write-ahead logging for a file database, and works with `":memory:"` for tests.
+
+The server creates a new database file readable and writable only by the user that runs it (mode 0600), and SQLite gives the `-wal` and `-shm` files it creates the same mode. In an empty file, the server creates the tables and sets `PRAGMA user_version` to the version of the table layout, which is 1. The server refuses to start with a file of another version, or with a file that has tables and no version, and its message states the path, the version found, and the version expected. It also refuses a path it can't open, and states the path. Version 1 is the only table layout, so the server has no migrations. A later layout adds them.
 
 | Table | Columns |
 | --- | --- |
-| `ability_rolls` | `seq`, `id`, `client`, `scores` (JSON), `used`, `created_at` |
+| `ability_rolls` | `seq`, `id`, `client`, `scores` (JSON), `seed`, `used`, `created_at` |
 | `characters` | `seq`, `id`, `client`, `name`, `class_id`, `level`, `max_hp`, `document` (JSON), `created_at` |
 | `adventures` | `seq`, `id`, `client`, `name`, `info` (JSON), `document` (JSON), `created_at` |
 | `sessions` | `seq`, `id`, `client`, `name`, `adventure_id`, `adventure_name`, `mode`, `revision`, `clock_rounds`, `schema_version`, `engine_version`, `document` (JSON), `created_at`, `updated_at` |
@@ -309,12 +316,19 @@ Every query that reads or changes a row filters on `client`.
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `BXAPI_DATABASE` | `bxapi.db` | The path of the SQLite file, or `:memory:`. |
-| `BXAPI_API_KEYS` | `[]` | A JSON list of `{"client", "key", "role"}`. |
-| `BXAPI_CORS_ORIGINS` | `[]` | A JSON list of the web origins whose pages may call the API. |
+| `BXAPI_API_KEYS` | `[]` | A JSON list of `{"client", "key", "role"}`. `role` defaults to `player`, and any other member is an error. |
+| `BXAPI_ALLOW_ANONYMOUS` | `false` | Whether a server with no API keys starts. |
+| `BXAPI_CORS_ORIGINS` | `[]` | A JSON list of the web origins whose pages may call the API. Each is a scheme, a host, and an optional port, like `https://game.example`, with no path and no trailing slash. `*` isn't allowed. Cross-origin responses expose the `WWW-Authenticate` and `Retry-After` headers. |
 | `BXAPI_SESSION_CACHE_SIZE` | `256` | How many sessions stay loaded in memory. |
 | `BXAPI_MAX_BODY_BYTES` | `8388608` | The largest request body. |
+| `BXAPI_BODY_TIMEOUT_SECONDS` | `30` | How long the server waits for a request's whole body to arrive. |
+| `BXAPI_DOCS_ENABLED` | `true` | Whether the server serves `/docs`, `/redoc`, and `/openapi.json`. |
 | `BXAPI_HOST` | `127.0.0.1` | The address the `bxapi` command listens on. |
 | `BXAPI_PORT` | `8640` | The port the `bxapi` command listens on. |
+
+A setting the server can't accept stops it from starting, and the error message doesn't repeat the value, so a key doesn't end up in a log.
+
+The server limits how long a request's body may take to arrive, but it can't limit how long a client takes to send the request's headers, or how long a connection stays open between requests. Run a deployed server behind a reverse proxy that enforces header and idle timeouts.
 
 ## Not in version 1
 

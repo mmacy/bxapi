@@ -19,27 +19,33 @@ a person:
 An endpoint raises [`ApiError`][bxapi.errors.ApiError], or calls one of the functions here
 that build one, and [`install_error_handlers`][bxapi.errors.install_error_handlers] turns the
 exception into the response. The same handlers convert a request that fails validation, an
-osrlib exception, and any exception the code didn't expect.
+osrlib exception, a busy database, and any other exception.
 
 A command the rules refuse isn't an error. The command endpoint returns it with status 200
 and `accepted` set to `false`.
 """
 
 import logging
+import sqlite3
 from http import HTTPStatus
 from typing import Any
 
 from fastapi import FastAPI, Request
-from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from osrlib.core.validation import Rejection
 from osrlib.errors import ContentValidationError, ReplayVersionError, SaveVersionError
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic.config import JsonDict
+from pydantic.json_schema import SkipJsonSchema
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 __all__ = [
+    "MAX_DETAIL_LENGTH",
+    "MAX_FIELD_ERRORS",
     "PROBLEM_MEDIA_TYPE",
     "ApiError",
+    "FieldError",
     "Problem",
     "conflict",
     "forbidden",
@@ -48,21 +54,89 @@ __all__ = [
     "not_found",
     "problem_response",
     "problem_responses",
+    "shorten",
 ]
 
 PROBLEM_MEDIA_TYPE = "application/problem+json"
 """The media type of every error response."""
 
+MAX_DETAIL_LENGTH = 1000
+"""The most characters a problem document's `detail` has."""
+
+MAX_FIELD_ERRORS = 20
+"""The most entries the `errors` member of a `validation_error` lists."""
+
+_MAX_TEXT_SHOWN = 128
+
+_BUSY_CODES = frozenset({sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED})
+
 _log = logging.getLogger("bxapi")
 
-_MAX_ID_SHOWN = 128
+
+def shorten(text: str, limit: int) -> str:
+    """Return text cut to at most `limit` characters, ending in `...` when it was cut.
+
+    Use it on any text that can repeat what a caller sent, before it goes into a response.
+
+    Args:
+        text: The text to shorten.
+        limit: The most characters to return. At least 3.
+
+    Returns:
+        `text` unchanged when it fits, and otherwise its start followed by `...`.
+
+    Examples:
+        ```python
+        from bxapi.errors import shorten
+
+        assert shorten("goblin", 10) == "goblin"
+        assert shorten("x" * 50, 10) == "xxxxxxx..."
+        ```
+    """
+    return text if len(text) <= limit else text[: limit - 3] + "..."
+
+
+def _leave_out_default(schema: JsonDict) -> None:
+    # The server leaves an unset member out of the document instead of sending null.
+    schema.pop("default", None)
+
+
+def _is_none(value: object) -> bool:
+    return value is None
+
+
+def _optional() -> Any:
+    return Field(default=None, exclude_if=_is_none, json_schema_extra=_leave_out_default)
+
+
+class FieldError(BaseModel):
+    """One part of a request that failed validation."""
+
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    loc: list[str | int]
+    """Where the error is: `body`, `query`, `path`, or `header`, followed by the field names
+    and list positions that lead to the value. The server cuts each name to 128 characters."""
+    msg: str
+    """What's wrong with the value, at most 128 characters."""
+    type: str
+    """pydantic's name for the kind of error, like `missing` or `extra_forbidden`."""
 
 
 class Problem(BaseModel):
     """The body of an error response.
 
-    Some codes add extra members, like `resource` and `id` on `not_found` or `errors` on
-    `validation_error`. The table of codes in `docs/spec.md` lists them.
+    Every problem document has `type`, `title`, `status`, `detail`, and `code`. Some codes add
+    members, and a document leaves out each member its code doesn't use:
+
+    - `validation_error` adds `errors` and `error_count`.
+    - `not_found` adds `resource` and `id`.
+    - `revision_conflict` adds `revision`.
+    - `referee_command` adds `command_type`.
+    - `character_invalid` adds `rejections` when osrlib reports them. Otherwise it adds `field`
+      and `id`, and `index` when `field` is a list.
+
+    A later release can add members, so ignore any member you don't know.
     """
 
     model_config = ConfigDict(extra="allow", use_attribute_docstrings=True)
@@ -74,10 +148,38 @@ class Problem(BaseModel):
     status: int
     """The HTTP status code, repeated from the response."""
     detail: str
-    """One or two sentences that say what went wrong, written for a person."""
+    """A short description of what went wrong, written for a person, at most 1,000 characters."""
     code: str
     """A fixed snake_case name for the error, like `"not_found"`. It doesn't change between
     releases, so a client can branch on it."""
+    errors: list[FieldError] | SkipJsonSchema[None] = _optional()
+    """`validation_error` only: the first 20 parts of the request that failed validation."""
+    error_count: int | SkipJsonSchema[None] = _optional()
+    """`validation_error` only: how many parts of the request failed validation, including any
+    that `errors` leaves out."""
+    resource: str | SkipJsonSchema[None] = _optional()
+    """`not_found` only: the kind of resource the request named, like `"session"`."""
+    id: str | SkipJsonSchema[None] = _optional()
+    """For `not_found`, the id the request named, or its first 128 characters followed by `...`.
+    For `character_invalid`, the value of the entry that's wrong, like an item id."""
+    revision: int | SkipJsonSchema[None] = _optional()
+    """`revision_conflict` only: the session's current revision."""
+    command_type: str | SkipJsonSchema[None] = _optional()
+    """`referee_command` only: the `command_type` of the referee command a player sent."""
+    field: str | SkipJsonSchema[None] = _optional()
+    """`character_invalid` only, when osrlib reports no rejections: the request field that's
+    wrong, like `"equip_item_ids"`."""
+    index: int | SkipJsonSchema[None] = _optional()
+    """`character_invalid` only, when `field` is a list: the position of the entry that's
+    wrong, counted from 0."""
+    rejections: list[Rejection] | SkipJsonSchema[None] = _optional()
+    """`character_invalid` only, and only when osrlib reports them: osrlib's reasons for
+    refusing the character, each a `code` and `params`."""
+
+    @field_validator("detail")
+    @classmethod
+    def _detail_is_short(cls, detail: str) -> str:
+        return shorten(detail, MAX_DETAIL_LENGTH)
 
 
 class ApiError(Exception):
@@ -135,7 +237,7 @@ def not_found(resource: str, resource_id: str) -> ApiError:
     Returns:
         An [`ApiError`][bxapi.errors.ApiError] with the code `not_found`.
     """
-    shown = resource_id if len(resource_id) <= _MAX_ID_SHOWN else resource_id[:_MAX_ID_SHOWN] + "..."
+    shown = resource_id if len(resource_id) <= _MAX_TEXT_SHOWN else resource_id[:_MAX_TEXT_SHOWN] + "..."
     return ApiError(404, "not_found", f"No {resource} has the id {shown!r}.", resource=resource, id=shown)
 
 
@@ -193,7 +295,7 @@ def problem_response(problem: Problem, headers: dict[str, str] | None = None) ->
     """
     return JSONResponse(
         status_code=problem.status,
-        content=jsonable_encoder(problem.model_dump()),
+        content=problem.model_dump(mode="json"),
         media_type=PROBLEM_MEDIA_TYPE,
         headers=headers,
     )
@@ -202,10 +304,10 @@ def problem_response(problem: Problem, headers: dict[str, str] | None = None) ->
 def problem_responses(*statuses: int) -> dict[int | str, dict[str, Any]]:
     """Return the `responses` argument that documents an endpoint's error statuses in OpenAPI.
 
-    Pass the result to a route decorator. Every route under `/v1` can also return 401 and 422,
-    which the router documents once for all of them. [`create_app`][bxapi.app.create_app]
-    changes the media type of each of these responses to `application/problem+json` when it
-    builds the OpenAPI document.
+    Pass the result to a route decorator. Every route under `/v1` can also return 401, 422,
+    500, and 503, which the router documents once for all of them.
+    [`create_app`][bxapi.app.create_app] changes the media type of each of these responses to
+    `application/problem+json` when it builds the OpenAPI document.
 
     Args:
         *statuses: The error statuses the endpoint can return, like `404` and `409`.
@@ -224,20 +326,32 @@ def problem_responses(*statuses: int) -> dict[int | str, dict[str, Any]]:
     return {status: {"description": HTTPStatus(status).phrase, "model": Problem} for status in statuses}
 
 
+def _field_error(entry: Any) -> FieldError:
+    location = [part if isinstance(part, int) else shorten(str(part), _MAX_TEXT_SHOWN) for part in entry["loc"]]
+    return FieldError(loc=location, msg=shorten(str(entry["msg"]), _MAX_TEXT_SHOWN), type=str(entry["type"]))
+
+
 def install_error_handlers(app: FastAPI) -> None:
     """Register the handlers that turn exceptions into problem documents.
 
     [`create_app`][bxapi.app.create_app] calls it once. The handlers cover:
 
     - [`ApiError`][bxapi.errors.ApiError], sent as raised.
-    - A request FastAPI can't validate, sent as 422 `validation_error` with pydantic's list of
-      errors in `errors`.
+    - A request FastAPI can't validate, sent as 422 `validation_error`. `errors` lists the
+      first 20 of pydantic's errors, without the values the caller sent, and `error_count`
+      states how many there are.
     - osrlib's `ContentValidationError`, sent as 422 `content_invalid`.
     - osrlib's `SaveVersionError` and `ReplayVersionError`, sent as 409
       `version_unsupported`.
+    - SQLite's busy and locked errors, raised when another process holds the database's write
+      lock for longer than [`BUSY_TIMEOUT_SECONDS`][bxapi.db.BUSY_TIMEOUT_SECONDS], sent as
+      503 `database_busy` with the header `Retry-After: 1`.
     - Starlette's `HTTPException`, like the 404 for a path with no route.
     - Any other exception, logged with its traceback and sent as 500 `internal_error` with no
       detail about the cause.
+
+    Every `detail` is at most [`MAX_DETAIL_LENGTH`][bxapi.errors.MAX_DETAIL_LENGTH] characters,
+    because an osrlib message can repeat a large part of the document the caller sent.
 
     Args:
         app: The application to register the handlers on.
@@ -249,9 +363,13 @@ def install_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(RequestValidationError)
     def _request_validation_error(request: Request, error: RequestValidationError) -> JSONResponse:
-        errors = [{"loc": list(entry["loc"]), "msg": entry["msg"], "type": entry["type"]} for entry in error.errors()]
+        entries = error.errors()
         problem = ApiError(
-            422, "validation_error", "The request failed validation. See `errors` for each field.", errors=errors
+            422,
+            "validation_error",
+            "The request failed validation. See `errors` for each field.",
+            errors=[_field_error(entry) for entry in entries[:MAX_FIELD_ERRORS]],
+            error_count=len(entries),
         ).problem()
         return problem_response(problem)
 
@@ -263,6 +381,18 @@ def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(ReplayVersionError)
     def _version_error(request: Request, error: Exception) -> JSONResponse:
         return problem_response(ApiError(409, "version_unsupported", str(error)).problem())
+
+    @app.exception_handler(sqlite3.OperationalError)
+    def _database_error(request: Request, error: sqlite3.OperationalError) -> JSONResponse:
+        # The extended result codes, like SQLITE_BUSY_SNAPSHOT, keep the primary code in the low byte.
+        # An OperationalError that Python code raises, rather than SQLite, has no code.
+        code = getattr(error, "sqlite_errorcode", None)
+        if code is None or code & 0xFF not in _BUSY_CODES:
+            raise error
+        problem = ApiError(
+            503, "database_busy", "Another process is writing to the database. Send the request again."
+        ).problem()
+        return problem_response(problem, {"Retry-After": "1"})
 
     @app.exception_handler(StarletteHTTPException)
     def _http_exception(request: Request, error: StarletteHTTPException) -> JSONResponse:

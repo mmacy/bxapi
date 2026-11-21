@@ -18,7 +18,7 @@ class Health(ApiModel):
     """The body of the health check."""
 
     status: str = "ok"
-    """Always `"ok"`. A server that can't answer returns no body at all."""
+    """Always `"ok"`."""
 
 
 class Meta(ApiModel):
@@ -35,13 +35,13 @@ class Meta(ApiModel):
     """Whether the server asks for an API key."""
     client: str
     """The client application the caller's API key identifies, or `"local"` when the server
-    asks for no key."""
+    allows anonymous callers."""
     role: Role
     """The caller's role."""
 
 
 @health_router.get("/health", summary="Check that the server is up")
-def health() -> Health:
+def get_health() -> Health:
     """Return `{"status": "ok"}`. The endpoint needs no API key and reads no data."""
     return Health()
 

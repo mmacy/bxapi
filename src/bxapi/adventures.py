@@ -4,10 +4,10 @@ An *adventure document* is osrlib's `Adventure` model inside osrlib's versioned 
 `kind` set to `"adventure"`. Tools like osr-forge and osr-editor write these documents, and a
 client uploads one to play it.
 
-[`parse_adventure`][bxapi.adventures.parse_adventure] is the one place bxapi turns a document
-into an `Adventure`. It runs every check osrlib has, so an adventure that parses can start a
-session. [`builtin_adventures`][bxapi.adventures.builtin_adventures] returns the adventures in
-the [`bxapi.data`][bxapi.data] package, which every client can read and none can delete.
+[`parse_adventure`][bxapi.adventures.parse_adventure] turns a document into an `Adventure`
+after it runs every check osrlib has on one, so an adventure that parses can start a session.
+[`builtin_adventures`][bxapi.adventures.builtin_adventures] returns the adventures in the
+[`bxapi.data`][bxapi.data] package, which every client can read and none can delete.
 [`find_adventure`][bxapi.adventures.find_adventure] looks an id up in both places.
 """
 
@@ -20,12 +20,12 @@ from types import MappingProxyType
 
 from osrlib.crawl.adventure import Adventure, validate_adventure
 from osrlib.data import load_equipment, load_monsters
-from osrlib.errors import ContentValidationError
+from osrlib.errors import ContentValidationError, SaveVersionError
 from osrlib.versioning import check_document, stamp_document
 from pydantic import ValidationError
 
 from bxapi.db import Database
-from bxapi.errors import not_found
+from bxapi.errors import MAX_DETAIL_LENGTH, not_found, shorten
 
 __all__ = [
     "ADVENTURE_KIND",
@@ -44,12 +44,39 @@ ADVENTURE_KIND = "adventure"
 BUILTIN_PREFIX = "builtin-"
 """The start of the id of every adventure that comes with the server."""
 
+_MAX_PROBLEMS = 20
+_MAX_PROBLEM_LENGTH = 128
+
+
+_INVALID = "The document isn't a valid adventure. "
+# Room for "; and N more" with a count of up to 15 digits.
+_MORE_ROOM = 30
+
+
+def _invalid_message(error: ValidationError) -> str:
+    entries = error.errors()
+    listed: list[str] = []
+    length = len(_INVALID)
+    for entry in entries[:_MAX_PROBLEMS]:
+        location = ".".join(str(part) for part in entry["loc"]) or "payload"
+        problem = shorten(f"{location}: {entry['msg']}", _MAX_PROBLEM_LENGTH)
+        if length + len(problem) + 2 + _MORE_ROOM > MAX_DETAIL_LENGTH:
+            break
+        listed.append(problem)
+        length += len(problem) + 2
+    if len(entries) > len(listed):
+        listed.append(f"and {len(entries) - len(listed)} more")
+    return _INVALID + "; ".join(listed)
+
 
 def parse_adventure(document: Mapping[str, object]) -> Adventure:
     """Return the adventure in a document, after every check osrlib makes on one.
 
     The function checks the envelope, then the adventure's structure, then every reference the
-    adventure makes to a monster, an item, an area, or a quest.
+    adventure makes to a monster, an item, an area, or a quest. The message of the error it
+    raises is at most 1,000 characters long, because osrlib's messages can repeat parts of the
+    document. For a payload that isn't a valid adventure, the message lists at most 20
+    problems, followed by how many more there are.
 
     Args:
         document: An adventure document, as decoded JSON.
@@ -72,15 +99,18 @@ def parse_adventure(document: Mapping[str, object]) -> Adventure:
         assert parse_adventure(adventure_document(barrow)) == barrow
         ```
     """
-    payload = check_document(document, ADVENTURE_KIND)
     try:
-        adventure = Adventure.model_validate(payload)
-    except ValidationError as error:
-        problems = "; ".join(
-            f"{'.'.join(str(part) for part in entry['loc']) or 'payload'}: {entry['msg']}" for entry in error.errors()
-        )
-        raise ContentValidationError(f"The document isn't a valid adventure. {problems}") from error
-    validate_adventure(adventure, load_monsters(), load_equipment())
+        payload = check_document(document, ADVENTURE_KIND)
+        try:
+            adventure = Adventure.model_validate(payload)
+        except ValidationError as error:
+            raise ContentValidationError(_invalid_message(error)) from error
+        validate_adventure(adventure, load_monsters(), load_equipment())
+    except (ContentValidationError, SaveVersionError) as error:
+        message = str(error)
+        if len(message) <= MAX_DETAIL_LENGTH:
+            raise
+        raise type(error)(shorten(message, MAX_DETAIL_LENGTH)) from error
     return adventure
 
 

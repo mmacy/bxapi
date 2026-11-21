@@ -1,6 +1,7 @@
 import multiprocessing
 import re
 import sqlite3
+import stat
 import threading
 from collections.abc import Callable, Iterator
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
@@ -11,7 +12,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from bxapi.app import create_app
-from bxapi.db import Database, utc_now
+from bxapi.db import LAYOUT_VERSION, Database, DatabaseOpenError, utc_now
 from bxapi.settings import Settings
 
 ME = "game"
@@ -489,3 +490,55 @@ def test_app_database_works_without_entering_the_client(settings: Settings) -> N
     TestClient(app).get("/health")
     assert app.state.db.insert_ability_roll(ME, scores={}, seed=1).id.startswith("rol_")
     app.state.db.close()
+
+
+def test_a_new_file_gets_the_layout_version(path: str) -> None:
+    Database(path).close()
+    with sqlite3.connect(path) as connection:
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == LAYOUT_VERSION
+
+
+def test_a_file_with_another_layout_version_is_refused(path: str) -> None:
+    Database(path).close()
+    with sqlite3.connect(path) as connection:
+        connection.execute(f"PRAGMA user_version = {LAYOUT_VERSION + 1}")
+    with pytest.raises(DatabaseOpenError) as refused:
+        Database(path)
+    message = str(refused.value)
+    assert path in message
+    assert f"version {LAYOUT_VERSION + 1}" in message and f"version {LAYOUT_VERSION}." in message
+
+
+def test_a_file_with_tables_and_no_version_is_refused(path: str) -> None:
+    with sqlite3.connect(path) as connection:
+        connection.execute("CREATE TABLE notes (body TEXT)")
+    with pytest.raises(DatabaseOpenError, match="version 0"):
+        Database(path)
+
+
+def test_an_empty_file_gets_the_tables(path: str) -> None:
+    Path(path).touch()
+    db = Database(path)
+    assert db.get_session_revision(ME, _session(db)) == 0
+    db.close()
+
+
+@pytest.mark.parametrize("make", ["missing directory", "not a database"])
+def test_an_unusable_path_is_refused_with_the_path(tmp_path: Path, make: str) -> None:
+    if make == "missing directory":
+        target = tmp_path / "missing" / "bxapi.db"
+    else:
+        target = tmp_path / "notes.txt"
+        target.write_text("These are not the tables you are looking for. " * 100)
+    with pytest.raises(DatabaseOpenError) as refused:
+        Database(str(target))
+    assert str(target) in str(refused.value)
+
+
+def test_the_database_files_are_private(path: str) -> None:
+    db = Database(path)
+    _session(db)
+    for suffix in ("", "-wal", "-shm"):
+        mode = stat.S_IMODE(Path(path + suffix).stat().st_mode)
+        assert mode == 0o600, f"{path + suffix} has mode {mode:o}"
+    db.close()

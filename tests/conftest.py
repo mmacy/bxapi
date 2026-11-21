@@ -1,5 +1,6 @@
 """Shared fixtures: settings that point at a temporary database, and clients for each role."""
 
+import os
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
@@ -25,10 +26,18 @@ def bearer(key: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {key}"}
 
 
+@pytest.fixture(autouse=True)
+def _no_bxapi_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Remove every `BXAPI_` variable from the environment, so a developer's shell can't change a test."""
+    for name in list(os.environ):
+        if name.startswith("BXAPI_"):
+            monkeypatch.delenv(name)
+
+
 @pytest.fixture
 def settings(tmp_path: Path) -> Settings:
-    """Settings with no API keys and a database file in the test's temporary directory."""
-    return Settings(database=str(tmp_path / "bxapi.db"), _env_file=None)  # pyright: ignore[reportCallIssue]
+    """Settings with no API keys, anonymous callers allowed, and a database file in the test's temporary directory."""
+    return Settings(database=str(tmp_path / "bxapi.db"), allow_anonymous=True, _env_file=None)  # pyright: ignore[reportCallIssue]
 
 
 @pytest.fixture
