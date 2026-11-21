@@ -14,7 +14,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-# The party stands on its first cell facing north, and a move that a wall blocks is refused.
+# The party starts on its first cell facing north, and the rules refuse a move into a wall.
 DIRECTIONS = ("north", "east", "south", "west")
 
 # Each kit costs at most 30 gp, and a first-level character starts with at least 30 gp.
@@ -42,7 +42,7 @@ class Api:
             with urllib.request.urlopen(request) as response:
                 return json.load(response)
         except urllib.error.HTTPError as error:
-            # An error status is a problem document with a `code`. A refused command is not an error.
+            # The body of an error response is a problem document with a `code`. A refused command isn't an error.
             problem = json.load(error)
             raise SystemExit(f"{method} {path} failed: {problem['code']}: {problem['detail']}") from None
 
