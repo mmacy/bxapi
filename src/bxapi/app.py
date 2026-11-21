@@ -482,7 +482,7 @@ class BodyLimitMiddleware:
         await self.app(scope, limited_receive, send)
 
 
-def require_json_body(request: Request) -> None:
+async def require_json_body(request: Request) -> None:
     """Refuse a request that has a body and doesn't declare the body as JSON.
 
     FastAPI parses a body as JSON only when the `Content-Type` header says it's JSON. Without this
@@ -491,8 +491,10 @@ def require_json_body(request: Request) -> None:
     dependency of every route under `/v1`.
 
     The function accepts the media type `application/json` and any `application` type whose name
-    ends in `+json`, with or without parameters like `charset`. It accepts a request with no body,
-    whatever its content type, so a `POST` whose body is optional needs no header.
+    ends in `+json`, with or without parameters like `charset`. It accepts a request with an
+    empty body, whatever its content type and however the client framed it, so a `POST` whose
+    body is optional needs no header. The function is `async` only to read the body, which
+    Starlette keeps for the endpoint. It does no other work.
 
     Args:
         request: The request.
@@ -501,12 +503,9 @@ def require_json_body(request: Request) -> None:
         ApiError: With status 415 and the code `unsupported_media_type`, if a `POST`, `PUT`, or
             `PATCH` request has a body and its `Content-Type` isn't a JSON media type.
     """
-    headers = request.headers
-    if request.method not in _JSON_BODY_METHODS:
+    if request.method not in _JSON_BODY_METHODS or not await request.body():
         return
-    if headers.get("content-length", "0").strip() == "0" and "transfer-encoding" not in headers:
-        return
-    media_type = headers.get("content-type", "").partition(";")[0].strip().lower()
+    media_type = request.headers.get("content-type", "").partition(";")[0].strip().lower()
     kind, _, subtype = media_type.partition("/")
     if kind != "application" or not (subtype == "json" or subtype.endswith("+json")):
         raise unsupported_media_type()
@@ -814,7 +813,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         BodyLimitMiddleware, max_bytes=settings.max_body_bytes, timeout_seconds=settings.body_timeout_seconds
     )
     app.add_middleware(AuthMiddleware, settings=settings)
-    app.add_middleware(ConditionalGetMiddleware)
+    app.add_middleware(ConditionalGetMiddleware, vary="Accept-Encoding")
     if settings.cors_origins:
         app.add_middleware(
             CORSMiddleware,

@@ -1,10 +1,13 @@
+import asyncio
 import gzip
 import json
 import re
+from collections.abc import Iterator
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from starlette.types import Message
 
 from bxapi.app import COMPRESSION_MINIMUM_BYTES, create_app
 from bxapi.caching import REVALIDATE
@@ -248,3 +251,80 @@ def test_the_openapi_document_describes_conditional_requests_on_every_get(client
     for operation in posts:
         assert "304" not in operation["responses"]
         assert "unsupported_media_type" in operation["responses"]["415"]["description"]
+
+
+# What an independent review found
+
+
+def test_a_304_varies_on_accept_encoding_like_the_compressed_200(client: TestClient) -> None:
+    path = "/v1/rules/monsters?limit=200"
+    full = client.get(path)
+    unchanged = client.get(path, headers={"If-None-Match": full.headers["etag"]})
+    assert full.headers["vary"] == unchanged.headers["vary"] == "Accept-Encoding"
+    small = client.get("/v1/meta")
+    assert client.get("/v1/meta", headers={"If-None-Match": small.headers["etag"]}).headers["vary"] == "Accept-Encoding"
+
+
+def test_an_empty_chunked_body_needs_no_content_type(client: TestClient) -> None:
+    def nothing() -> Iterator[bytes]:
+        yield b""
+
+    response = client.post("/v1/ability-rolls", content=nothing())
+    assert response.request.headers["transfer-encoding"] == "chunked"
+    assert response.status_code == 201, response.text
+
+
+def test_a_chunked_body_that_is_not_declared_as_json_is_415(client: TestClient) -> None:
+    def chunks() -> Iterator[bytes]:
+        yield b'{"expression": '
+        yield b'"3d6"}'
+
+    assert client.post("/v1/dice/roll", content=chunks()).status_code == 415
+    declared = client.post("/v1/dice/roll", content=chunks(), headers={"Content-Type": "application/json"})
+    assert declared.status_code == 200
+
+
+def test_head_has_no_body_when_the_server_fails(settings: Settings) -> None:
+    app = create_app(settings)
+
+    @app.get("/v1/bug")
+    def bug() -> None:
+        raise RuntimeError("SECRET")
+
+    def call(method: str) -> tuple[int, dict[bytes, bytes], bytes]:
+        sent: list[Message] = []
+
+        async def receive() -> Message:
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        async def send(message: Message) -> None:
+            sent.append(message)
+
+        scope = {
+            "type": "http",
+            "asgi": {"version": "3.0"},
+            "http_version": "1.1",
+            "method": method,
+            "scheme": "http",
+            "path": "/v1/bug",
+            "raw_path": b"/v1/bug",
+            "query_string": b"",
+            "root_path": "",
+            "headers": [],
+            "client": ("127.0.0.1", 1),
+            "server": ("127.0.0.1", 8640),
+        }
+        # Starlette sends the 500 and then raises the exception again, for the server to log.
+        with pytest.raises(RuntimeError):
+            asyncio.run(app(scope, receive, send))
+        body = b"".join(message.get("body", b"") for message in sent if message["type"] == "http.response.body")
+        return sent[0]["status"], dict(sent[0]["headers"]), body
+
+    get_status, get_headers, get_body = call("GET")
+    head_status, head_headers, head_body = call("HEAD")
+    app.state.db.close()
+    assert (get_status, head_status) == (500, 500)
+    assert json.loads(get_body)["code"] == "internal_error"
+    assert head_body == b""
+    assert head_headers[b"content-length"] == get_headers[b"content-length"]
+    assert head_headers[b"x-request-id"].startswith(b"req_")

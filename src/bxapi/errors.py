@@ -595,4 +595,8 @@ def install_error_handlers(app: FastAPI) -> None:
         _log.exception(
             "unhandled error on %s %s, request %s", request.method, request.url.path, request_id, exc_info=error
         )
-        return respond(request, internal_error())
+        response = respond(request, internal_error())
+        if request.method == "HEAD":
+            # Starlette sends this response from outside every middleware, so HeadMiddleware can't drop its body.
+            response.body = b""
+        return response
