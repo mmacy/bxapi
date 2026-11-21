@@ -71,7 +71,9 @@ _TABLES: dict[str, Callable[[], AbilityTables | CombatTables | EncounterTables |
     "treasure": load_treasure_tables,
 }
 
-_Q = Annotated[str | None, Query(description="Keep entries whose id or name contains this text, ignoring case.")]
+_Q = Annotated[
+    str | None, Query(description="Return only the entries whose id or name contains this text, ignoring case.")
+]
 
 
 def _set_cache_control(response: Response) -> None:
@@ -138,19 +140,19 @@ def list_spells(
     class_id: Annotated[
         str | None,
         Query(
-            description="Keep the spells on this class's spell list. For a class that casts no spells, the page is "
-            "empty. An unknown class id is a 404."
+            description="Return only the spells on this class's spell list. For a class that casts no spells, the "
+            "page is empty. An unknown class id is a 404."
         ),
     ] = None,
     level: Annotated[
         int | None,
-        Query(ge=SPELL_LEVEL_MIN, le=SPELL_LEVEL_MAX, description="Keep the spells of this spell level."),
+        Query(ge=SPELL_LEVEL_MIN, le=SPELL_LEVEL_MAX, description="Return only the spells of this spell level."),
     ] = None,
 ) -> Page[SpellSummary]:
     """List the spells in osrlib's order, with each spell's level, spell list, range, and duration.
 
     A class casts the spells on one spell list. The cleric uses `cleric`, and the magic-user and the elf use
-    `magic_user`. Pass `class_id` to get the spells a class can cast, and `level` to keep one spell level.
+    `magic_user`. Pass `class_id` to get the spells a class can cast, and `level` to list only one spell level.
 
     Returns:
         A page of spell summaries.
@@ -170,11 +172,11 @@ def get_spell(
 def list_equipment(
     page: PageQuery,
     q: _Q = None,
-    item_type: Annotated[ItemType | None, Query(description="Keep the items of one type.")] = None,
+    item_type: Annotated[ItemType | None, Query(description="Return only the items of one type.")] = None,
 ) -> Page[EquipmentSummary]:
     """List the mundane equipment a character can buy: weapons first, then armour, gear, and ammunition.
 
-    Pass `item_type` to keep one type of item.
+    Pass `item_type` to list only one type of item.
 
     Returns:
         A page of equipment summaries.
@@ -197,7 +199,7 @@ def get_equipment_item(
 def list_magic_items(
     page: PageQuery,
     q: _Q = None,
-    category: Annotated[MagicItemCategory | None, Query(description="Keep the items of one category.")] = None,
+    category: Annotated[MagicItemCategory | None, Query(description="Return only the items of one category.")] = None,
 ) -> Page[MagicItemSummary]:
     """List the magic items in osrlib's order.
 
@@ -261,10 +263,14 @@ def get_table(
 @router.get("/commands", summary="List the commands")
 def list_commands(
     page: PageQuery,
-    kind: Annotated[CommandKind | None, Query(description="Keep the play commands or the referee commands.")] = None,
-    mode: Annotated[SessionMode | None, Query(description="Keep the commands that are legal in this mode.")] = None,
+    kind: Annotated[
+        CommandKind | None, Query(description="Return only the play commands or only the referee commands.")
+    ] = None,
+    mode: Annotated[
+        SessionMode | None, Query(description="Return only the commands that are legal in this mode.")
+    ] = None,
 ) -> Page[CommandSummary]:
-    """List the commands a session accepts, in osrlib's order.
+    """List the commands you can send to a session, in osrlib's order.
 
     A `play` command is one a player may send, and a `referee` command is one only a referee may send.
     `allowed_modes` lists the session modes the command is legal in. osrlib has more commands than the default

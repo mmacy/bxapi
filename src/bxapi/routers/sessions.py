@@ -62,7 +62,7 @@ for, and osrlib's `load_game` returns that entry as a dict."""
 if TYPE_CHECKING:
     # osrlib builds `AnyCommand` and `AnyEvent` from tuples of classes at run time, so a type checker can't read
     # them as types. It checks against the base classes. FastAPI and pydantic read the unions, which validate the
-    # body as the one command its `command_type` names, serialize every field of each event, and put every
+    # body as the command class that matches its `command_type`, serialize every field of each event, and put every
     # command and event class in the OpenAPI document.
     CommandBody = Command
     AnyEventModel = Event
@@ -74,8 +74,8 @@ SessionId = Annotated[str, Path(description="The session's id, which starts with
 VisibilityQuery = Annotated[
     Visibility,
     Query(
-        description="Which events to return. `player` returns the events the players may see. `referee` returns "
-        "every event, and only a referee may pass it."
+        description="Which events to return. With `player`, the response has the events the players may see. With "
+        "`referee`, it has every event, and only a referee may pass `referee`."
     ),
 ]
 
@@ -84,7 +84,7 @@ VisibilityQuery = Annotated[
 
 
 class Clock(ApiModel):
-    """How much game time has passed since the session began."""
+    """How much game time has passed since the game began. A session restored from a save continues the save's clock."""
 
     rounds: int
     """The time in rounds of 10 seconds. `turns` and `days` are the same time in whole turns and whole days."""
@@ -106,22 +106,23 @@ class SessionInfo(ApiModel):
     id: str
     """The session's id, which starts with `ses_`."""
     name: str
-    """The session's name. It defaults to the adventure's name, and `PATCH` changes it."""
+    """The session's name. It defaults to the adventure's name, and `PATCH /v1/sessions/{session_id}` changes it."""
     adventure_id: str | None
-    """The id of the adventure the session plays, or `null` for a session restored from an imported save.
+    """The id of the session's adventure, or `null` for a session restored from an imported save.
 
-    A session restored from a save has the save's `adventure_id`. The adventure may have been deleted since the
-    session started. Neither case changes play, because the session plays the copy of the adventure in its save
-    document.
+    A session restored from a save has the save's `adventure_id`, which is `null` for an imported save. The adventure
+    may have been deleted since the session started. Neither a deleted adventure nor a `null` id changes play,
+    because the session uses the copy of the adventure in its save document.
     """
     adventure_name: str
-    """The name of the adventure the session plays."""
+    """The name of the session's adventure."""
     mode: SessionMode
     """The session's mode after its last accepted command."""
     ended: bool
     """Whether the session is over, which it is in the modes `game_over` and `victory`."""
     revision: int
-    """How many command requests the session has accepted. A new session, and a restored one, start at 0."""
+    """How many of the session's command requests osrlib has accepted. A new session, and a restored one, start at
+    0."""
     clock: Clock
     """The game time after the last accepted command."""
     schema_version: int
@@ -131,12 +132,15 @@ class SessionInfo(ApiModel):
     created_at: str
     """When the session was created."""
     updated_at: str
-    """When the session last accepted a command, or when it was created if it hasn't accepted one yet. Renaming the
-    session doesn't change it."""
+    """The time of the session's last accepted command, or `created_at` before the first one. Renaming the session
+    doesn't change it."""
 
 
 class SaveInfo(ApiModel):
-    """A save's description, without the save document."""
+    """A save's info, without its save document.
+
+    The save document is osrlib's record of the whole game at that moment.
+    """
 
     id: str
     """The save's id, which starts with `sav_`."""
@@ -144,9 +148,9 @@ class SaveInfo(ApiModel):
     """The session the save was made from, which may have been deleted since. `null` for an imported save."""
     adventure_id: str | None
     """The id of the adventure the save's session played, which may have been deleted since. `null` for an
-    imported save, and for a save of a session restored from one."""
+    imported save, and for a save of a session restored from an imported save."""
     adventure_name: str
-    """The name of the adventure the save plays."""
+    """The name of the adventure in the save."""
     label: str | None
     """The label the player gave the save, or `null` if it has none."""
     mode: SessionMode
@@ -166,19 +170,21 @@ class CreateSessionRequest(RequestModel):
     adventure_id: str = Field(min_length=1, max_length=128)
     """The id of the adventure to play: a built-in adventure, like `builtin-barrow`, or one you uploaded."""
     character_ids: list[str] | None = Field(default=None, max_length=MAX_PARTY_SIZE)
-    """The ids of stored characters, in marching order: the first one walks in front. The session plays copies,
-    so the stored characters don't change. osrlib requires at least one member, and this server allows at most 20.
-    You can name a character twice to play two copies of it."""
+    """The ids of stored characters, in marching order: the first one walks in front. The session uses copies,
+    so play doesn't change the stored characters. osrlib requires at least one member, and this server allows at
+    most 20. You can name a character twice to play two copies of it, and the session gives each copy a different
+    id."""
     party_document: JsonObject | None = None
     """Referee only. A party document from osrlib's `party_to_document`, in place of stored characters. It has at
     most 20 characters."""
     name: str | None = Field(default=None, min_length=1, max_length=NAME_MAX_LENGTH)
     """A name for the session. Defaults to the adventure's name."""
     ruleset: Ruleset | None = None
-    """osrlib's optional rules, as `Ruleset` fields. A field you leave out keeps the rule as written, and with no
-    `ruleset` the session plays every rule as written."""
+    """osrlib's optional rules, as `Ruleset` fields. For each field you leave out, the session uses the rule as
+    written. With no `ruleset`, the session uses every rule as written."""
     seed: Seed | None = None
-    """Referee only. The session's master seed. The server draws one when you leave it out, and never returns it."""
+    """Referee only. The session's master seed. The server draws one when you leave it out. It returns the seed only
+    inside a save document, which only a referee can read."""
 
     @model_validator(mode="after")
     def _one_party(self) -> CreateSessionRequest:
@@ -202,7 +208,7 @@ class CreateSaveRequest(RequestModel):
 
 
 class CommandChoice(ApiModel):
-    """A command the session accepts in its current mode."""
+    """A command that's legal in the session's current mode."""
 
     command_type: str
     """The `command_type` to send, like `"move_party"`."""
@@ -220,16 +226,16 @@ class SessionCommands(ApiModel):
     command since you read this list."""
     commands: list[CommandChoice]
     """Each command that's legal in the mode and that the caller may send, in osrlib's order. A player gets only
-    `play` commands. The rules can still refuse a legal command, for a reason they check when you send it."""
+    `play` commands. osrlib can still refuse a legal command, for a reason it checks when you send the command."""
 
 
 class CommandOutcome(ApiModel):
-    """What happened when the session got the command. A refused command is an outcome, not an error."""
+    """What happened when you sent the command. A refused command is an outcome, not an error."""
 
     accepted: bool
-    """Whether the rules accepted the command. A refused command changed nothing."""
+    """Whether osrlib accepted the command. When osrlib refused it, nothing in the game changed."""
     rejections: list[Rejection]
-    """Why the rules refused the command: each a `code` and its `params`. Empty when the command was accepted."""
+    """Why osrlib refused the command: each a `code` and its `params`. Empty when osrlib accepted the command."""
     events: list[AnyEventModel]
     """The events the command caused, in order, as osrlib serializes them: the command's events, then the events
     of what the adventure's triggers and quests did in response. With player visibility, the list leaves out the
@@ -248,8 +254,9 @@ class EventPage(ApiModel):
     """A page of a session's event log, for one visibility."""
 
     events: list[AnyEventModel | JsonObject]
-    """The events after the first `after`, in the order they happened, as osrlib serializes them. An event that
-    this server's osrlib has no class for, from a save a newer osrlib wrote, comes back as it was stored."""
+    """The events that follow the first `after` events of this visibility, in the order they happened, as osrlib
+    serializes them. An event that this server's osrlib has no class for, from a save a newer osrlib wrote, comes
+    back as it was stored."""
     messages: list[str]
     """One line of English for each event in `events`, in the same order, from osrlib's `format_message`. For an
     event that osrlib has no class for, the line is the event's `code`."""
@@ -369,12 +376,14 @@ def _party(db: Database, principal: Principal, body: CreateSessionRequest) -> Pa
 def create_session(request: Request, principal: CurrentPrincipal, body: CreateSessionRequest) -> SessionInfo:
     """Start a game of an adventure with a party. The session starts in town, at revision 0.
 
-    Name the party with `character_ids`, the stored characters in marching order. A referee can send a
-    `party_document` instead, and can choose the `seed`. A player who sends either gets 403 `referee_required`. The
-    server draws a seed when the request has none, and no response ever contains it.
+    Choose the party with `character_ids`, the stored characters in marching order. A referee can send a
+    `party_document` instead, and can choose the `seed`. A player who sends `party_document` or `seed` gets 403
+    `referee_required`. The server draws a seed when the request has none. Only a save document contains the seed,
+    and only a referee can read one.
 
-    An unknown adventure or character id gets 404 `not_found`. An empty party, or a party in which two members have
-    the same id, gets 422 `party_invalid`. A malformed `party_document` gets 422 `content_invalid`.
+    An unknown adventure or character id gets 404 `not_found`. An empty party gets 422 `party_invalid`, and so does a
+    `party_document` in which two members end up with the same id. A malformed `party_document` gets 422
+    `content_invalid`.
     """
     seed = referee_seed(body.seed, principal)
     if body.party_document is not None and not principal.is_referee:
@@ -401,11 +410,11 @@ def list_sessions(
     request: Request,
     principal: CurrentPrincipal,
     page: PageQuery,
-    mode: Annotated[SessionMode | None, Query(description="Keep the sessions in this mode.")] = None,
+    mode: Annotated[SessionMode | None, Query(description="Return only the sessions in this mode.")] = None,
 ) -> Page[SessionInfo]:
     """List your client's sessions, newest first.
 
-    Pass `mode` to keep the sessions in one mode, like `victory` for the games the party won.
+    Pass `mode` to list only the sessions in one mode, like `victory` for the games that ended in a win.
     """
     rows = _db(request).list_sessions(
         principal.client, limit=page.limit, offset=page.offset, mode=None if mode is None else mode.value
@@ -415,7 +424,7 @@ def list_sessions(
 
 @router.get("/{session_id}", summary="Get a session", responses=problem_responses(404))
 def get_session(request: Request, principal: CurrentPrincipal, session_id: SessionId) -> SessionInfo:
-    """Return a session's info: its mode, revision, clock, and versions."""
+    """Return a session's info, like its mode, revision, clock, and versions."""
     row = _db(request).get_session(principal.client, session_id)
     if row is None:
         raise not_found("session", session_id)
@@ -448,7 +457,9 @@ def delete_session(request: Request, principal: CurrentPrincipal, session_id: Se
 
 
 @router.get(
-    "/{session_id}/commands", summary="List the commands a session accepts now", responses=problem_responses(404)
+    "/{session_id}/commands",
+    summary="List the commands that are legal in a session now",
+    responses=problem_responses(404),
 )
 def list_session_commands(request: Request, principal: CurrentPrincipal, session_id: SessionId) -> SessionCommands:
     """Return the session's mode and revision, and the commands that are legal in that mode for your role.
@@ -491,22 +502,24 @@ def send_command(
     """Execute one osrlib command, like `{"command_type": "move_party", "direction": "north"}`, and return the outcome.
 
     The body is one of osrlib's commands, chosen by `command_type`, and `GET /v1/sessions/{session_id}/commands`
-    lists the ones that are legal now. An unknown `command_type`, or a field that doesn't fit the command, gets 422.
-    A field the command doesn't define is ignored.
+    lists the ones that are legal now. An unknown `command_type`, or a field value that doesn't fit the command, gets
+    422. osrlib ignores a field that the command doesn't define.
 
-    When the rules refuse the command, the response is a 200 with `accepted` set to `false` and osrlib's
-    `rejections`, and the session doesn't change. When they accept it, the server stores the new state before it
+    When osrlib refuses the command, the response is a 200 with `accepted` set to `false` and osrlib's
+    `rejections`, and the session doesn't change. When osrlib accepts it, the server stores the new state before it
     responds, and the revision goes up by 1.
 
     A player who sends a referee command gets 403 `referee_command`. A player who passes `visibility=referee`, or
-    sends a command with a `source`, gets 403 `referee_required`. None of those requests runs the command. With
-    `expected_revision`, a session at another revision runs nothing and returns 409 `revision_conflict`.
+    sends a command with a `source`, gets 403 `referee_required`. In each of those cases, the server doesn't run the
+    command. With `expected_revision`, if the session is at another revision, the server runs nothing and returns
+    409 `revision_conflict`.
 
-    The session runs one command at a time. The response is 409 `session_busy`, with the session's `revision`, when
-    the command waited more than 5 seconds for the request ahead of it, or when another server process wrote the
-    session after this request read it and before this request wrote it. In both cases the command had no effect. If
-    you sent `expected_revision`, read the session before you decide what to do: when the revision has changed, the
-    same request gets `revision_conflict`. If you didn't, send the command again.
+    The server runs one command at a time on each session. The response is 409 `session_busy`, with the session's
+    `revision`, when the command waited more than 5 seconds for the request ahead of it, or when another server
+    process wrote the session after this request read it and before this request wrote it. In both cases the command
+    had no effect. If you sent `expected_revision`, read the session before you decide what to do: when the revision
+    has changed, the same request gets `revision_conflict`. If you didn't send `expected_revision`, send the command
+    again.
 
     A 500 `session_unreadable` means the server's osrlib can't load the session's stored state.
     """

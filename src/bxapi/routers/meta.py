@@ -29,8 +29,8 @@ class Meta(ApiModel):
     engine_version: str
     """The version of osrlib that applies the rules."""
     schema_version: int
-    """The version of osrlib's document format. Adventure, character, and save documents are
-    stamped with it, and the server refuses a document stamped with a higher one."""
+    """The version of osrlib's document format. osrlib stamps adventure, character, and save
+    documents with it, and the server refuses a document stamped with a higher one."""
     auth_enabled: bool
     """Whether the server asks for an API key."""
     client: str
@@ -51,7 +51,7 @@ def get_meta(request: Request, principal: CurrentPrincipal) -> Meta:
     """Return the versions of bxapi and osrlib, and the client and role of the API key you sent.
 
     Call it when your application starts, to check that the key works and that the server's
-    `schema_version` isn't lower than the one your stored documents need.
+    `schema_version` isn't lower than the schema version your stored documents are stamped with.
     """
     return Meta(
         api_version=__version__,

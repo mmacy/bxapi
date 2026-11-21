@@ -31,9 +31,9 @@ __all__ = [
 router = APIRouter(prefix="/generate", tags=["generate"])
 
 STOCKING_STREAM = "stocking"
-"""The key of the stream that rolls rooms. osrlib's `StreamName` has no member for it. The example in the
-documentation of `stock_area` draws from a stream with this key. The key is part of what makes a seed repeatable, so
-changing it changes every room."""
+"""The key of the stream the server rolls rooms from. osrlib's `StreamName` has no member for it. The example in the
+documentation of `stock_area` draws from a stream with this key. The same seed gives a different stream for a
+different key, so changing the key changes every room."""
 
 
 class TreasureRequest(RequestModel):

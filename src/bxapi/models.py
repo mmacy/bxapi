@@ -17,8 +17,8 @@ class ApiModel(BaseModel):
     into the field's description, and FastAPI copies the description into the OpenAPI document,
     which is the reference a client developer reads.
 
-    A response that is an osrlib model is returned as osrlib defines it, and doesn't extend this
-    class.
+    A response model from osrlib doesn't extend this class. The server returns it as osrlib
+    defines it.
 
     Examples:
         ```python
@@ -41,7 +41,7 @@ class RequestModel(ApiModel):
     """The base class of every request body that bxapi defines.
 
     A request with a field the model doesn't define gets 422 `validation_error`. Without that
-    check, a misspelled field name would be dropped, and the server would act on the default.
+    check, pydantic would drop a misspelled field name, and the server would act on the default.
     The response lists each unknown field, up to 20 of them. An object with more than 20
     unknown fields gets one error for the object instead, because FastAPI copies every error
     pydantic reports before the server can cut the list short.

@@ -43,7 +43,7 @@ class TownInfo(ApiModel):
 class DungeonInfo(ApiModel):
     """What a player may know about one of the adventure's dungeons before play.
 
-    It leaves out how many levels the dungeon has, because osrlib's player view shows only the
+    The info leaves out how many levels the dungeon has, because osrlib's player view shows only the
     levels the party has explored.
     """
 
@@ -108,7 +108,7 @@ class InvalidAdventure(ApiModel):
     document osrlib refuses, and `version_unsupported` for a document stamped with a newer schema
     version than the server's osrlib reads."""
     detail: str
-    """Why the document was refused."""
+    """Why osrlib refused the document."""
 
 
 def _db(request: Request) -> Database:
@@ -141,8 +141,8 @@ def upload_adventure(
 ) -> AdventureInfo:
     """Check an adventure document with osrlib and store it as uploaded.
 
-    The server runs every check osrlib makes on an adventure, so an adventure you can upload can
-    start a session. Each upload stores a new adventure, even when the document is the same as
+    The server runs every check osrlib makes on an adventure, so you can start a session with any
+    adventure you can upload. Each upload stores a new adventure, even when the document is the same as
     one already stored. A document osrlib refuses gets 422 `content_invalid`. A document stamped
     with a newer schema version than the server's osrlib reads gets 409 `version_unsupported`.
     """
@@ -159,7 +159,7 @@ def validate_adventure(document: Annotated[dict[str, Any], _DOCUMENT_BODY]) -> V
     """Run the checks of `POST /v1/adventures` on a document, and store nothing.
 
     The response is 200 either way. When the upload would fail, `valid` is `false`, `code` is
-    the error code the upload would return, and `detail` says why.
+    the error code the upload would return, and `detail` states why.
     """
     try:
         adventure = parse_adventure(document)
@@ -211,7 +211,7 @@ def get_adventure_document(request: Request, principal: RefereePrincipal, advent
     """Return the whole adventure document, as uploaded, with the map, monsters, treasure, triggers, and quests.
 
     The document is the one the client uploaded, including any field osrlib ignores. Only a
-    referee may read it. It works for the adventures that come with the server too.
+    referee may read it. You can also read the document of an adventure that comes with the server.
     """
     builtin = builtin_adventures().get(adventure_id)
     if builtin is not None:
@@ -229,7 +229,7 @@ def get_adventure_document(request: Request, principal: RefereePrincipal, advent
     responses=problem_responses(403, 404),
 )
 def delete_adventure(request: Request, principal: CurrentPrincipal, adventure_id: str) -> Response:
-    """Delete an adventure the client stored. A session that already started keeps its copy.
+    """Delete an adventure the client stored. A session that already started has a copy and isn't affected.
 
     An adventure that comes with the server gets 403 `adventure_read_only`.
     """

@@ -8,8 +8,8 @@ router. Serve it with the `bxapi` command, or point an ASGI server at the factor
 uvicorn bxapi.app:create_app --factory --port 8640
 ```
 
-The `bxapi` command sends the server's own log lines, like the one about API keys at startup,
-to the same place as uvicorn's. Another ASGI server shows them only if you configure the
+The `bxapi` command sends bxapi's log lines, like the one about API keys at startup, to the
+same place as uvicorn's. Another ASGI server shows them only if you configure the
 `bxapi` logger.
 """
 
@@ -42,11 +42,11 @@ __all__ = ["BodyLimitMiddleware", "create_app"]
 _log = logging.getLogger("bxapi")
 
 _DESCRIPTION = """
-The 1981 B/X (Basic/Expert) fantasy adventure game rules over HTTP, run by
-[osrlib](https://github.com/mmacy/osrlib-python).
+bxapi serves the rules of the 1981 B/X (Basic/Expert) fantasy adventure game over HTTP, and
+[osrlib](https://github.com/mmacy/osrlib-python) applies them.
 
-Every error is a problem document (RFC 9457) with a fixed `code`. A command the rules refuse
-isn't an error: the command endpoint returns it with status 200 and `accepted` set to `false`.
+Every error is a problem document (RFC 9457) with a fixed `code`. A command that osrlib refuses
+isn't an error: the command endpoint responds with status 200 and `accepted` set to `false`.
 """
 
 _TAGS = [
@@ -54,10 +54,14 @@ _TAGS = [
     {"name": "rules", "description": "The rules content: classes, monsters, spells, items, and the printed tables."},
     {"name": "dice", "description": "Roll dice expressions."},
     {"name": "generate", "description": "Roll characters, treasure, and encounters without starting a game."},
-    {"name": "characters", "description": "Create characters and store them so a session can start from them."},
-    {"name": "adventures", "description": "Upload, validate, and list the adventures a session can play."},
+    {"name": "characters", "description": "Create characters and store them, so you can start sessions with them."},
+    {"name": "adventures", "description": "Upload, validate, and list the adventures you can play in a session."},
     {"name": "sessions", "description": "Start a game, send it commands, and read what the players see."},
-    {"name": "saves", "description": "Save a game, and start a new session from a save."},
+    {
+        "name": "saves",
+        "description": "List, label, restore, and delete the saves that `POST /v1/sessions/{session_id}/saves` makes, "
+        "and move save documents between servers.",
+    },
 ]
 
 _NO_KEYS = (
@@ -222,7 +226,8 @@ def _discriminators(value: object) -> Iterator[dict[str, Any]]:
 def _require_discriminators(schema: dict[str, Any]) -> None:
     # osrlib gives each tag field, like `command_type`, a default, so pydantic leaves it out of
     # `required`. A union can't be narrowed on an optional property, and the server needs the tag
-    # to pick the member anyway, so each member a discriminator refers to requires it.
+    # to pick the member anyway, so this function adds the tag to `required` in each member that a
+    # discriminator refers to.
     schemas = schema.get("components", {}).get("schemas", {})
     for union in list(_discriminators(schema)):
         tag = union["discriminator"]["propertyName"]
@@ -270,13 +275,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     when [`allow_anonymous`][bxapi.settings.Settings.allow_anonymous] is set, and then asks
     for no key.
 
-    The function loads the adventures that come with the server, so a broken adventure file
-    stops the server before it serves a request. It opens the database in the settings and puts
+    The function loads the adventures that come with the server, so if an adventure file is
+    broken, the server stops before it serves a request. It opens the database in the settings and puts
     it at `app.state.db`, and puts the
     [`SessionManager`][bxapi.session_manager.SessionManager] that runs the sessions at
     `app.state.sessions`. It opens the database here rather than at startup, so a test client that
     never runs the application's startup can still use it. When the server starts the
-    application, the application logs one line about its API keys and CORS origins: a warning
+    application, the application logs one line about its API keys and CORS origins, as a warning
     when it asks for no key. When the server shuts the application down, the application closes
     the database.
 

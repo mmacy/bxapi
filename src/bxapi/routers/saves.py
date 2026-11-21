@@ -2,7 +2,7 @@
 
 A save is osrlib's save document for one moment of a session, stored beside the save's info. The document
 contains the master seed, the state only the referee may see, like the unexplored map and the monsters' hit
-points, and the logs of every command and event. Only a referee reads or imports a save document.
+points, and the logs of every command and event. Only a referee may read or import a save document.
 """
 
 from typing import Annotated
@@ -37,7 +37,7 @@ class RestoreSaveRequest(RequestModel):
     """An optional name for the session a restore starts."""
 
     name: str | None = Field(default=None, min_length=1, max_length=NAME_MAX_LENGTH)
-    """A name for the new session. Defaults to the adventure's name."""
+    """A name for the new session. Defaults to the name of the adventure in the save."""
 
 
 def _db(request: Request) -> Database:
@@ -56,9 +56,9 @@ def list_saves(
     request: Request,
     principal: CurrentPrincipal,
     page: PageQuery,
-    session_id: Annotated[str | None, Query(description="Keep the saves made from this session.")] = None,
+    session_id: Annotated[str | None, Query(description="Return only the saves made from this session.")] = None,
 ) -> Page[SaveInfo]:
-    """List your client's saves, newest first. Pass `session_id` to keep the saves of one session."""
+    """List your client's saves, newest first. Pass `session_id` to list only the saves of one session."""
     rows = _db(request).list_saves(principal.client, limit=page.limit, offset=page.offset, session_id=session_id)
     return Page(items=[save_info(row) for row in rows.items], total=rows.total, limit=page.limit, offset=page.offset)
 
@@ -69,19 +69,19 @@ def import_save(
     principal: RefereePrincipal,
     document: Annotated[JsonObject, Body(description="A save document from osrlib's `save_game`.")],
 ) -> SaveInfo:
-    """Store a save document, like one from `GET /v1/saves/{save_id}/document` on another server, as a new save.
+    """Store the save document in the request body as a new save, like one from `GET /v1/saves/{save_id}/document`.
 
     Only a referee may import a save. The server loads the document with osrlib's `load_game`, runs osrlib's
     `validate_adventure` on the adventure in it, and stores the document osrlib writes back out of the loaded game,
     in the installed osrlib's format. A document osrlib can't load, an adventure that refers to something osrlib
-    doesn't have, or a game clock larger than the server stores gets 422 `content_invalid`. A document stamped with
+    doesn't have, or a game clock larger than the server can store gets 422 `content_invalid`. A document stamped with
     a newer `schema_version` gets 409 `version_unsupported`. The new save has no session, no adventure id, and no
     label.
     """
     game = load_game(document)
     validate_loaded_adventure(game)
     if not fits_integer_column(game.clock.rounds):
-        raise invalid("content_invalid", "The save's game clock is larger than the server stores.")
+        raise invalid("content_invalid", "The save's game clock is larger than the server can store.")
     row = _db(request).insert_save(
         principal.client,
         session_id=None,
@@ -103,7 +103,7 @@ def get_save(request: Request, principal: CurrentPrincipal, save_id: SaveId) -> 
 
 @router.patch("/{save_id}", summary="Relabel a save", responses=problem_responses(404))
 def relabel_save(request: Request, principal: CurrentPrincipal, save_id: SaveId, body: RelabelSaveRequest) -> SaveInfo:
-    """Change a save's label, or remove it with `null`. The saved game doesn't change."""
+    """Change a save's label, or remove the label with `null`. The saved game doesn't change."""
     db = _db(request)
     if not db.update_save_label(principal.client, save_id, body.label):
         raise not_found("save", save_id)
@@ -112,7 +112,7 @@ def relabel_save(request: Request, principal: CurrentPrincipal, save_id: SaveId,
 
 @router.delete("/{save_id}", status_code=204, summary="Delete a save", responses=problem_responses(404))
 def delete_save(request: Request, principal: CurrentPrincipal, save_id: SaveId) -> Response:
-    """Delete a save. A session restored from it doesn't change."""
+    """Delete a save. A session restored from the save doesn't change."""
     if not _db(request).delete_save(principal.client, save_id):
         raise not_found("save", save_id)
     return Response(status_code=204)
@@ -125,10 +125,10 @@ def restore_save(
     save_id: SaveId,
     body: Annotated[RestoreSaveRequest, Body(default_factory=RestoreSaveRequest)],
 ) -> SessionInfo:
-    """Start a new session at the moment of the save, and return its info.
+    """Start a new session at the moment of the save, and return the new session's info.
 
     The new session starts at revision 0, has the save's `adventure_id`, and plays on from the save as the original
-    session would have. The save, and the session it was made from, don't change. The body is optional.
+    session would have. The save, and the session it was made from, don't change. The request body is optional.
 
     A 500 `session_unreadable` means the server's osrlib can't load the save's stored document, or refuses the
     adventure in it.

@@ -1,4 +1,4 @@
-"""Stored characters, the ability score rolls that start one, and the stateless character generator."""
+"""Stored characters, the ability score rolls that a character starts from, and the stateless character generator."""
 
 from typing import Annotated, Any, Self
 
@@ -45,8 +45,8 @@ class AbilityRollRequest(RequestModel):
     """The body of a request for an ability roll."""
 
     seed: Seed | None = None
-    """The seed for the roll. Only a referee may pass one, and the server never returns it. The seed
-    decides the hit point and gold rolls of the character created from the roll too."""
+    """The seed for the roll. Only a referee may pass one, and the server never returns the seed. It
+    also determines the hit point and gold rolls of the character created from the roll."""
 
 
 class AbilityRoll(ApiModel):
@@ -70,7 +70,7 @@ class CharacterRequest(CharacterChoices):
     """The choices for a new stored character."""
 
     ability_roll_id: str | None = None
-    """The id of an unused ability roll to take the scores from. The roll's seed also decides the
+    """The id of an unused ability roll to take the scores from. The roll's seed also determines the
     hit point and gold rolls. Without it, the server rolls the scores as part of the request."""
     seed: Seed | None = None
     """The seed for the creation rolls, when the request has no `ability_roll_id`. Only a referee
@@ -79,7 +79,7 @@ class CharacterRequest(CharacterChoices):
     @model_validator(mode="after")
     def _one_source_of_dice(self) -> Self:
         if self.ability_roll_id is not None and self.seed is not None:
-            raise ValueError("pass seed or ability_roll_id, not both: an ability roll has its own seed")
+            raise ValueError("pass seed or ability_roll_id, not both: an ability roll already has a seed")
         return self
 
 
@@ -179,7 +179,7 @@ def _stored(row: CharacterDocumentRow, character: Character, derived: DerivedVal
 
 
 def _store(db: Database, client: str, character: Character, roll_id: str | None = None) -> StoredCharacter:
-    # The derived values come first, so a character osrlib can't compute them for is never stored.
+    # The derived values come first, so the server never stores a character that osrlib can't compute them for.
     derived = _derived(character)
     name, class_id, level, max_hp = character.name, character.class_id, character.level, character.max_hp
     document = character.to_document()
@@ -209,12 +209,12 @@ def create_ability_roll(
     """Roll the six ability scores with osrlib, store them, and return them with the classes they qualify for.
 
     Show the player the scores and `eligible_class_ids`, then pass the roll's `id` as
-    `ability_roll_id` to `POST /v1/characters`. The body is optional.
+    `ability_roll_id` to `POST /v1/characters`. The request body of this endpoint is optional.
 
     The server stores the roll's seed with it, and the character created from the roll gets
     its hit point and gold rolls from the same seed. So every attempt to create a character
-    from one roll gets the same rolls. The server doesn't limit how many rolls a client asks
-    for.
+    from one roll, like a retry after osrlib refuses a choice, gets the same rolls. The server
+    doesn't limit how many rolls a client asks for.
 
     A player who passes `seed` gets 403 `referee_required`.
     """
@@ -249,13 +249,14 @@ def create_character(request: Request, principal: CurrentPrincipal, body: Charac
 
     With `ability_roll_id`, the character gets that roll's scores, its hit points and gold come
     from the roll's seed, and the roll becomes used. Without it, the server rolls the scores
-    first. Then osrlib checks the class, applies the
-    ability adjustment, checks the first spells, rolls hit points, checks the extra languages,
-    rolls starting gold, and buys and equips the gear, in that order.
+    first. Then osrlib checks the choices in the request and rolls the dice, in this order: it
+    checks the class, checks and applies the ability adjustment, checks the first spells, rolls
+    hit points, checks the extra languages, rolls starting gold, and buys and equips the gear.
 
     When a choice breaks a rule, the response is 422 `character_invalid`, with osrlib's
-    `rejections` when it reports them, and the ability roll stays unused. A roll that already
-    started a character gets 409 `ability_roll_used`. An unknown roll id gets 404. A player who
+    `rejections` when osrlib reports them, and the ability roll stays unused. If a character was
+    already created from the roll, the response is 409 `ability_roll_used`. An unknown roll id gets 404
+    `not_found`. A player who
     passes `seed` gets 403 `referee_required`, and a request with both `seed` and
     `ability_roll_id` gets 422 `validation_error`.
     """
@@ -287,14 +288,15 @@ def import_character(
     """Store a character from a character document, the format osrlib's `Character.to_document` writes.
 
     The server accepts any character osrlib's `Character` model accepts, like a fighter at level
-    14. It clears the character's `id`, because a session assigns each party member an id when it
-    starts.
+    14. It clears the `id` field of the character in the document, because osrlib gives each party
+    member without an id a new one when a session starts. The stored character gets a new `chr_` id.
 
-    A condition or a stat modifier that an effect granted refers to the effect by its
-    `effect_id`, and the effect belongs to the game the character came from. In a new session the
-    condition would never end, and the modifier would end with an unrelated effect that has the
-    same id. So a character with a stat modifier, or with a condition that has an `effect_id`,
-    gets 422 `content_invalid`. A condition with no `effect_id`, like `dead`, is accepted.
+    When an effect grants a character a condition or a stat modifier, the condition or modifier
+    refers to the effect by its `effect_id`, and the effect belongs to the game the character
+    came from. In a new session the condition would never end, and the modifier would end with
+    an unrelated effect that has the same id. So a character with a stat modifier, or with a
+    condition that has an `effect_id`, gets 422 `content_invalid`. A condition with no
+    `effect_id`, like `dead`, is accepted.
 
     A document that isn't a valid character document, or that refers to an item osrlib doesn't
     have, gets 422 `content_invalid`. A document stamped with a newer schema version than the
@@ -352,7 +354,7 @@ def get_character(request: Request, principal: CurrentPrincipal, character_id: s
     responses=problem_responses(404),
 )
 def delete_character(request: Request, principal: CurrentPrincipal, character_id: str) -> Response:
-    """Delete a stored character. A session that started with the character keeps its copy."""
+    """Delete a stored character. A session that started with the character has a copy and isn't affected."""
     if not _db(request).delete_character(principal.client, character_id):
         raise not_found("character", character_id)
     return Response(status_code=204)
@@ -365,7 +367,7 @@ def generate_character(body: GenerateCharacterRequest) -> GeneratedCharacterResp
     The server rolls the ability scores, then applies the choices with the same osrlib steps as
     `POST /v1/characters`. Send the same body with the returned seed to get the same character
     again. A choice that breaks a rule gets 422 `character_invalid`, with osrlib's `rejections`
-    when it reports them.
+    when osrlib reports them.
     """
     seed = seed_or_draw(body.seed)
     generated = roll_character(body, seed)

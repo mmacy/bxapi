@@ -1,16 +1,16 @@
 """The server creates characters from a client's choices with osrlib's step-by-step creation functions.
 
 A character starts from an ability roll the server stored earlier, or from scores the server
-rolls in the same request. Either way, one seed decides every roll: the ability scores, the hit
+rolls in the same request. Either way, one seed determines every roll: the ability scores, the hit
 points, and the starting gold. [`roll_character`][bxapi.creation.roll_character] rolls a new
 character from a seed, and [`character_from_roll`][bxapi.creation.character_from_roll] creates
 one from a stored roll and its seed. Both run the step-by-step creation functions from
 `osrlib.core.character`, in the order osrlib lists them, so the result is the character that
 osrlib's `create_character` returns for the same seed and choices. bxapi doesn't call
-`create_character`, because it reports only the first refused choice, as a `ValueError` with no
-`Rejection` records.
+`create_character`, because `create_character` reports only the first refused choice, as a
+`ValueError` with no `Rejection` records.
 
-Each step that refuses a choice stops the creation with 422 `character_invalid`. When osrlib
+If a step refuses a choice, creation stops there with 422 `character_invalid`. When osrlib
 returns `Rejection` records for the step, the problem document includes them as `rejections`.
 When the server refuses one input with no rejections from osrlib, like an unknown class id, the
 problem document has `field`, `index` for a list, and `id`, which locate the input.
@@ -67,7 +67,7 @@ MAX_NAME_LENGTH = 100
 """The longest character name the server accepts, in characters."""
 
 MAX_QUANTITY = 10_000
-"""The most lots of one item a single purchase can buy."""
+"""The largest `quantity` one purchase can have, in lots."""
 
 
 class Purchase(RequestModel):
@@ -91,21 +91,22 @@ class CharacterChoices(RequestModel):
     alignment: Alignment
     """The character's alignment."""
     adjustment: AbilityAdjustment | None = None
-    """A trade of ability points, as osrlib's `AbilityAdjustment`. `lowered` maps each ability to
-    take points from to the points taken, and `raised` maps each ability to add points to to the
-    points added. The keys are `str` (Strength), `int` (Intelligence), `wis` (Wisdom), `dex`
-    (Dexterity), `con` (Constitution), and `cha` (Charisma). osrlib checks the trade, and the server
-    returns a trade osrlib refuses as 422 `character_invalid` with osrlib's rejections. Leave the
-    field out to keep the scores as rolled."""
+    """A trade of ability points, as osrlib's `AbilityAdjustment`. In `lowered`, each key is an
+    ability to take points from, and its value is the number of points to take. In `raised`, each
+    key is an ability to add points to, and its value is the number of points to add. The keys are
+    `str` (Strength), `int` (Intelligence), `wis` (Wisdom), `dex` (Dexterity), `con` (Constitution),
+    and `cha` (Charisma). osrlib checks the trade. If osrlib refuses it, the response is 422
+    `character_invalid` with osrlib's rejections. Leave the field out to keep the scores as rolled."""
     starting_spell_ids: list[str] = []
-    """The spells in an arcane caster's first spell book. A first-level magic-user or elf needs
-    exactly one first-level spell. Leave it empty for every other class."""
+    """The ids of the spells for an arcane caster's first spell book, from `GET /v1/rules/spells`. A first-level
+    magic-user or elf needs exactly one first-level spell. Leave it empty for every other class."""
     extra_languages: list[str] = []
-    """The extra languages a high INT allows, as language ids from `GET /v1/rules/languages`."""
+    """The ids of the extra languages the character learns, from `GET /v1/rules/languages`. A high Intelligence allows
+    extra languages."""
     purchases: list[Purchase] = []
     """Starting gear to buy, in order, with the starting gold."""
     equip_item_ids: list[str] = []
-    """The ids of purchased items to wear or wield, equipped in order."""
+    """The ids of purchased items to wear or wield. The server equips them in order."""
     hp_reroll_at_first_level: bool = False
     """Whether to use the optional rule that rerolls a first hit die that shows 1 or 2."""
 
@@ -114,7 +115,7 @@ class CreationRolls(ApiModel):
     """The dice osrlib rolled to create a character."""
 
     ability_rolls: AbilityScoreRolls
-    """The six ability scores as rolled, before any adjustment, with the three dice behind each."""
+    """The six ability scores as rolled, before any adjustment, with the three dice rolled for each."""
     hit_point_roll: HitPointRoll
     """The first-level hit point roll, with every die thrown."""
     gold_roll: RollResult
@@ -136,19 +137,19 @@ class DerivedValues(ApiModel):
     saves: SavingThrows
     """The five saving throw targets for the character's level."""
     melee_modifier: int
-    """The STR modifier to melee attack and damage rolls."""
+    """The Strength modifier to melee attack and damage rolls."""
     open_doors_chance: int
-    """The chance in 6 of forcing a stuck door open, from STR."""
+    """The chance in 6 of forcing a stuck door open, from Strength."""
     missile_modifier: int
-    """The DEX modifier to missile attack rolls."""
+    """The Dexterity modifier to missile attack rolls."""
     initiative_modifier: int
-    """The DEX modifier to individual initiative, used only under the individual initiative rule."""
+    """The Dexterity modifier to individual initiative, used only under the individual initiative rule."""
     hit_point_modifier: int
-    """The CON modifier to each hit die."""
+    """The Constitution modifier to each hit die."""
     magic_save_modifier: int
-    """The WIS modifier to saving throws against magic."""
+    """The Wisdom modifier to saving throws against magic."""
     npc_reaction_modifier: int
-    """The CHA modifier to monster reaction rolls when the character speaks."""
+    """The Charisma modifier to monster reaction rolls when the character speaks."""
     xp_modifier_pct: int
     """The percentage the class adds to or takes from each experience award, from the prime
     requisites."""
@@ -260,7 +261,7 @@ def _buy_and_equip(inventory: Inventory, definition: ClassDefinition, choices: C
         )
         if instance is None and item_id in bought:
             detail = (
-                f"equip_item_ids equips {item_id!r} more times than the purchases buy it. Equipping a purchase equips "
+                f"equip_item_ids lists {item_id!r} more times than the purchases buy it. Equipping a purchase equips "
                 "all of it, whatever its quantity."
             )
             raise _bad_input(detail, "equip_item_ids", item_id, index)
