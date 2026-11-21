@@ -61,7 +61,7 @@ Unlike the commands endpoint, the endpoints that create a character, `POST /v1/c
 
 | Status | `code` | When it happens | What your client does | Extra members |
 | --- | --- | --- | --- | --- |
-| 400 | `bad_request` | The server can't decode the body, because it isn't UTF-8 or it has an integer of more than 4,300 digits. | Fix the request. Don't retry. | |
+| 400 | `bad_request` | The server can't decode the body as text, or the body has an integer of more than 4,300 digits. Send JSON in UTF-8. | Fix the request. Don't retry. | |
 | 401 | `unauthorized` | The key is missing or unknown. | Check the key. See [Authentication](authentication.md#handle-a-401). | |
 | 403 | `referee_required` | A caller with a player key asked for something only a referee may do: a referee endpoint, or a field like `seed`, `source`, or `party_document`, or `visibility=referee`. | Use a referee key, or leave the field out. | |
 | 403 | `referee_command` | A caller with a player key sent a referee command. | Use a referee key, or send a play command. | `command_type` |
