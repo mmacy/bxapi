@@ -11,8 +11,10 @@ A JSON column goes in as a Python object and comes out as one. The database stor
 """
 
 import json
+import os
 import sqlite3
 import threading
+import time
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, fields
@@ -23,11 +25,13 @@ from bxapi.ids import new_id
 
 __all__ = [
     "BUSY_TIMEOUT_SECONDS",
+    "LAYOUT_VERSION",
     "AbilityRollRow",
     "AdventureRow",
     "CharacterDocumentRow",
     "CharacterRow",
     "Database",
+    "DatabaseOpenError",
     "JsonObject",
     "RowPage",
     "SaveRow",
@@ -42,8 +46,12 @@ type JsonObject = dict[str, Any]
 BUSY_TIMEOUT_SECONDS = 5.0
 """How long a statement waits for another connection's write lock before it fails."""
 
+LAYOUT_VERSION = 1
+"""The version of the table layout, which the server writes to the file's `PRAGMA user_version`.
+
+A server opens only a file with this version, or an empty file."""
+
 _SCHEMA = """
-BEGIN IMMEDIATE;
 CREATE TABLE IF NOT EXISTS ability_rolls (
     seq INTEGER PRIMARY KEY,
     id TEXT NOT NULL UNIQUE,
@@ -106,8 +114,26 @@ CREATE TABLE IF NOT EXISTS saves (
 ) STRICT;
 CREATE INDEX IF NOT EXISTS saves_by_client ON saves (client, created_at, seq);
 CREATE INDEX IF NOT EXISTS saves_by_session ON saves (client, session_id, created_at, seq);
-COMMIT;
 """
+
+
+class DatabaseOpenError(Exception):
+    """The server can't use a database file.
+
+    [`Database`][bxapi.db.Database] raises it when SQLite can't open the file, when the file
+    isn't a SQLite database, and when the file's table layout version isn't
+    [`LAYOUT_VERSION`][bxapi.db.LAYOUT_VERSION]. The message states the path.
+    """
+
+
+def _create_private_file(path: str) -> None:
+    # SQLite gives the -wal and -shm files the permissions of the database file, so creating the
+    # database file with mode 0600 keeps all three readable and writable only by their owner.
+    try:
+        descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError:
+        return
+    os.close(descriptor)
 
 
 def utc_now() -> str:
@@ -309,9 +335,10 @@ def _envelope_versions(document: JsonObject) -> tuple[int, str]:
 class Database:
     """The server's SQLite database.
 
-    The constructor opens the file, creates any missing table, and turns on write-ahead logging
-    for a file database. One `Database` uses one connection, and a lock lets one thread at a time
-    run a query on it, so every endpoint thread can share it. With `":memory:"`, every thread
+    The constructor opens the file, creates the tables in an empty file, and turns on write-ahead
+    logging for a file database. It refuses a file whose table layout version isn't
+    [`LAYOUT_VERSION`][bxapi.db.LAYOUT_VERSION]. One `Database` uses one connection, and a lock
+    lets one thread at a time run a query on it, so every endpoint thread can share it. With `":memory:"`, every thread
     sees the same data, and the data is gone when you close the database.
 
     Two processes can open the same file. Each method that changes rows is one SQLite
@@ -325,8 +352,13 @@ class Database:
     they were inserted.
 
     Args:
-        path: The path of the database file, or `":memory:"`. SQLite creates the file if it
-            doesn't exist.
+        path: The path of the database file, or `":memory:"`. The constructor creates the file
+            if it doesn't exist, readable and writable only by its owner (mode 0600), and SQLite
+            gives its `-wal` and `-shm` files the same mode.
+
+    Raises:
+        DatabaseOpenError: If the file can't be opened, isn't a SQLite database, or has another
+            table layout version.
 
     Examples:
         ```python
@@ -344,11 +376,60 @@ class Database:
 
     def __init__(self, path: str) -> None:
         self._lock = threading.Lock()
-        self._connection = sqlite3.connect(path, timeout=BUSY_TIMEOUT_SECONDS, check_same_thread=False, autocommit=True)
-        self._connection.row_factory = sqlite3.Row
-        if path != ":memory:":
-            self._connection.execute("PRAGMA journal_mode = WAL")
-        self._connection.executescript(_SCHEMA)
+        try:
+            if path != ":memory:":
+                _create_private_file(path)
+            self._connection = sqlite3.connect(
+                path, timeout=BUSY_TIMEOUT_SECONDS, check_same_thread=False, autocommit=True
+            )
+        except (OSError, sqlite3.Error) as error:
+            raise DatabaseOpenError(f"bxapi can't open the database file {path!r}: {error}") from error
+        try:
+            self._connection.row_factory = sqlite3.Row
+            if path != ":memory:":
+                self._use_write_ahead_log()
+            self._create_tables(path)
+        except sqlite3.Error as error:
+            self._connection.close()
+            raise DatabaseOpenError(f"bxapi can't use the database file {path!r}: {error}") from error
+        except BaseException:
+            self._connection.close()
+            raise
+
+    def _use_write_ahead_log(self) -> None:
+        # While another process creates the same file, the pragma fails at once instead of waiting
+        # for the busy timeout. Retry it for as long as a statement waits.
+        deadline = time.monotonic() + BUSY_TIMEOUT_SECONDS
+        while True:
+            try:
+                self._connection.execute("PRAGMA journal_mode = WAL")
+                return
+            except sqlite3.OperationalError as error:
+                busy = error.sqlite_errorcode & 0xFF in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED)
+                if not busy or time.monotonic() >= deadline:
+                    raise
+            time.sleep(0.01)
+
+    def _create_tables(self, path: str) -> None:
+        if self._layout_version() == LAYOUT_VERSION:
+            return
+        with self._write_transaction() as connection:
+            # Read the version again under the write lock: another process may have created the tables meanwhile.
+            found = self._layout_version()
+            if found == LAYOUT_VERSION:
+                return
+            if found != 0 or connection.execute("SELECT count(*) FROM sqlite_schema").fetchone()[0]:
+                raise DatabaseOpenError(
+                    f"The database file {path!r} has table layout version {found}, and this server uses version "
+                    f"{LAYOUT_VERSION}. Point BXAPI_DATABASE at a new file, or at a file this version of bxapi created."
+                )
+            for statement in _SCHEMA.split(";"):
+                if statement.strip():
+                    connection.execute(statement)
+            connection.execute(f"PRAGMA user_version = {LAYOUT_VERSION}")
+
+    def _layout_version(self) -> int:
+        return self._connection.execute("PRAGMA user_version").fetchone()[0]
 
     def close(self) -> None:
         """Close the connection. Any later call on the database raises `sqlite3.ProgrammingError`."""

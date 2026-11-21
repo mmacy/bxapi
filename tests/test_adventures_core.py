@@ -1,4 +1,5 @@
 import copy
+from types import MappingProxyType
 
 import pytest
 from osrlib.core.alignment import Alignment
@@ -22,8 +23,10 @@ from bxapi.adventures import (
     is_builtin,
     parse_adventure,
 )
+from bxapi.app import create_app
 from bxapi.db import Database
 from bxapi.errors import ApiError
+from bxapi.settings import Settings
 
 
 def _barrow_document() -> dict:
@@ -44,8 +47,8 @@ def test_every_builtin_parses_and_has_a_prefixed_id() -> None:
 
 def test_builtins_are_loaded_once_and_read_only() -> None:
     assert builtin_adventures() is builtin_adventures()
-    with pytest.raises(TypeError):
-        builtin_adventures()["builtin-x"] = builtin_adventures()["builtin-barrow"]  # pyright: ignore[reportIndexIssue]
+    assert isinstance(builtin_adventures(), MappingProxyType)
+    assert all(isinstance(builtin.document, MappingProxyType) for builtin in builtin_adventures().values())
 
 
 def test_a_document_round_trips() -> None:
@@ -90,6 +93,36 @@ def test_a_malformed_payload_lists_each_problem() -> None:
     assert "dungeons" in str(refused.value)
 
 
+def test_a_long_list_of_problems_is_cut_short() -> None:
+    document = _barrow_document()
+    document["payload"]["town"]["travel_turns"] = {f"{'d' * 500}{n}": "many" for n in range(5000)}
+    with pytest.raises(ContentValidationError) as refused:
+        parse_adventure(document)
+    message = str(refused.value)
+    assert len(message) <= 1000
+    assert message.startswith("The document isn't a valid adventure.")
+
+
+def test_the_problems_end_with_how_many_more_there_are() -> None:
+    document = _barrow_document()
+    document["payload"]["town"]["travel_turns"] = {f"d{n}": "many" for n in range(25)}
+    with pytest.raises(ContentValidationError) as refused:
+        parse_adventure(document)
+    message = str(refused.value)
+    assert len(message) <= 1000
+    listed = message.removeprefix("The document isn't a valid adventure. ").split("; ")
+    shown = len(listed) - 1
+    assert 5 <= shown <= 20
+    assert listed[-1] == f"and {25 - shown} more"
+
+
+def test_a_long_kind_is_not_repeated_in_full() -> None:
+    document = _barrow_document() | {"kind": "k" * 100_000}
+    with pytest.raises(ContentValidationError) as refused:
+        parse_adventure(document)
+    assert len(str(refused.value)) <= 1000
+
+
 def test_a_dangling_reference_is_refused() -> None:
     document = _barrow_document()
     document["payload"]["town"]["travel_turns"] = {"no-such-dungeon": 1}
@@ -115,3 +148,12 @@ def test_find_adventure_reads_builtins_and_the_clients_adventures() -> None:
         assert (refused.value.status, refused.value.code) == (404, "not_found")
         assert refused.value.extras == {"resource": "adventure", "id": adventure_id}
     db.close()
+
+
+def test_a_broken_builtin_stops_the_app_from_building(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> None:
+    def broken() -> None:
+        raise ContentValidationError("builtin-broken: the town has no name")
+
+    monkeypatch.setattr("bxapi.app.builtin_adventures", broken)
+    with pytest.raises(ContentValidationError, match="builtin-broken"):
+        create_app(settings)

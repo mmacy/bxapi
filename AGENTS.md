@@ -12,15 +12,15 @@ osrlib is installed from PyPI, and the installed source in `.venv/lib/python3.14
 
 ```sh
 uv sync
-uv run bxapi
+BXAPI_ALLOW_ANONYMOUS=true uv run bxapi
 ```
 
-The server listens on <http://127.0.0.1:8640>, with interactive documentation at `/docs`. With no `BXAPI_API_KEYS` set, it asks for no key.
+The server listens on <http://127.0.0.1:8640>, with interactive documentation at `/docs`. With no `BXAPI_API_KEYS` set, it starts only when `BXAPI_ALLOW_ANONYMOUS` is `true`, and then asks for no key. To run it with keys, set `BXAPI_API_KEYS` as `docs/spec.md` describes under "Settings".
 
 To check a change from outside the code, start the server on a spare port with a temporary database and drive it with `curl` or a short script:
 
 ```sh
-BXAPI_PORT=8641 BXAPI_DATABASE=/tmp/bxapi-check.db uv run bxapi
+BXAPI_PORT=8641 BXAPI_DATABASE=/tmp/bxapi-check.db BXAPI_ALLOW_ANONYMOUS=true uv run bxapi
 ```
 
 If you start a server, record its process id and stop that id alone. Never stop a process by name.
@@ -37,7 +37,18 @@ uv run pyright
 uv run pytest
 ```
 
-The gate has no exceptions: no `noqa`, no `type: ignore`, and no ignore list. Fix a finding in the code. The one allowed suppression is a `# pyright: ignore[...]` on a pydantic-settings constructor call in a test, where pyright can't see the `_env_file` argument.
+Fix a finding in the code. Don't add `noqa`, `type: ignore`, or a rule to an ignore list. `pyproject.toml` has two ignores: ruff's `D107`, because a class docstring documents the constructor's arguments, and the docstring rules (`D`) for `tests/`. The one allowed suppression in the code is `# pyright: ignore[reportCallIssue]` on a call to the `Settings` constructor in a test that passes `_env_file`, which pyright can't see.
+
+The CI workflow runs a second job that installs the lowest version of each direct dependency that `pyproject.toml` allows and runs `pytest`. When you raise a lower bound or add a dependency, run the same check:
+
+```sh
+uv sync --resolution lowest-direct
+uv run --no-sync pytest
+```
+
+The sync rewrites `uv.lock`, so run it in a copy of the worktree, or restore `uv.lock` and run `uv sync` afterward.
+
+`tests/test_docstring_examples.py` lints and runs every fenced `python` block in the docstrings under `src/bxapi/`.
 
 ## Rules for the code
 
@@ -55,7 +66,7 @@ The gate has no exceptions: no `noqa`, no `type: ignore`, and no ignore list. Fi
 
 - Python 3.14. Use built-in generic types (`list[str]`, `dict[str, int]`), and never `from __future__ import annotations`.
 - Follow the Google Python Style Guide. `ruff` enforces a 120-column line.
-- Write docstrings in Markdown, in Google style, with `Args:`, `Returns:`, `Raises:`, and `Examples:` sections where they apply. Link to other code as ``[`Name`][package.module.Name]``. An example in a docstring must run as written.
+- Write docstrings in Markdown, in Google style, with `Args:`, `Returns:`, `Raises:`, and `Examples:` sections where they apply. Link to other code as ``[`Name`][package.module.Name]``. An example in a docstring must run as written, and the gate runs it.
 - Each module defines `__all__`.
 
 ## Writing
