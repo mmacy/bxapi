@@ -147,7 +147,8 @@ def get_monster(
     The template is the stat block every monster of the kind shares. `display_name` and `display_name_plural` are
     what to call one of the monsters and several of them in a sentence, like `"giant centipede"` for the template named
     `"Centipede, Giant"`. `family_id` is the id that every form of the same creature shares, and it's the
-    `family_id` that the player view reports for a group of these monsters.
+    `family_id` that the player view reports for a group of these monsters. This operation takes a template id, not
+    a `family_id`: `hellhound` is a 404, and the hellhound's forms are `hellhound_3` to `hellhound_7`.
 
     To roll hit points for one or more of them, use `POST /v1/generate/monsters`. `treasure` has the monster's
     treasure types, each a letter that `POST /v1/generate/treasure` takes as `treasure_type`.

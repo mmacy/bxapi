@@ -86,8 +86,11 @@ def list_saves(
             ],
             422: [
                 VALIDATION_ERROR,
-                "`content_invalid`: osrlib can't load the document, the adventure in it refers to something osrlib "
-                "doesn't have, or its game clock is larger than the server can store. `detail` says which.",
+                "`content_invalid`: osrlib can't load the document, the adventure in it fails osrlib's checks, or "
+                "its game clock is larger than the server can store. The checks are the ones `POST /v1/adventures` "
+                "runs: the adventure refers to something that doesn't exist (a monster, an item, an area, or a "
+                "quest), or it has content that a session can't play, like a treasure type letter outside `A` to "
+                "`V`. `detail` says which.",
             ],
         }
     ),

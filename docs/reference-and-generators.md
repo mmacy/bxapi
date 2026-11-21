@@ -210,6 +210,8 @@ To build a request from a schema:
 - Read `description` for the rules of the command. It describes the modes the command works in, the `rejections` it can return, and the events it causes.
 - Read each property's `description` for what the field means and the values it takes.
 
+The descriptions come from osrlib's documentation for Python. The `command_type` description says you never pass the field yourself, because constructing a command in Python sets it, but a request body has to include `command_type`. A body without it gets 422 `validation_error`.
+
 A command's `source` field is for referees. A player who sets it gets 403 `referee_required`.
 
 A game can generate its forms from the schemas, or it can hard-code the few commands it uses and read the schema when it adds one. The OpenAPI document at `/openapi.json` describes every command in the body of `POST /v1/sessions/{session_id}/commands` too.

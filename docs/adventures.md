@@ -2,7 +2,9 @@
 
 Upload your own adventure so a session can play it, and check an adventure document before you store it.
 
-An *adventure* is the content that a *session*, one game in progress, plays: a town, dungeons with maps, monsters and treasure, and the triggers and quests that drive them. An *adventure document* is an adventure written as JSON.
+An *adventure* is the content that a *session*, one game in progress, plays: a town, dungeons with maps, monsters and treasure, and the triggers and quests that drive them. An *adventure document* is an adventure written as JSON. An adventure can also bundle spells of its own in `spells`, and set what its town's temple charges for each service in `town.healing_prices`.
+
+An adventure can bundle monsters of its own, too. A bundled monster that has no `family_id` gets its template id as its `family_id`, and the player view shows every group's `family_id` to the players. So don't give a monster an id that tells the players what it really is, or set `family_id` to what the players should see.
 
 You don't need to write a document by hand. Two separate projects by osrlib's author write adventure documents: [osr-forge](https://github.com/mmacy/osr-forge) converts a tabletop adventure module PDF into a document, and [osr-editor](https://github.com/mmacy/osr-editor) is a graphical editor for creating and changing one. Both write the `adventure.json` file that bxapi accepts as a request body. A program that uses [osrlib](https://mmacy.github.io/osrlib-python/), the Python rules engine that bxapi runs, can also write one.
 
@@ -41,7 +43,7 @@ export KEY=player-key-0123456789
 
 ## Validate a document
 
-Send a document to `POST /v1/adventures/validate` to check it without storing it. The server runs every check that the rules engine makes on an adventure. It checks the document's structure, and every reference the adventure makes to a monster, an item, an area, or a quest. It also checks for content that a session couldn't play, like a treasure type letter outside `A` to `V`, a key in a level's `edges` that doesn't match a side of a cell on the grid, or an area whose cells all belong to areas listed before it. After you upload an adventure that passes, a session can play it.
+Send a document to `POST /v1/adventures/validate` to check it without storing it. The server runs every check that the rules engine makes on an adventure. It checks the document's structure, and every reference the adventure makes to a monster, an item, an area, or a quest. It also checks for content that a session couldn't play, like a treasure type letter outside `A` to `V`, a key in a level's `edges` that doesn't match a side of a cell on the grid, or an area whose cells all belong to areas listed before it. After you upload an adventure that passes, a session can play it on this server's osrlib release. A later release can add checks, and then `POST /v1/sessions` gets 422 `content_invalid` for a stored adventure that fails one. Upload a fixed document to play it again.
 
 ```sh
 curl -s -X POST http://127.0.0.1:8640/v1/adventures/validate -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d @barrow.json

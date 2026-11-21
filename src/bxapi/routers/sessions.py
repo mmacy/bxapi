@@ -567,7 +567,9 @@ def list_session_commands(request: Request, principal: CurrentPrincipal, session
         {
             403: [
                 "`referee_command`: A player sent a referee command. `command_type` is the command's type. "
-                "`GET /v1/sessions/{session_id}/commands` lists the commands your role may send.",
+                "`GET /v1/sessions/{session_id}/commands` lists the commands your role may send. The server checks "
+                "the body against the command's schema first, so a referee command that doesn't fit it gets 422 "
+                "`validation_error` instead.",
                 "`referee_required`: A player passed `visibility=referee` or sent a command with a `source`. Leave "
                 "them out.",
             ],
@@ -667,13 +669,19 @@ def get_player_view(request: Request, principal: CurrentPrincipal, session_id: S
       `position` as `[x, y]`, and `facing`.
     - `party`: each member's character sheet, in marching order: `id`, conditions, inventory, hit points, and every
       other number on a B/X character sheet, like `scores`, `armour_class`, `thac0`, `saves`, and `thief_skills`. A
-      command that acts on one member takes this `id`, like `character_id` in `equip_item`.
+      command that acts on one member takes this `id`, like `character_id` in `equip_item`. The numbers count every
+      item the member wears, identified or not, because those are the numbers the monsters roll against. So a
+      player can infer an unidentified item's bonus or curse from them, while `inventory` keeps the item's name
+      masked, like `"a shield with a faint aura"`.
     - `explored`: for each dungeon level the party has visited, the `cells` it has seen and the `edges` between
       them. An edge's key is `x,y:side`, like `0,0:north`.
     - `encounter`: the encounter in progress, or `null`. Each of its `groups` has an `id` to put in a battle
       declaration's `target_group_id`. Show a group's `label` or `label_plural`, and read its `family_id` and
       `categories` to tell what kind of creature it is. The view doesn't say which group a monster id in a message
-      belongs to. Only the referee view lists each group's `monster_ids`.
+      belongs to. Only the referee view lists each group's `monster_ids`. The rules reference has no lookup by
+      `family_id`. To find the built-in forms of a family, pass the `family_id` as `q` to `GET /v1/rules/monsters`,
+      which also matches other ids and names that contain it, and check each result's `family_id` in
+      `GET /v1/rules/monsters/{monster_id}`.
     - `journal` and `quests`: what the players have learned, and the quests they know about.
     - `town_healing_prices`: what the town's temple charges, in gold pieces, for each service that
       `purchase_healing` buys.

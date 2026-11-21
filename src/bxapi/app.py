@@ -119,6 +119,11 @@ exist.
 - **Unknown fields.** A request body with a field the operation doesn't define gets 422
   `validation_error`. A command and a document are osrlib's models, and osrlib ignores a field it
   doesn't define.
+- **osrlib's descriptions.** The descriptions of osrlib's models, like the commands and the player
+  view, were written for osrlib's Python API. Read `None` as JSON `null`, and a tuple as an array.
+  Where a description says that a model raises `ValueError` or `ValidationError`, the server refuses
+  the request: a command or another request body gets 422 `validation_error`, and an uploaded or
+  imported document, like an adventure, gets 422 `content_invalid`.
 - **Rate limits.** The server has none.
 
 ## Refused commands

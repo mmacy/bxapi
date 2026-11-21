@@ -255,7 +255,7 @@ curl -s -X POST http://127.0.0.1:8640/v1/saves/import -H "Authorization: Bearer 
 }
 ```
 
-An imported save has no `session_id`, `adventure_id`, or label. The server loads the document before it stores anything, so a document that the rules engine can't load gets 422 `content_invalid`, and one with a newer schema version gets 409 `version_unsupported`. Restore the imported save the way you restore any save:
+An imported save has no `session_id`, `adventure_id`, or label. The server loads the document and checks its adventure before it stores anything. A document that the rules engine can't load gets 422 `content_invalid`, and so does one whose adventure fails the checks that an [upload](adventures.md#validate-a-document) runs. A document with a newer schema version gets 409 `version_unsupported`. Restore the imported save the way you restore any save:
 
 ```sh
 curl -s -X POST http://127.0.0.1:8640/v1/saves/sav_mAJU7Pqpm2ScDYKejDK-Rw/restore -H "Authorization: Bearer $KEY"
