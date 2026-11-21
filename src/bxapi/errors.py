@@ -140,74 +140,74 @@ class FieldError(BaseModel):
     model_config = ConfigDict(use_attribute_docstrings=True)
 
     loc: list[str | int]
-    """Where the error is: `body`, `query`, `path`, or `header`, followed by the field names
-    and list positions that lead to the value. The server cuts each name to 128 characters."""
+    """Path to the invalid value: starts with `body`, `query`, `path`, or `header`, followed by field names and
+    0-based array indices. The server truncates each string segment to at most 128 characters."""
     msg: str
-    """What's wrong with the value, at most 128 characters."""
+    """Human-readable validation failure message, at most 128 characters."""
     type: str
-    """pydantic's name for the kind of error, like `missing` or `extra_forbidden`."""
+    """Machine-readable validation error identifier, such as `missing`, `extra_forbidden`, or
+    `string_control_character`."""
 
 
 class Problem(BaseModel):
-    """The body of an error response.
+    """RFC 9457 problem document returned in every 4xx and 5xx error response.
 
-    Every problem document has `type`, `title`, `status`, `detail`, `code`, and `request_id`. The
-    server leaves out the other members, except the ones that the document's code adds:
+    Every problem document includes `type`, `title`, `status`, `detail`, `code`, and `request_id`.
+    The server omits the other members unless the specific `code` adds them:
 
     - `validation_error` adds `errors` and `error_count`.
     - `not_found` adds `resource` and `id`.
     - `revision_conflict` and `session_busy` add `revision`.
     - `referee_command` adds `command_type`.
     - `character_invalid` adds `rejections` when osrlib reports them. Otherwise it adds `field`
-      and `id`, and `index` when `field` is a list.
+      and `id`, plus `index` when `field` is a list.
     - `storage_full` adds `used_bytes` and `max_bytes`.
 
-    A later release can add members, so ignore any member you don't know.
+    Later releases may add members, so ignore any member your client doesn't recognize.
     """
 
     model_config = ConfigDict(extra="allow", use_attribute_docstrings=True)
 
     type: str = "about:blank"
-    """Always `"about:blank"`. Read `code` to identify the error."""
+    """Always `"about:blank"`. Branch on `code` rather than `type`."""
     title: str
-    """The standard phrase for the HTTP status, like `"Not Found"`."""
+    """Standard HTTP status phrase, such as `"Not Found"`."""
     status: int
-    """The HTTP status code, repeated from the response."""
+    """HTTP status code, matching the response status."""
     detail: str
-    """A short description of what went wrong, written for a person, at most 1,000 characters."""
+    """Human-readable explanation of what went wrong, at most 1,000 characters."""
     code: str
-    """A fixed snake_case name for the error, like `"not_found"`. It doesn't change between
-    releases, so a client can branch on it."""
+    """Stable snake_case error identifier, such as `"not_found"`, for programmatic branching."""
     request_id: str | SkipJsonSchema[None] = left_out_when_none()
-    """The id of the request, which the `X-Request-Id` response header has too. The server logs
-    it with the request. Include it when you report the error to whoever runs the server."""
+    """Request identifier matching the `X-Request-Id` response header, logged by the server.
+    Include it when reporting an error to the server's operator."""
     errors: list[FieldError] | SkipJsonSchema[None] = left_out_when_none()
-    """`validation_error` only: the first 20 parts of the request that failed validation."""
+    """Present on `validation_error`: the first 20 validation failures in the request."""
     error_count: int | SkipJsonSchema[None] = left_out_when_none()
-    """`validation_error` only: how many parts of the request failed validation, including any
-    that `errors` leaves out."""
+    """Present on `validation_error`: total number of validation failures, including any omitted
+    from `errors`."""
     resource: str | SkipJsonSchema[None] = left_out_when_none()
-    """`not_found` only: the kind of resource the request asked for, like `"session"`."""
+    """Present on `not_found`: kind of resource requested, such as `"session"` or `"character"`."""
     id: str | SkipJsonSchema[None] = left_out_when_none()
-    """For `not_found`, the id in the request, or its first 128 characters followed by `...`.
-    For `character_invalid`, the value of the entry that's wrong, like an item id."""
+    """On `not_found`, the requested id (truncated to 128 characters with `...`). On
+    `character_invalid` without `rejections`, the offending id value, such as an unknown item id."""
     revision: int | SkipJsonSchema[None] = left_out_when_none()
-    """`revision_conflict` and `session_busy` only: the session's current revision."""
+    """Present on `revision_conflict` and `session_busy`: the session's current revision."""
     command_type: str | SkipJsonSchema[None] = left_out_when_none()
-    """`referee_command` only: the `command_type` of the referee command a player sent."""
+    """Present on `referee_command`: the `command_type` of the referee command a player sent."""
     field: str | SkipJsonSchema[None] = left_out_when_none()
-    """`character_invalid` only, when osrlib reports no rejections: the request field that's
-    wrong, like `"equip_item_ids"`."""
+    """Present on `character_invalid` when osrlib reports no `rejections`: the offending request
+    field, such as `"class_id"`, `"purchases"`, or `"equip_item_ids"`."""
     index: int | SkipJsonSchema[None] = left_out_when_none()
-    """`character_invalid` only, when `field` is a list: the position of the entry that's
-    wrong, counted from 0."""
+    """Present on `character_invalid` when `field` is a list: 0-based index of the offending
+    entry."""
     used_bytes: int | SkipJsonSchema[None] = left_out_when_none()
-    """`storage_full` only: the bytes of documents the server stores for your client."""
+    """Present on `storage_full`: bytes of documents currently stored for your client."""
     max_bytes: int | SkipJsonSchema[None] = left_out_when_none()
-    """`storage_full` only: the most bytes the server stores for one client."""
+    """Present on `storage_full`: maximum bytes of documents the server stores for one client."""
     rejections: list[Rejection] | SkipJsonSchema[None] = left_out_when_none()
-    """`character_invalid` only, and only when osrlib reports them: osrlib's reasons for
-    refusing the character, each a `code` and `params`."""
+    """Present on `character_invalid` when osrlib reports rule violations: osrlib `Rejection`
+    entries, each with `code` and `params`."""
 
     @field_validator("detail")
     @classmethod

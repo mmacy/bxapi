@@ -1,6 +1,6 @@
 // Writes the two files the reference pages are built from:
 //
-// - generated/openapi.json: bxapi's OpenAPI document, changed in the four ways Docs MD needs.
+// - generated/openapi.json: bxapi's OpenAPI document, adjusted for Docs MD 0.2.37.
 // - generated/curl-samples.json: one curl command for each operation, built from the example
 //   exchanges that bxapi's tests replay against a server.
 
@@ -14,10 +14,22 @@ const generatedRoot = path.resolve(import.meta.dirname, "../generated");
 // The address of a server on the reader's machine, as the guides use it.
 const SERVER_URL = "http://127.0.0.1:8640";
 const HTTP_METHODS = ["get", "put", "post", "delete", "options", "head", "patch", "trace"];
+const DATA_KEYS = new Set(["default", "enum", "example", "examples", "const"]);
+
+// Save documents contain 128-bit PCG RNG integers, which plain `JSON.parse` rounds to floats such
+// as `1.4762342539966353e+38` that the server then refuses with 422 `content_invalid`. `JSON.rawJSON`
+// keeps exact integer tokens intact through `JSON.stringify`.
+function parseJson(text) {
+  return JSON.parse(text, (_key, value, context) =>
+    typeof value === "number" && !Number.isSafeInteger(value) && context?.source && /^-?\d+$/.test(context.source)
+      ? JSON.rawJSON(context.source)
+      : value,
+  );
+}
 
 // bxapi builds the OpenAPI document from its code, so the reference describes the checkout it's
 // built from.
-const document = JSON.parse(
+const document = parseJson(
   execFileSync("uv", ["run", "python", "-m", "bxapi.openapi"], {
     cwd: repoRoot,
     encoding: "utf8",
@@ -28,6 +40,35 @@ const document = JSON.parse(
 // bxapi's document has no `servers` entry, because each server runs at its own address. Docs MD
 // writes a code sample only when the document has one.
 document.servers = [{ url: SERVER_URL, description: "A bxapi server on your machine." }];
+
+// Docs MD 0.2.37 drops an operation's entire Parameters section when the operation has more than
+// four parameters unless `x-speakeasy-max-method-params` raises that threshold.
+document["x-speakeasy-max-method-params"] = 20;
+
+// Docs MD 0.2.37 hides query parameters that use JSON Schema `const` (such as `include=view`) and
+// renders `const` object properties without their fixed value. Replacing `const` with a
+// single-element `enum` preserves the exact schema meaning while making Docs MD render both.
+function constToEnum(value) {
+  if (Array.isArray(value)) {
+    value.forEach(constToEnum);
+    return;
+  }
+  if (value === null || typeof value !== "object" || JSON.isRawJSON(value)) {
+    return;
+  }
+  if (Object.hasOwn(value, "const")) {
+    value.enum = [value.const];
+    delete value.const;
+  }
+  for (const [key, child] of Object.entries(value)) {
+    if (!DATA_KEYS.has(key)) {
+      constToEnum(child);
+    }
+  }
+}
+
+constToEnum(document.paths);
+constToEnum(document.components?.schemas);
 
 function resolvePointer(root, pointer) {
   let target = root;
@@ -46,7 +87,7 @@ function inlineRefs(value, schemaRoot, resolving = []) {
   if (Array.isArray(value)) {
     return value.map((item) => inlineRefs(item, schemaRoot, resolving));
   }
-  if (value === null || typeof value !== "object") {
+  if (value === null || typeof value !== "object" || JSON.isRawJSON(value)) {
     return value;
   }
   if (Object.hasOwn(value, "$defs")) {
@@ -101,6 +142,38 @@ function summarizeProblem(response, media, operationId, status) {
   }
 }
 
+const exchanges = parseJson(readFileSync(path.join(repoRoot, "src/bxapi/openapi_examples.json"), "utf8"));
+const validRequestNames = new Set(
+  exchanges
+    .filter(
+      ({ recorded }) =>
+        recorded.status < 300 && !(typeof recorded.response === "object" && recorded.response?.valid === false),
+    )
+    .map(({ name }) => name),
+);
+
+// Docs MD renders every entry in `requestBody.content.*.examples` under "Request examples", so keep
+// only valid 2xx request bodies with distinct payloads (error bodies belong to error tabs).
+function keepValidRequestExamples(holder) {
+  if (!holder?.examples) {
+    return;
+  }
+  const seen = new Set();
+  const kept = {};
+  for (const [name, example] of Object.entries(holder.examples)) {
+    const serialized = JSON.stringify(example.value);
+    if (validRequestNames.has(name) && !seen.has(serialized)) {
+      seen.add(serialized);
+      kept[name] = example;
+    }
+  }
+  if (Object.keys(kept).length > 0) {
+    holder.examples = kept;
+  } else {
+    delete holder.examples;
+  }
+}
+
 // The ids of the operations that need an API key.
 const keyed = new Set();
 for (const pathItem of Object.values(document.paths)) {
@@ -113,7 +186,10 @@ for (const pathItem of Object.values(document.paths)) {
       keyed.add(operation.operationId);
     }
     operation.parameters?.forEach(inlineRefsInExamples);
-    Object.values(operation.requestBody?.content ?? {}).forEach(inlineRefsInExamples);
+    for (const media of Object.values(operation.requestBody?.content ?? {})) {
+      keepValidRequestExamples(media);
+      inlineRefsInExamples(media);
+    }
     for (const [status, response] of Object.entries(operation.responses ?? {})) {
       for (const media of Object.values(response.content ?? {})) {
         inlineRefsInExamples(media);
@@ -130,7 +206,7 @@ for (const pathItem of Object.values(document.paths)) {
 function schemaRefs(value, found = new Set()) {
   if (Array.isArray(value)) {
     value.forEach((item) => schemaRefs(item, found));
-  } else if (value !== null && typeof value === "object") {
+  } else if (value !== null && typeof value === "object" && !JSON.isRawJSON(value)) {
     for (const [key, child] of Object.entries(value)) {
       if (key === "$ref" && typeof child === "string" && child.startsWith("#/components/schemas/")) {
         found.add(child.slice("#/components/schemas/".length));
@@ -169,7 +245,6 @@ function curlCommand({ method, path: requestPath, query, body }, needsKey) {
   return lines.join(" \\\n  ");
 }
 
-const exchanges = JSON.parse(readFileSync(path.join(repoRoot, "src/bxapi/openapi_examples.json"), "utf8"));
 const curlSamples = {};
 for (const { operation, recorded } of exchanges) {
   if (!(operation in curlSamples) && recorded.status < 300) {

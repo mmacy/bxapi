@@ -31,7 +31,11 @@ gaps between it and 0. So a client can send back any seed it received."""
 
 Seed = Annotated[
     int,
-    Field(ge=0, le=MAX_SEED, description="The seed for the random numbers, an integer from 0 to 2^53 - 1."),
+    Field(
+        ge=0,
+        le=MAX_SEED,
+        description="Random number seed, an integer from 0 to 2^53 - 1 (9,007,199,254,740,991).",
+    ),
 ]
 """The type of a `seed` field in a request or response model."""
 

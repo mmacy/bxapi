@@ -4125,146 +4125,9 @@
     }
   },
   {
-    "name": "unknown_monster",
-    "operation": "validate_adventure",
-    "summary": "A document with an unknown monster id",
-    "request": {
-      "method": "POST",
-      "path": "/v1/adventures/validate",
-      "body": {
-        "kind": "adventure",
-        "schema_version": 4,
-        "engine_version": "2.4.0",
-        "payload": {
-          "name": "The Old Well",
-          "description": "Something is living at the bottom of the village well.",
-          "hooks": [
-            "The miller pays 50 gp to whoever clears the well."
-          ],
-          "town": {
-            "name": "Millbrook",
-            "description": "A village of forty houses beside a mill pond."
-          },
-          "dungeons": [
-            {
-              "id": "well",
-              "name": "The Old Well",
-              "levels": [
-                {
-                  "number": 1,
-                  "width": 2,
-                  "height": 1,
-                  "entrance": [
-                    0,
-                    0
-                  ],
-                  "edges": {
-                    "1,0:west": {
-                      "kind": "open"
-                    }
-                  },
-                  "areas": [
-                    {
-                      "id": "cistern",
-                      "name": "Cistern",
-                      "description": "A flooded chamber. Two giant rats nest on a ledge.",
-                      "cells": [
-                        [
-                          1,
-                          0
-                        ]
-                      ],
-                      "encounter": {
-                        "monsters": [
-                          {
-                            "template_id": "rat_giant",
-                            "count_fixed": 2
-                          }
-                        ]
-                      }
-                    }
-                  ]
-                }
-              ]
-            }
-          ]
-        }
-      }
-    },
-    "recorded": {
-      "method": "POST",
-      "path": "/v1/adventures/validate",
-      "body": {
-        "kind": "adventure",
-        "schema_version": 4,
-        "engine_version": "2.4.0",
-        "payload": {
-          "name": "The Old Well",
-          "description": "Something is living at the bottom of the village well.",
-          "hooks": [
-            "The miller pays 50 gp to whoever clears the well."
-          ],
-          "town": {
-            "name": "Millbrook",
-            "description": "A village of forty houses beside a mill pond."
-          },
-          "dungeons": [
-            {
-              "id": "well",
-              "name": "The Old Well",
-              "levels": [
-                {
-                  "number": 1,
-                  "width": 2,
-                  "height": 1,
-                  "entrance": [
-                    0,
-                    0
-                  ],
-                  "edges": {
-                    "1,0:west": {
-                      "kind": "open"
-                    }
-                  },
-                  "areas": [
-                    {
-                      "id": "cistern",
-                      "name": "Cistern",
-                      "description": "A flooded chamber. Two giant rats nest on a ledge.",
-                      "cells": [
-                        [
-                          1,
-                          0
-                        ]
-                      ],
-                      "encounter": {
-                        "monsters": [
-                          {
-                            "template_id": "rat_giant",
-                            "count_fixed": 2
-                          }
-                        ]
-                      }
-                    }
-                  ]
-                }
-              ]
-            }
-          ]
-        }
-      },
-      "status": 200,
-      "response": {
-        "valid": false,
-        "code": "content_invalid",
-        "detail": "adventure validation failed:\nwell level 1: area 'cistern' references unknown monster 'rat_giant'"
-      }
-    }
-  },
-  {
     "name": "old_well",
     "operation": "validate_adventure",
-    "summary": "A one-room adventure",
+    "summary": "Check a valid one-room adventure",
     "request": {
       "method": "POST",
       "path": "/v1/adventures/validate",
@@ -4414,6 +4277,143 @@
           "builtin": false,
           "created_at": null
         }
+      }
+    }
+  },
+  {
+    "name": "unknown_monster",
+    "operation": "validate_adventure",
+    "summary": "Check a document with an unknown monster id",
+    "request": {
+      "method": "POST",
+      "path": "/v1/adventures/validate",
+      "body": {
+        "kind": "adventure",
+        "schema_version": 4,
+        "engine_version": "2.4.0",
+        "payload": {
+          "name": "The Old Well",
+          "description": "Something is living at the bottom of the village well.",
+          "hooks": [
+            "The miller pays 50 gp to whoever clears the well."
+          ],
+          "town": {
+            "name": "Millbrook",
+            "description": "A village of forty houses beside a mill pond."
+          },
+          "dungeons": [
+            {
+              "id": "well",
+              "name": "The Old Well",
+              "levels": [
+                {
+                  "number": 1,
+                  "width": 2,
+                  "height": 1,
+                  "entrance": [
+                    0,
+                    0
+                  ],
+                  "edges": {
+                    "1,0:west": {
+                      "kind": "open"
+                    }
+                  },
+                  "areas": [
+                    {
+                      "id": "cistern",
+                      "name": "Cistern",
+                      "description": "A flooded chamber. Two giant rats nest on a ledge.",
+                      "cells": [
+                        [
+                          1,
+                          0
+                        ]
+                      ],
+                      "encounter": {
+                        "monsters": [
+                          {
+                            "template_id": "rat_giant",
+                            "count_fixed": 2
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/adventures/validate",
+      "body": {
+        "kind": "adventure",
+        "schema_version": 4,
+        "engine_version": "2.4.0",
+        "payload": {
+          "name": "The Old Well",
+          "description": "Something is living at the bottom of the village well.",
+          "hooks": [
+            "The miller pays 50 gp to whoever clears the well."
+          ],
+          "town": {
+            "name": "Millbrook",
+            "description": "A village of forty houses beside a mill pond."
+          },
+          "dungeons": [
+            {
+              "id": "well",
+              "name": "The Old Well",
+              "levels": [
+                {
+                  "number": 1,
+                  "width": 2,
+                  "height": 1,
+                  "entrance": [
+                    0,
+                    0
+                  ],
+                  "edges": {
+                    "1,0:west": {
+                      "kind": "open"
+                    }
+                  },
+                  "areas": [
+                    {
+                      "id": "cistern",
+                      "name": "Cistern",
+                      "description": "A flooded chamber. Two giant rats nest on a ledge.",
+                      "cells": [
+                        [
+                          1,
+                          0
+                        ]
+                      ],
+                      "encounter": {
+                        "monsters": [
+                          {
+                            "template_id": "rat_giant",
+                            "count_fixed": 2
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "status": 200,
+      "response": {
+        "valid": false,
+        "code": "content_invalid",
+        "detail": "adventure validation failed:\nwell level 1: area 'cistern' references unknown monster 'rat_giant'"
       }
     }
   },

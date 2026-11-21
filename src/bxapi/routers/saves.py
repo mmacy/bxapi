@@ -27,25 +27,29 @@ router = APIRouter(prefix="/saves", tags=["saves"], route_class=IdempotentRoute)
 
 SaveId = Annotated[
     str,
-    Path(description="The save's id, which starts with `sav_`. `POST /v1/sessions/{session_id}/saves` returns it."),
+    Path(
+        description="Save `id` (`sav_` followed by 22 characters), from `POST /v1/sessions/{session_id}/saves`, "
+        "`POST /v1/saves/import`, or `GET /v1/saves`."
+    ),
 ]
 
 _NOT_FOUND = "`not_found`: Your client has no save with this id. `GET /v1/saves` lists your saves."
 
 
 class RelabelSaveRequest(RequestModel):
-    """The save's new label."""
+    """New label (or `null` to clear it) for `PATCH /v1/saves/{save_id}`."""
 
     label: NameText | None = Field(min_length=1, max_length=NAME_MAX_LENGTH)
-    """The new label, with no control character like a tab or a newline, or `null` to remove the label."""
+    """New label, 1 to 200 characters without control characters such as tabs or newlines, or `null` to
+    remove the existing label."""
 
 
 class RestoreSaveRequest(RequestModel):
-    """An optional name for the session a restore starts."""
+    """Optional request body for `POST /v1/saves/{save_id}/restore`."""
 
     name: NameText | None = Field(default=None, min_length=1, max_length=NAME_MAX_LENGTH)
-    """A name for the new session, with no control character like a tab or a newline. Defaults to the name of the
-    adventure in the save."""
+    """Optional display name for the restored session, 1 to 200 characters without control characters.
+    Defaults to `adventure_name` from the save when omitted or `null`."""
 
 
 def _db(request: Request) -> Database:
@@ -64,12 +68,19 @@ def list_saves(
     request: Request,
     principal: CurrentPrincipal,
     page: PageQuery,
-    session_id: Annotated[str | None, Query(description="Return only the saves made from this session.")] = None,
+    session_id: Annotated[
+        str | None,
+        Query(
+            description="Filter to saves created from this `session_id` (`ses_` followed by 22 characters), even if "
+            "the session has since been deleted. Omit to return all saves for your client."
+        ),
+    ] = None,
 ) -> Page[SaveInfo]:
-    """List your client's saves, newest first.
+    """Return a page of your client's saved games, ordered newest first.
 
-    Use it for a menu of saved games. Pass `session_id` to list only the saves of one session, which works after the
-    session is deleted too. Restore a save with `POST /v1/saves/{save_id}/restore`.
+    Use this list for a load-game menu, optionally passing `session_id` to show checkpoints from one session (which
+    continues to work after `DELETE /v1/sessions/{session_id}`). Pass a save's `id` to
+    `POST /v1/saves/{save_id}/restore` to start a new session from that checkpoint.
     """
     rows = _db(request).list_saves(principal.client, limit=page.limit, offset=page.offset, session_id=session_id)
     return Page(items=[save_info(row) for row in rows.items], total=rows.total, limit=page.limit, offset=page.offset)
@@ -79,21 +90,23 @@ def list_saves(
     "/import",
     status_code=201,
     summary="Import a save document",
-    response_description="The new save's info. It has no session, no adventure id, and no label.",
+    response_description="Stored save metadata (`session_id`, `adventure_id`, and `label` are `null`).",
     responses=problem_responses(
         {
-            403: ["`referee_required`: Only a referee may import a save. Use a key with the referee role."],
+            403: [
+                "`referee_required`: Only a referee may import a save document. Send an API key with the `referee` "
+                "role."
+            ],
             409: [
-                "`version_unsupported`: The document's `schema_version` is higher than the server's osrlib reads, "
-                "which is the `schema_version` of `GET /v1/meta`. Import it on a server with a newer osrlib."
+                "`version_unsupported`: The document's `schema_version` exceeds the `schema_version` that "
+                "`GET /v1/meta` reports. Import it on a server running a newer osrlib."
             ],
             422: [
                 VALIDATION_ERROR,
-                "`content_invalid`: osrlib can't load the document, the adventure in it fails osrlib's checks, or "
-                "its game clock is larger than the server can store. The checks are the ones `POST /v1/adventures` "
-                "runs: the adventure refers to something that doesn't exist (a monster, an item, an area, or a "
-                "quest), or it has content that a session can't play, like a treasure type letter outside `A` to "
-                "`V`. `detail` says which.",
+                "`content_invalid`: osrlib can't load the save document, the embedded adventure fails osrlib's "
+                "checks (such as unknown monster, item, area, or quest references or a treasure type letter outside "
+                "`A` to `V`), the adventure's `name` contains a control character, or `clock.rounds` exceeds "
+                "2^63 - 1. Check `detail` and fix the document.",
             ],
         }
     ),
@@ -102,16 +115,25 @@ def list_saves(
 def import_save(
     request: Request,
     principal: RefereePrincipal,
-    document: Annotated[JsonObject, Body(description="A save document from osrlib's `save_game`.")],
+    document: Annotated[
+        JsonObject,
+        Body(
+            description='Save document envelope (`kind` set to `"save"`, `schema_version`, `engine_version`, and '
+            "`payload`), up to `BXAPI_MAX_BODY_BYTES` (8,388,608 bytes by default), from "
+            "`GET /v1/saves/{save_id}/document` or osrlib's `save_game`."
+        ),
+    ],
 ) -> SaveInfo:
-    """Store the save document in the request body as a new save, like one from `GET /v1/saves/{save_id}/document`.
+    """Requires a `referee` API key. Validate and store an exported save document as a new save.
 
-    Only a referee may import a save. Use it to move a game from one server to another: read the document on the
-    first server, send it here on the second, then restore the new save with `POST /v1/saves/{save_id}/restore`.
+    Use this operation to migrate a game from another server or import a save created with osrlib: export via
+    `GET /v1/saves/{save_id}/document` on the source server, upload here, then call
+    `POST /v1/saves/{save_id}/restore` to resume play.
 
-    The server loads the document with osrlib's `load_game`, runs osrlib's `validate_adventure` on the adventure in
-    it, and stores the document osrlib writes back out of the loaded game, in the installed osrlib's format. The new
-    save has no session, no adventure id, and no label. Set a label with `PATCH /v1/saves/{save_id}`.
+    Loads the document with osrlib's `load_game`, validates the embedded adventure, checks that `clock.rounds` fits in
+    a 64-bit integer and `adventure.name` contains no control characters, and re-serializes the document in the
+    installed osrlib's format. The imported save has `session_id`, `adventure_id`, and `label` set to `null` (assign a
+    label with `PATCH /v1/saves/{save_id}`).
     """
     game = load_game(document)
     validate_loaded_adventure(game)
@@ -135,13 +157,14 @@ def import_save(
 @router.get(
     "/{save_id}",
     summary="Get a save",
-    response_description="The save's info.",
+    response_description="Save metadata.",
     responses=problem_responses({404: [_NOT_FOUND]}),
 )
 def get_save(request: Request, principal: CurrentPrincipal, save_id: SaveId) -> SaveInfo:
-    """Return a save's info: its session, adventure, label, mode, and clock.
+    """Return metadata for one save: `session_id`, `adventure_id`, `label`, `mode`, `clock`, and `created_at`.
 
-    The info has no game state. A referee reads the whole game in `GET /v1/saves/{save_id}/document`.
+    Contains only player-safe metadata. To start a session from this save, call `POST /v1/saves/{save_id}/restore`. To
+    export the full game state and master seed, call `GET /v1/saves/{save_id}/document` with a `referee` key.
     """
     return save_info(_found(_db(request), principal.client, save_id))
 
@@ -149,11 +172,11 @@ def get_save(request: Request, principal: CurrentPrincipal, save_id: SaveId) -> 
 @router.patch(
     "/{save_id}",
     summary="Relabel a save",
-    response_description="The save's info, with the new label.",
+    response_description="Updated save metadata.",
     responses=problem_responses({404: [_NOT_FOUND]}),
 )
 def relabel_save(request: Request, principal: CurrentPrincipal, save_id: SaveId, body: RelabelSaveRequest) -> SaveInfo:
-    """Change a save's label, or remove the label with `null`. The saved game doesn't change."""
+    """Set a save's `label`, or clear it by passing `null`, without modifying the saved game."""
     db = _db(request)
     if not db.update_save_label(principal.client, save_id, body.label):
         raise not_found("save", save_id)
@@ -168,10 +191,10 @@ def relabel_save(request: Request, principal: CurrentPrincipal, save_id: SaveId,
     responses=problem_responses({404: [_NOT_FOUND]}),
 )
 def delete_save(request: Request, principal: CurrentPrincipal, save_id: SaveId) -> Response:
-    """Delete a save. A session restored from the save doesn't change.
+    """Delete a save and reclaim its bytes in your client's storage quota (`GET /v1/meta`).
 
-    The save's bytes no longer count toward your client's storage, which `GET /v1/meta` reports. A retry of a delete
-    that succeeded gets 404 `not_found`.
+    Sessions already restored from this save continue unaffected. Repeating a completed delete returns 404
+    `not_found`.
     """
     if not _db(request).delete_save(principal.client, save_id):
         raise not_found("save", save_id)
@@ -182,14 +205,14 @@ def delete_save(request: Request, principal: CurrentPrincipal, save_id: SaveId) 
     "/{save_id}/restore",
     status_code=201,
     summary="Restore a save",
-    response_description="The new session's info, at revision 0.",
+    response_description="New session metadata at revision 0.",
     responses=problem_responses(
         {
             404: [_NOT_FOUND],
             500: [
                 INTERNAL_ERROR,
-                "`session_unreadable`: The server's osrlib can't load the save's stored document, or refuses the "
-                "adventure in it. Report the save's id to the server's operator.",
+                "`session_unreadable`: The server's osrlib can't load the save's stored document or refuses its "
+                "embedded adventure. Report `save_id` and `request_id` to the server's operator.",
             ],
         }
     ),
@@ -200,12 +223,12 @@ def restore_save(
     save_id: SaveId,
     body: Annotated[RestoreSaveRequest, Body(default_factory=RestoreSaveRequest)],
 ) -> SessionInfo:
-    """Start a new session at the moment of the save, and return the new session's info.
+    """Start a new session from a saved checkpoint and return the new session's metadata at revision 0.
 
-    Keep the new session's `id`, and play it with `POST /v1/sessions/{session_id}/commands`. The new session starts
-    at revision 0, has the save's `adventure_id`, and plays on from the save as the original session would have. Its
-    `clock` continues the save's clock. The save, and the session it was made from, don't change, so you can restore
-    one save any number of times. The request body is optional.
+    Save the returned session `id`, then continue play with `POST /v1/sessions/{session_id}/commands` and
+    `GET /v1/sessions/{session_id}/view`. The new session inherits the save's `adventure_id`, `mode`, `clock`, party,
+    and RNG state, while leaving both the save and the original session untouched so one save can be restored any
+    number of times. The request body is optional: pass `name` to title the new session, or send an empty body.
     """
     db = _db(request)
     row = _found(db, principal.client, save_id)
@@ -222,19 +245,22 @@ def restore_save(
 @router.get(
     "/{save_id}/document",
     summary="Get a save document",
-    response_description="The save document.",
+    response_description="Full save document envelope.",
     responses=problem_responses(
         {
-            403: ["`referee_required`: Only a referee may read a save document. Use a key with the referee role."],
+            403: [
+                "`referee_required`: Only a referee may read a save document. Send an API key with the `referee` role."
+            ],
             404: [_NOT_FOUND],
         }
     ),
 )
 def get_save_document(request: Request, principal: RefereePrincipal, save_id: SaveId) -> JsonObject:
-    """Return the save document, osrlib's `save_game` output, to keep or to import on another server.
+    """Requires a `referee` API key. Return the complete save document envelope (`kind`, `schema_version`, `payload`).
 
-    Only a referee may read it, because it contains the master seed, the state only the referee may see, and the
-    logs of every command and event. Send it to `POST /v1/saves/import` on another server to move the game there.
+    Contains the session's master seed, RNG streams, unexplored map, monster hit points, `command_log`, and
+    `event_log`, so players receive 403 `referee_required` (use `GET /v1/saves/{save_id}` for player-safe metadata).
+    Pass the returned JSON object to `POST /v1/saves/import` on another server to migrate the game.
     """
     document = _db(request).get_save_document(principal.client, save_id)
     if document is None:

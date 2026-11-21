@@ -81,9 +81,17 @@ def test_openapi_describes_osrlib_models_in_json_terms(client: TestClient) -> No
     descriptions = str(schemas)
     assert "`" * 3 + "python" not in descriptions
     assert "Examples:" not in descriptions
+    assert "Attributes:" not in descriptions
+    assert "Raises:" not in descriptions
     assert "`None`" not in descriptions
     assert "`null` outside a battle" in schemas["EncounterView"]["properties"]["battle_round"]["description"]
     assert schemas["Rejection"]["description"].startswith("One reason a validator refused an input")
+    assert [name for name, schema in schemas.items() if not schema.get("description")] == []
+    move = schemas["MoveParty"]["properties"]
+    assert "default" not in move["command_type"]
+    assert '"move_party"' in move["command_type"]["description"]
+    assert "never pass it" not in move["command_type"]["description"]
+    assert move["source"]["description"].startswith("Referee only.")
 
 
 def test_operation_ids_are_the_endpoint_names_and_unique(client: TestClient) -> None:

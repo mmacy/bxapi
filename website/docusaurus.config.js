@@ -61,7 +61,7 @@ const config = {
           beforeDefaultRemarkPlugins: [
             [repoLinks, { contentRoot, repoRoot: path.resolve(siteDir, ".."), blobUrl: `${repoUrl}/blob/main` }],
             [unescapeCodeBraces, { generatedRoot: referenceRoot }],
-            [docsMdFixes, { generatedRoot: referenceRoot }],
+            [docsMdFixes, { generatedRoot: referenceRoot, openapiFile: path.resolve(siteDir, "generated/openapi.json") }],
             [
               operationLinks,
               { generatedRoot: referenceRoot, openapiFile: path.resolve(siteDir, "generated/openapi.json") },

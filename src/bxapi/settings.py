@@ -42,11 +42,15 @@ class SettingsError(Exception):
 
 
 class Role(StrEnum):
-    """What a caller may do in a game. A referee may do everything a player may.
+    """What an API key may do in a game: `player` or `referee`.
 
-    A role limits what the holder of a key can see and do in a game. It doesn't limit whose
-    data they can reach: every key of a client application can read and change all of that
-    application's characters, adventures, sessions, and saves, whatever its role.
+    - `player`: plays games and sees only player-visible state and events.
+    - `referee`: everything `player` may do, plus the referee view, referee events, referee
+      commands, chosen seeds, character and save imports, and full adventure and save documents.
+
+    A role restricts visibility and actions inside a game, not data ownership. Every key for a
+    client application can read and modify all of that client's characters, adventures, sessions,
+    and saves, regardless of role.
     """
 
     PLAYER = "player"

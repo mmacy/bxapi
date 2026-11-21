@@ -30,102 +30,96 @@ router = APIRouter(prefix="/adventures", tags=["adventures"], route_class=Idempo
 AdventureId = Annotated[
     str,
     Path(
-        description="The adventure's id: `adv_` and 22 characters for a stored adventure, or an id like "
-        "`builtin-barrow` for an adventure that comes with the server."
+        description="Adventure `id`: `builtin-barrow` (or another `builtin-` id) for a built-in adventure, or `adv_` "
+        "followed by 22 characters from `POST /v1/adventures` or `GET /v1/adventures`."
     ),
 ]
 
 _DOCUMENT_BODY = Body(
-    description="An adventure document: osrlib's `Adventure` model in osrlib's versioned envelope, with `kind` set "
-    "to `adventure`. osr-forge converts adventure module PDFs into these documents, and osr-editor is a local "
-    "graphical application for writing and editing them. Both are separate projects by osrlib's author."
+    description='Adventure document envelope (`kind` set to `"adventure"`, `schema_version`, `engine_version`, and '
+    "osrlib's `Adventure` model in `payload`), up to `BXAPI_MAX_BODY_BYTES` (8,388,608 bytes by default). Produced by "
+    "[osr-forge](https://github.com/mmacy/osr-forge), [osr-editor](https://github.com/mmacy/osr-editor), or osrlib."
 )
 
 
 _NOT_FOUND = (
-    "`not_found`: No adventure that comes with the server has this id, and your client has no adventure with this id. "
-    "`GET /v1/adventures` lists the ids."
+    "`not_found`: No built-in adventure and no adventure uploaded by your client has this id. "
+    "`GET /v1/adventures` lists available ids."
 )
 
 
 class TownInfo(ApiModel):
-    """What a player may know about the adventure's town before play."""
+    """Player-visible summary of an adventure's base town."""
 
     name: str
-    """The town's name."""
+    """Town display name."""
     description: str
-    """The text the adventure's author wrote about the town, or an empty string."""
+    """Player-facing town description written by the adventure's author, or `""` when none is set."""
 
 
 class DungeonInfo(ApiModel):
-    """What a player may know about one of the adventure's dungeons before play.
-
-    The info leaves out how many levels the dungeon has, because osrlib's player view shows only the
-    levels the party has explored.
-    """
+    """Player-visible summary of one dungeon in an adventure, omitting level counts and maps."""
 
     id: str
-    """The dungeon's id. A session's `enter_dungeon` command takes it as `dungeon_id`."""
+    """Dungeon identifier within the adventure. Pass as `dungeon_id` in the `enter_dungeon` command
+    on `POST /v1/sessions/{session_id}/commands`."""
     name: str
-    """The dungeon's name, or an empty string."""
+    """Dungeon display name, or `""` when none is set."""
 
 
 class AdventurePreview(ApiModel):
-    """What a player may know about an adventure before play, read from its document.
-
-    The server stores it with an uploaded adventure, in the `info` column.
-    """
+    """Player-visible summary extracted from an adventure document."""
 
     name: str
-    """The adventure's title."""
+    """Adventure title."""
     description: str
-    """The text the adventure's author wrote to describe the adventure, or an empty string."""
+    """Player-facing introduction written by the adventure's author, or `""` when none is set."""
     hooks: list[str]
-    """The reasons the author gives for a party to take the adventure on."""
+    """Plot hooks giving the party reasons to undertake the adventure."""
     party: PartySpec | None
-    """The character levels and party size the adventure is written for, as osrlib's `PartySpec`,
-    or `null` when the author gives none."""
+    """Recommended character levels and party size as osrlib's `PartySpec`, or `null` when
+    unspecified."""
     town: TownInfo
-    """The adventure's town, where a session starts."""
+    """Starting town where new sessions of this adventure begin."""
     dungeons: list[DungeonInfo]
-    """The adventure's dungeons, in the order the document lists them."""
+    """Dungeons in the adventure, in document order."""
 
 
 class AdventureInfo(AdventurePreview):
-    """What a player may know about an adventure before play, and where the adventure comes from."""
+    """Player-visible adventure summary along with storage metadata."""
 
     id: str | None
-    """The adventure's id. A stored adventure's id starts with `adv_`, and an adventure that
-    comes with the server has an id that starts with `builtin-`. It's `null` in the result of
-    `POST /v1/adventures/validate`, which stores nothing."""
+    """Adventure identifier (`builtin-` prefix for built-in adventures, or `adv_` followed by 22
+    characters for client uploads), or `null` in the response from `POST /v1/adventures/validate`."""
     builtin: bool
-    """Whether the adventure comes with the server. No client can delete one that does."""
+    """Whether the adventure ships with the server (`true`) rather than belonging to your client
+    (`false`). Built-in adventures cannot be deleted."""
     created_at: str | None
-    """When the client stored the adventure. It's `null` for an adventure that comes with the
-    server, and in the result of `POST /v1/adventures/validate`."""
+    """UTC timestamp when your client uploaded the adventure (RFC 3339 format, such as
+    `"2026-11-20T22:01:05Z"`), or `null` for built-in adventures and validation previews."""
 
 
 class ValidAdventure(ApiModel):
-    """The result of validating a document that osrlib accepts."""
+    """Validation result when `POST /v1/adventures/validate` accepts an adventure document."""
 
     valid: Literal[True]
     """Always `true`."""
     adventure: AdventureInfo
-    """What a player may know about the adventure before play, with `id` and `created_at` set to
+    """Player-visible info that `POST /v1/adventures` would return, with `id` and `created_at` set to
     `null`."""
 
 
 class InvalidAdventure(ApiModel):
-    """The result of validating a document that the server refuses."""
+    """Validation result when `POST /v1/adventures/validate` refuses an adventure document."""
 
     valid: Literal[False]
     """Always `false`."""
     code: Literal["content_invalid", "version_unsupported"]
-    """The error code `POST /v1/adventures` returns for the same document: `content_invalid` for a
-    document osrlib refuses, and `version_unsupported` for a document stamped with a newer schema
-    version than the server's osrlib reads."""
+    """Error code that `POST /v1/adventures` would return for the same document: `content_invalid`
+    when the envelope, schema, references, or adventure name fail validation, or
+    `version_unsupported` when `schema_version` exceeds the server's `schema_version`."""
     detail: str
-    """Why osrlib refused the document."""
+    """Human-readable validation error details, at most 1,000 characters."""
 
 
 def _db(request: Request) -> Database:
@@ -156,19 +150,19 @@ def _stored_info(row: AdventureRow) -> AdventureInfo:
     "",
     status_code=201,
     summary="Upload an adventure",
-    response_description="The stored adventure's info, with its new id.",
+    response_description="Stored adventure info with its newly assigned `adv_` id.",
     responses=problem_responses(
         {
             409: [
-                "`version_unsupported`: The document's `schema_version` is higher than the server's osrlib reads, "
-                "which is the `schema_version` of `GET /v1/meta`."
+                "`version_unsupported`: The document's `schema_version` exceeds the `schema_version` that "
+                "`GET /v1/meta` reports."
             ],
             422: [
                 VALIDATION_ERROR,
-                "`content_invalid`: osrlib refuses the document. The envelope is wrong, the adventure doesn't match "
-                "osrlib's `Adventure` model, the adventure refers to something that doesn't exist (a monster, an "
-                "item, an area, or a quest), or it has content that a session can't play, like a treasure type "
-                "letter outside `A` to `V`. `detail` lists the problems. Fix the document.",
+                "`content_invalid`: osrlib refuses the document: the envelope is malformed, `payload` fails osrlib's "
+                "`Adventure` schema, a monster, item, area, or quest reference is unknown, a gameplay constraint "
+                "fails (such as a treasure type letter outside `A` to `V`), or the adventure's `name` contains a "
+                "control character. Check `detail` and fix the document.",
             ],
         }
     ),
@@ -177,14 +171,15 @@ def _stored_info(row: AdventureRow) -> AdventureInfo:
 def upload_adventure(
     request: Request, principal: CurrentPrincipal, document: Annotated[dict[str, Any], _DOCUMENT_BODY]
 ) -> AdventureInfo:
-    """Check an adventure document with osrlib and store it as uploaded.
+    """Validate an adventure document with osrlib, store it as uploaded, and return its player-safe info.
 
-    Pass the returned `id` as `adventure_id` to `POST /v1/sessions` to play the adventure. The server runs every check
-    osrlib makes on an adventure, so you can start a session with any adventure you can upload. To check a document
-    without storing it, like in an editor, use `POST /v1/adventures/validate`.
+    Pass the returned `id` as `adventure_id` to `POST /v1/sessions` to start a game. The request body may be up to
+    `BXAPI_MAX_BODY_BYTES` (8,388,608 bytes by default). Because the server runs every osrlib adventure check before
+    storing, any uploaded adventure is ready to play on the current osrlib version. To check a document without
+    storing it, call `POST /v1/adventures/validate` instead.
 
-    Each upload stores a new adventure, even when the document is the same as one already stored. To replace an
-    adventure, upload the new document and delete the old adventure.
+    Uploading the same document twice creates two independent records with distinct `adv_` ids. To replace an
+    adventure, upload the new version and delete the old one with `DELETE /v1/adventures/{adventure_id}`.
     """
     adventure = parse_adventure(document)
     preview = _preview(adventure)
@@ -197,16 +192,17 @@ def upload_adventure(
 @router.post(
     "/validate",
     summary="Check an adventure document without storing it",
-    response_description="`valid` with the adventure's info, or the reason the upload would fail.",
+    response_description="`valid` with the adventure's info when accepted, or the failure `code` and `detail`.",
 )
 @accepts_document
 def validate_adventure(document: Annotated[dict[str, Any], _DOCUMENT_BODY]) -> ValidAdventure | InvalidAdventure:
-    """Run the checks of `POST /v1/adventures` on a document, and store nothing.
+    """Run every check of `POST /v1/adventures` on an adventure document without storing anything.
 
-    Use it in a tool that writes adventures, to show the author what's wrong before an upload. The response is 200
-    either way. When the document passes, `valid` is `true` and `adventure` is the info the upload would store, with
-    `id` and `created_at` set to `null`. When the upload would fail, `valid` is `false`, `code` is the error code the
-    upload would return, and `detail` states why.
+    Use this endpoint in an editor or CI pipeline before calling `POST /v1/adventures`. Always returns HTTP 200 for a
+    syntactically valid JSON object (up to `BXAPI_MAX_BODY_BYTES`): when accepted, `valid` is `true` and `adventure`
+    contains the player-safe preview with `id` and `created_at` set to `null`. When refused, `valid` is `false`,
+    `code` matches the error code `POST /v1/adventures` would return (`content_invalid` or `version_unsupported`),
+    and `detail` explains what failed.
     """
     try:
         adventure = parse_adventure(document)
@@ -220,11 +216,11 @@ def validate_adventure(document: Annotated[dict[str, Any], _DOCUMENT_BODY]) -> V
 
 @router.get("", summary="List the adventures", response_description="A page of adventure info.")
 def list_adventures(request: Request, principal: CurrentPrincipal, page: PageQuery) -> Page[AdventureInfo]:
-    """Return a page of the adventures you can play.
+    """Return playable adventures: built-in adventures in id order first, then your client's uploads newest first.
 
-    Show the list to the player to choose an adventure, and pass the chosen `id` as `adventure_id` to
-    `POST /v1/sessions`. The list starts with the adventures that come with the server, in id order, and continues
-    with your client's adventures, newest first. `total`, `limit`, and `offset` count both parts as one list.
+    Display the returned `AdventureInfo` entries in an adventure picker and pass the chosen `id` as `adventure_id` to
+    `POST /v1/sessions`. `total`, `limit`, and `offset` paginate across built-in and uploaded adventures as one
+    combined list. Every server includes `builtin-barrow`.
     """
     builtins = [
         _builtin_info(adventure_id, builtin.adventure) for adventure_id, builtin in builtin_adventures().items()
@@ -240,15 +236,16 @@ def list_adventures(request: Request, principal: CurrentPrincipal, page: PageQue
 @router.get(
     "/{adventure_id}",
     summary="Get an adventure's info",
-    response_description="The adventure's info.",
+    response_description="Player-visible adventure info.",
     responses=problem_responses({404: [_NOT_FOUND]}),
 )
 def get_adventure(request: Request, principal: CurrentPrincipal, adventure_id: AdventureId) -> AdventureInfo:
-    """Return what a player may know about an adventure before play.
+    """Return player-safe info for one built-in or uploaded adventure before play.
 
-    The info has the title, the author's description and hooks, the town, and the names of the dungeons. It never has
-    the map, the monsters, the treasure, the triggers, or the quests. For those, a referee reads
-    `GET /v1/adventures/{adventure_id}/document`.
+    Includes `name`, `description`, `hooks`, recommended `party`, `town`, and dungeon `id` and `name` entries, while
+    omitting maps, keyed rooms, monsters, treasure, triggers, and quests. Pass `id` as `adventure_id` to
+    `POST /v1/sessions` to start a game, or call `GET /v1/adventures/{adventure_id}/document` with a `referee` key to
+    read the full document.
     """
     builtin = builtin_adventures().get(adventure_id)
     if builtin is not None:
@@ -262,22 +259,24 @@ def get_adventure(request: Request, principal: CurrentPrincipal, adventure_id: A
 @router.get(
     "/{adventure_id}/document",
     summary="Get an adventure document",
-    response_description="The adventure document.",
+    response_description="Full adventure document envelope.",
     responses=problem_responses(
         {
             403: [
-                "`referee_required`: Only a referee may read an adventure document. Use a key with the referee role."
+                "`referee_required`: Only a referee may read an adventure document. Send an API key with the "
+                "`referee` role."
             ],
             404: [_NOT_FOUND],
         }
     ),
 )
 def get_adventure_document(request: Request, principal: RefereePrincipal, adventure_id: AdventureId) -> dict[str, Any]:
-    """Return the whole adventure document, as uploaded, with the map, monsters, treasure, triggers, and quests.
+    """Requires a `referee` API key. Return the complete adventure document as uploaded.
 
-    Only a referee may read it, because it shows everything the players are meant to find in play. The document is
-    the one the client uploaded, including any field osrlib ignores. You can also read the document of an adventure
-    that comes with the server, to start a new adventure from it in an editor.
+    Exposes dungeon maps, keyed monsters, treasure, triggers, and quests, so players receive 403 `referee_required`
+    (use `GET /v1/adventures/{adventure_id}` for player-safe info). Returns uploaded documents verbatim, including
+    any unknown fields osrlib ignores, and also exports built-in adventures such as `builtin-barrow` so you can
+    inspect or adapt them in an editor and re-upload via `POST /v1/adventures`.
     """
     builtin = builtin_adventures().get(adventure_id)
     if builtin is not None:
@@ -295,17 +294,17 @@ def get_adventure_document(request: Request, principal: RefereePrincipal, advent
     response_description="The server deleted the adventure. The response has no body.",
     responses=problem_responses(
         {
-            403: ["`adventure_read_only`: The adventure comes with the server, and no client can delete it."],
-            404: ["`not_found`: Your client has no adventure with this id."],
+            403: ["`adventure_read_only`: Built-in adventures ship with the server and cannot be deleted."],
+            404: ["`not_found`: Your client has no uploaded adventure with this id."],
         }
     ),
 )
 def delete_adventure(request: Request, principal: CurrentPrincipal, adventure_id: AdventureId) -> Response:
-    """Delete an adventure the client stored. A session that already started has a copy and isn't affected.
+    """Delete an adventure uploaded by your client and reclaim its bytes in your storage quota (`GET /v1/meta`).
 
-    An adventure that comes with the server gets 403 `adventure_read_only`. The adventure's bytes no longer count
-    toward your client's storage, which `GET /v1/meta` reports. A retry of a delete that succeeded gets 404
-    `not_found`.
+    Sessions already started from this adventure embed a copy and continue unaffected. Attempting to delete a
+    built-in adventure such as `builtin-barrow` fails with 403 `adventure_read_only`, and repeating a completed
+    delete returns 404 `not_found`.
     """
     if adventure_id in builtin_adventures():
         raise forbidden("adventure_read_only", f"The adventure {adventure_id!r} comes with the server.")

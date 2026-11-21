@@ -27,11 +27,20 @@ class PageParams(BaseModel):
 
 
 def _page_params(
-    limit: Annotated[int, Query(ge=1, le=MAX_LIMIT, description="The largest number of items to return.")] = 50,
+    limit: Annotated[
+        int,
+        Query(
+            ge=1,
+            le=MAX_LIMIT,
+            description="Maximum number of items to return, from 1 to 200. Defaults to 50.",
+        ),
+    ] = 50,
     offset: Annotated[
         int,
         Query(
-            ge=0, le=MAX_OFFSET, description="How many items to skip before the first one returned, from 0 to 2^53 - 1."
+            ge=0,
+            le=MAX_OFFSET,
+            description="Number of items to skip before the first returned item, from 0 to 2^53 - 1. Defaults to 0.",
         ),
     ] = 0,
 ) -> PageParams:

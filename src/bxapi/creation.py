@@ -71,98 +71,100 @@ MAX_QUANTITY = 10_000
 
 
 class Purchase(RequestModel):
-    """One item to buy with the starting gold."""
+    """One equipment purchase paid from the character's starting gold."""
 
     item_id: str
-    """The id of an item from `GET /v1/rules/equipment`, like `sword`."""
+    """Equipment item `id` from `GET /v1/rules/equipment`, such as `sword`."""
     quantity: int = Field(default=1, ge=1, le=MAX_QUANTITY)
-    """How many lots to buy, from 1 to 10,000. A lot is the unit the item is sold in. osrlib sells
-    weapons and armour one at a time, and gear and ammunition in bundles, so one lot of torches is
-    six torches."""
+    """Number of purchase lots to buy, from 1 to 10,000 (defaults to 1). Weapons and armour sell
+    one item per lot, whereas adventuring gear and ammunition sell in bundles (for example, one lot
+    of `torch` is six torches)."""
 
 
 class CharacterChoices(RequestModel):
-    """The choices a player makes for a new first-level character."""
+    """Player choices for creating a first-level character."""
 
     name: NameText = Field(min_length=1, max_length=MAX_NAME_LENGTH)
-    """The character's name, 1 to 100 characters, with no control character like a tab or a newline."""
+    """Character name, 1 to 100 characters, without control characters such as tabs or newlines."""
     class_id: str
-    """A class id from `GET /v1/rules/classes`, like `fighter`."""
+    """Character class `id` from `GET /v1/rules/classes`, such as `fighter`. Must meet the class's
+    ability score requirements (`eligible_class_ids` on `POST /v1/ability-rolls`)."""
     alignment: Alignment
-    """The character's alignment."""
+    """Character alignment: `lawful`, `neutral`, or `chaotic`."""
     adjustment: AbilityAdjustment | None = None
-    """A trade of ability points, as osrlib's `AbilityAdjustment`. In `lowered`, each key is an
-    ability to take points from, and its value is the number of points to take. In `raised`, each
-    key is an ability to add points to, and its value is the number of points to add. The keys are
-    `str` (Strength), `int` (Intelligence), `wis` (Wisdom), `dex` (Dexterity), `con` (Constitution),
-    and `cha` (Charisma). osrlib checks the trade. If osrlib refuses it, the response is 422
-    `character_invalid` with osrlib's rejections. Leave the field out to keep the scores as rolled."""
+    """Optional point trade between ability scores before rolling hit points, as osrlib's
+    `AbilityAdjustment`. Map abilities to lower in `lowered` and abilities to raise in `raised`
+    using keys `str`, `int`, `wis`, `dex`, `con`, and `cha`. If osrlib refuses the trade, creation
+    fails with 422 `character_invalid` and `rejections`. Omit or set to `null` to keep the rolled
+    scores."""
     starting_spell_ids: list[str] = []
-    """The ids of the spells for an arcane caster's first spell book, from `GET /v1/rules/spells`. A first-level
-    magic-user or elf needs exactly one first-level spell. Leave it empty for every other class."""
+    """First-level spell `id` values from `GET /v1/rules/spells` for an arcane caster's starting
+    spell book. A first-level `magic_user` or `elf` requires exactly one first-level `magic_user`
+    spell. Leave empty (`[]`) for every other class."""
     extra_languages: list[str] = []
-    """The ids of the extra languages the character learns, from `GET /v1/rules/languages`. A high Intelligence allows
-    extra languages."""
+    """Extra language `id` values from `GET /v1/rules/languages` (entries with `choosable` set to
+    `true`), up to the bonus languages granted by the character's adjusted Intelligence score."""
     purchases: list[Purchase] = []
-    """Starting gear to buy, in order, with the starting gold. The server rolls the gold in this same request, so to
-    choose gear after you see the gold, leave `purchases` empty and send `purchase_equipment` and `equip_item` commands
-    to a session in `town` mode."""
+    """Starting equipment bought in list order from rolled starting gold (3d6 x 10 gp). Because the
+    server rolls gold during this same request, leave `purchases` empty if you want the player to
+    see their gold first, then send `purchase_equipment` and `equip_item` commands to a session in
+    `town` mode."""
     equip_item_ids: list[str] = []
-    """The ids of purchased items to wear or wield. The server equips them in order."""
+    """Purchased item `id` values to wear or wield, applied in list order. Each entry equips one
+    purchased stack from `purchases` and must be permitted for `class_id`."""
     hp_reroll_at_first_level: bool = False
-    """Whether to use the optional rule that rerolls a first hit die that shows 1 or 2."""
+    """Whether to reroll a first-level hit die result of 1 or 2. Defaults to `false`."""
 
 
 class CreationRolls(ApiModel):
-    """The dice osrlib rolled to create a character."""
+    """Dice rolled by osrlib while creating a first-level character."""
 
     ability_rolls: AbilityScoreRolls
-    """The six ability scores as rolled, before any adjustment, with the three dice rolled for each."""
+    """Six ability scores as rolled (3d6 each) before any `adjustment`, with the three dice for each."""
     hit_point_roll: HitPointRoll
-    """The first-level hit point roll, with every die thrown."""
+    """First-level hit point roll, including any rerolled dice and the Constitution modifier."""
     gold_roll: RollResult
-    """The 3d6 × 10 roll for starting gold. Its `total` is the gold before the purchases."""
+    """Starting gold roll (3d6 x 10 gp). Its `total` is the gold pieces before `purchases`."""
 
 
 class DerivedValues(ApiModel):
-    """The values osrlib computes from a character and doesn't store in the character document."""
+    """Combat, saving throw, modifier, and language values computed by osrlib from a `Character`."""
 
     thac0: int
-    """The d20 roll the character needs to hit armour class 0."""
+    """Attack roll needed on 1d20 to hit descending armour class 0."""
     attack_bonus: int
-    """The bonus to an attack roll under ascending armour class. It describes the same attack as
-    `thac0`."""
+    """Bonus added to 1d20 attack rolls against ascending armour class, equivalent to `thac0`."""
     armour_class: int
-    """The descending armour class, where lower is better."""
+    """Descending armour class, where lower numbers are harder to hit."""
     armour_class_ascending: int
-    """The ascending armour class, where higher is better."""
+    """Ascending armour class, where higher numbers are harder to hit."""
     saves: SavingThrows
-    """The five saving throw targets for the character's level."""
+    """Target numbers on 1d20 for the five saving throw categories at the character's level."""
     melee_modifier: int
-    """The Strength modifier to melee attack and damage rolls."""
+    """Strength modifier applied to melee attack and damage rolls."""
     open_doors_chance: int
-    """The chance in 6 of forcing a stuck door open, from Strength."""
+    """Chance on 1d6 (from 1 to 5) of forcing open a stuck door, derived from Strength."""
     missile_modifier: int
-    """The Dexterity modifier to missile attack rolls."""
+    """Dexterity modifier applied to missile attack rolls."""
     initiative_modifier: int
-    """The Dexterity modifier to individual initiative, used only under the individual initiative rule."""
+    """Dexterity modifier applied to individual initiative when `individual_initiative` is enabled."""
     hit_point_modifier: int
-    """The Constitution modifier to each hit die."""
+    """Constitution modifier applied to each hit die roll."""
     magic_save_modifier: int
-    """The Wisdom modifier to saving throws against magic."""
+    """Wisdom modifier applied to saving throws against magic."""
     npc_reaction_modifier: int
-    """The Charisma modifier to monster reaction rolls when the character speaks."""
+    """Charisma modifier applied to monster and NPC reaction rolls when this character speaks."""
     xp_modifier_pct: int
-    """The percentage the class adds to or takes from each experience award, from the prime
-    requisites."""
+    """Percentage bonus or penalty applied to earned experience points, such as `10` for +10%,
+    derived from the class's prime requisites."""
     level_title: str | None
-    """The title of the character's class at its level, like `Veteran`, or `null` past the last
-    title."""
+    """Traditional title for the character's class and level, such as `"Veteran"`, or `null` above
+    title level."""
     alignment_tongue: str
-    """The id of the secret language of the character's alignment, like `alignment_lawful`."""
+    """Language `id` of the character's alignment tongue, such as `"alignment_lawful"`."""
     languages: list[str]
-    """Every language the character speaks: the alignment tongue, the class's languages, and the
-    extra languages."""
+    """All language `id` values the character speaks: alignment tongue, class languages, and
+    `extra_languages`."""
 
 
 @dataclass(frozen=True)

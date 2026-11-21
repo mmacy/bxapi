@@ -72,7 +72,11 @@ _TABLES: dict[str, Callable[[], AbilityTables | CombatTables | EncounterTables |
 }
 
 _Q = Annotated[
-    str | None, Query(description="Return only the entries whose id or name contains this text, ignoring case.")
+    str | None,
+    Query(
+        description="Case-insensitive substring filter matched against each entry's `id` and `name`. Omit to return "
+        "all entries."
+    ),
 ]
 
 
@@ -88,21 +92,21 @@ router = APIRouter(prefix="/rules", tags=["rules"], dependencies=[Depends(_set_c
 
 
 class License(ApiModel):
-    """The license that covers the rules content."""
+    """Open Game License covering the rules catalogs."""
 
     name: str
-    """The name of the license."""
+    """License title, `"Open Game License 1.0a"`."""
     text: str
-    """The license text in Markdown, with its Section 15 notice."""
+    """Full license text in Markdown, including its Section 15 copyright notice."""
 
 
 @router.get("/classes", summary="List the character classes", response_description="A page of class summaries.")
 def list_classes(page: PageQuery) -> Page[ClassSummary]:
-    """List every character class in osrlib's order, with the facts a class picker shows.
+    """Return a page of B/X character classes in osrlib's catalog order, with requirements, hit dice, and max levels.
 
-    Pass a class's `id` as `class_id` to `POST /v1/characters`. To show only the classes a player's scores qualify
-    for, use `eligible_class_ids` from `POST /v1/ability-rolls`. Read `GET /v1/rules/classes/{class_id}` for the full
-    definition.
+    Pass a class's `id` as `class_id` to `POST /v1/characters` or `POST /v1/generate/character`, or to
+    `GET /v1/rules/classes/{class_id}` for the full progression table. To list only classes that a rolled set of
+    ability scores qualifies for, read `eligible_class_ids` from `POST /v1/ability-rolls`.
     """
     return paginate(class_summaries(), page)
 
@@ -114,21 +118,26 @@ def list_classes(page: PageQuery) -> Page[ClassSummary]:
     responses=_not_found("class", "GET /v1/rules/classes"),
 )
 def get_class(
-    class_id: Annotated[str, Path(description="A class `id` from the class list, like `fighter`.")],
+    class_id: Annotated[
+        str, Path(description="Class `id` from `GET /v1/rules/classes`, such as `fighter` or `magic_user`.")
+    ],
 ) -> ClassDefinition:
-    """Return osrlib's definition of one class: its requirements, XP tiers, abilities, and level progression.
+    """Return osrlib's `ClassDefinition`: requirements, armour and weapon rules, abilities, and level progression.
 
-    `requirements` has the lowest score in each ability that the class needs, and `progression` has one entry for
-    each level, with the XP it takes, the hit dice, `thac0`, the saving throws, and the spell slots of that level.
+    `requirements` maps each constrained ability score to its minimum value, and `progression` contains one row per
+    level with required XP, hit dice, `thac0`, `saves`, and spell slots. Pass `class_id` to `GET /v1/rules/spells` to
+    list the spells this class can cast, or to `POST /v1/characters` to create a character of this class.
     """
     return lookup(load_classes().get, "class", class_id)
 
 
 @router.get("/monsters", summary="List the monsters", response_description="A page of monster summaries.")
 def list_monsters(page: PageQuery, q: _Q = None) -> Page[MonsterSummary]:
-    """List the monsters in osrlib's order, with hit dice, armour class, experience, and alignment.
+    """Return a page of monster summaries in osrlib's catalog order, with hit dice, armour class, XP, and alignment.
 
-    Pass `q` to search by id or name. Read `GET /v1/rules/monsters/{monster_id}` for the full template.
+    Pass `q` to search by template `id` or `name` (233 templates in total, so pass `limit=200` and page with `offset`
+    to read the full catalog). Pass an entry's `id` to `GET /v1/rules/monsters/{monster_id}` for attacks, saves,
+    morale, and special abilities, or to `POST /v1/generate/monsters` to roll hit points.
     """
     return paginate(monster_summaries(q), page)
 
@@ -140,18 +149,20 @@ def list_monsters(page: PageQuery, q: _Q = None) -> Page[MonsterSummary]:
     responses=_not_found("monster", "GET /v1/rules/monsters"),
 )
 def get_monster(
-    monster_id: Annotated[str, Path(description="A monster `id` from the monster list, like `goblin`.")],
+    monster_id: Annotated[
+        str, Path(description="Monster template `id` from `GET /v1/rules/monsters`, such as `goblin`.")
+    ],
 ) -> MonsterTemplate:
-    """Return osrlib's template for one monster: attacks, saves, morale, treasure, and special abilities.
+    """Return osrlib's `MonsterTemplate` stat block: attacks, saves, morale, movement, treasure, and abilities.
 
-    The template is the stat block every monster of the kind shares. `display_name` and `display_name_plural` are
-    what to call one of the monsters and several of them in a sentence, like `"giant centipede"` for the template named
-    `"Centipede, Giant"`. `family_id` is the id that every form of the same creature shares, and it's the
-    `family_id` that the player view reports for a group of these monsters. This operation takes a template id, not
-    a `family_id`: `hellhound` is a 404, and the hellhound's forms are `hellhound_3` to `hellhound_7`.
+    Use `display_name` and `display_name_plural` when naming the creature in prose (for example, `"giant centipede"`
+    for the index name `"Centipede, Giant"`). `family_id` groups variants of the same creature and matches the
+    `family_id` reported on encounter groups in `GET /v1/sessions/{session_id}/view`. This endpoint requires a
+    template `id` rather than a `family_id` (for example, `hellhound_3` through `hellhound_7`, whereas `hellhound`
+    returns 404 `not_found`).
 
-    To roll hit points for one or more of them, use `POST /v1/generate/monsters`. `treasure` has the monster's
-    treasure types, each a letter that `POST /v1/generate/treasure` takes as `treasure_type`.
+    Pass `monster_id` to `POST /v1/generate/monsters` to spawn instances with rolled hit points, or pass each letter
+    in `treasure` as `treasure_type` to `POST /v1/generate/treasure`.
     """
     return lookup(load_monsters().get, "monster", monster_id)
 
@@ -168,21 +179,26 @@ def list_spells(
     class_id: Annotated[
         str | None,
         Query(
-            description="Return only the spells on this class's spell list. For a class that casts no spells, the "
-            "page is empty. An unknown class id is a 404."
+            description="Class `id` from `GET /v1/rules/classes`, such as `cleric` or `magic_user`, to return only "
+            "spells on that class's spell list. Returns an empty `items` list for non-casting classes such as "
+            "`fighter`, and 404 `not_found` for an unknown `class_id`."
         ),
     ] = None,
     level: Annotated[
         int | None,
-        Query(ge=SPELL_LEVEL_MIN, le=SPELL_LEVEL_MAX, description="Return only the spells of this spell level."),
+        Query(
+            ge=SPELL_LEVEL_MIN,
+            le=SPELL_LEVEL_MAX,
+            description="Spell level from 1 to 6. Omit to return spells of all levels.",
+        ),
     ] = None,
 ) -> Page[SpellSummary]:
-    """List the spells in osrlib's order, with each spell's level, spell list, range, and duration.
+    """Return a page of spell summaries in osrlib's catalog order, filterable by search text, class, and spell level.
 
-    A class casts the spells on one spell list. The cleric uses `cleric`, and the magic-user and the elf use
-    `magic_user`. Pass `class_id` to get the spells a class can cast, and `level` to list only one spell level. For
-    the first spell of a new magic-user or elf, list `class_id=magic_user&level=1`, and pass a spell's `id` in
-    `starting_spell_ids` to `POST /v1/characters`.
+    Clerics cast from the `cleric` spell list, whereas magic-users and elves cast from `magic_user`. Filter with
+    `class_id=magic_user&level=1` to pick the starting spell for a new magic-user or elf, then pass the chosen `id`
+    in `starting_spell_ids` to `POST /v1/characters`. Read `GET /v1/rules/spells/{spell_id}` for full targeting,
+    saving throw, and effect details.
     """
     return paginate(spell_summaries(q, class_id, level), page)
 
@@ -194,9 +210,13 @@ def list_spells(
     responses=_not_found("spell", "GET /v1/rules/spells"),
 )
 def get_spell(
-    spell_id: Annotated[str, Path(description="A spell `id` from the spell list, like `magic_missile`.")],
+    spell_id: Annotated[str, Path(description="Spell `id` from `GET /v1/rules/spells`, such as `magic_missile`.")],
 ) -> SpellTemplate:
-    """Return osrlib's template for one spell: its range, duration, and effects."""
+    """Return osrlib's `SpellTemplate`: range, duration, targeting, saving throw, and mechanical effect.
+
+    Pass `spell_id` in `starting_spell_ids` on `POST /v1/characters` for a first-level arcane caster, or in the
+    `learn_spell`, `prepare_spells`, and `cast_spell` commands of `POST /v1/sessions/{session_id}/commands`.
+    """
     return lookup(load_spells().get, "spell", spell_id)
 
 
@@ -204,13 +224,20 @@ def get_spell(
 def list_equipment(
     page: PageQuery,
     q: _Q = None,
-    item_type: Annotated[ItemType | None, Query(description="Return only the items of one type.")] = None,
+    item_type: Annotated[
+        ItemType | None,
+        Query(
+            description="Equipment category filter: `weapon`, `armour` (including shields), `gear` (adventuring "
+            "gear), or `ammunition`. Omit to return all four categories."
+        ),
+    ] = None,
 ) -> Page[EquipmentSummary]:
-    """List the mundane equipment a character can buy: weapons first, then armour, gear, and ammunition.
+    """Return a page of mundane equipment items ordered by category: weapons, armour, gear, then ammunition.
 
-    Pass `item_type` to list only one type of item. Pass an item's `id` as `item_id` in the `purchases` of
-    `POST /v1/characters`, or in `item_ids` of a session's `purchase_equipment` command. `cost_gp` is the price of
-    one lot. A lot is one weapon or one suit of armour, and a bundle of gear or ammunition, like six torches.
+    Filter by `q` or `item_type`, and read `GET /v1/rules/equipment/{item_id}` for weight, damage, armour class, or
+    bundle size. Pass `id` as `item_id` in `purchases` on `POST /v1/characters` or in `item_ids` on a session's
+    `purchase_equipment` command. `cost_gp` is the price in gold pieces for one purchase lot (one weapon or suit of
+    armour, or a bundle of gear or ammunition such as six torches).
     """
     return paginate(equipment_summaries(q, item_type), page)
 
@@ -222,11 +249,13 @@ def list_equipment(
     responses=_not_found("equipment item", "GET /v1/rules/equipment"),
 )
 def get_equipment_item(
-    item_id: Annotated[str, Path(description="An equipment `id` from the equipment list, like `sword`.")],
+    item_id: Annotated[str, Path(description="Equipment `id` from `GET /v1/rules/equipment`, such as `sword`.")],
 ) -> EquipmentItem:
-    """Return osrlib's template for one weapon, armour, gear, or ammunition item.
+    """Return osrlib's template for one weapon, armour, adventuring gear, or ammunition item.
 
-    `item_type` is `weapon`, `armour`, `gear`, or `ammunition`.
+    Narrow the union on `item_type` (`weapon`, `armour`, `gear`, or `ammunition`). Pass `item_id` in `purchases` and
+    `equip_item_ids` on `POST /v1/characters`, or in a session's `purchase_equipment`, `equip_item`, and `grant_item`
+    commands.
     """
     return EquipmentItem(lookup(load_equipment().get, "equipment item", item_id))
 
@@ -235,12 +264,18 @@ def get_equipment_item(
 def list_magic_items(
     page: PageQuery,
     q: _Q = None,
-    category: Annotated[MagicItemCategory | None, Query(description="Return only the items of one category.")] = None,
+    category: Annotated[
+        MagicItemCategory | None,
+        Query(
+            description="Magic item category filter: `armour`, `misc`, `potion`, `ring`, `rod`, `staff`, `wand`, "
+            "`scroll`, `sword`, or `weapon`. Omit to return all categories."
+        ),
+    ] = None,
 ) -> Page[MagicItemSummary]:
-    """List the magic items in osrlib's order.
+    """Return a page of magic item summaries in osrlib's catalog order, filterable by search text and category.
 
-    Pass `category` to list only one kind of item, like `potion`. Read `GET /v1/rules/magic-items/{item_id}` for what
-    an item does.
+    Pass an entry's `id` to `GET /v1/rules/magic-items/{item_id}` for full rules and modifiers, or to a session's
+    referee `grant_item` command on `POST /v1/sessions/{session_id}/commands`.
     """
     return paginate(magic_item_summaries(q, category), page)
 
@@ -252,32 +287,35 @@ def list_magic_items(
     responses=_not_found("magic item", "GET /v1/rules/magic-items"),
 )
 def get_magic_item(
-    item_id: Annotated[str, Path(description="A magic item `id` from the magic item list, like `potion_of_healing`.")],
+    item_id: Annotated[
+        str, Path(description="Magic item `id` from `GET /v1/rules/magic-items`, such as `potion_of_healing`.")
+    ],
 ) -> MagicItemTemplate:
-    """Return osrlib's template for one magic item.
+    """Return osrlib's `MagicItemTemplate` for one magic item, including bonuses, charges, usable classes, and curses.
 
-    The template includes what the players learn only when the item is identified in play, like whether it's
-    `cursed`. Show a player only what the session's player view reveals about the item.
+    Both `player` and `referee` keys receive the full template, including `cursed` and unidentified details. During a
+    session, show players only what `GET /v1/sessions/{session_id}/view` reveals about items in their inventory.
     """
     return lookup(load_magic_items().get, "magic item", item_id)
 
 
 @router.get("/languages", summary="List the languages", response_description="A page of languages.")
 def list_languages(page: PageQuery) -> Page[Language]:
-    """List the languages in osrlib's catalog, in alphabetical order by id.
+    """Return the spoken languages in osrlib's catalog, sorted alphabetically by `id`.
 
-    A character speaks the language of its alignment without choosing it, so the alignment languages aren't
-    listed. When you create a character with a high Intelligence, pass the `id` of a language whose
-    `choosable` is `true` in `extra_languages`.
+    osrlib grants alignment tongues (`alignment_lawful`, `alignment_neutral`, `alignment_chaotic`) automatically from
+    alignment, so they do not appear in this list. When creating a character with high Intelligence on
+    `POST /v1/characters` or `POST /v1/generate/character`, pass `id` values whose `choosable` field is `true` in
+    `extra_languages`.
     """
     return paginate(load_languages().languages, page)
 
 
 @router.get("/tables", summary="List the printed tables", response_description="A page of table names.")
 def list_tables(page: PageQuery) -> Page[str]:
-    """List the names of the printed tables: `abilities`, `combat`, `encounters`, and `treasure`.
+    """Return the four printed B/X table set names: `abilities`, `combat`, `encounters`, and `treasure`.
 
-    Pass a name to `GET /v1/rules/tables/{name}` to read that set of tables.
+    Pass any returned name as `name` to `GET /v1/rules/tables/{name}` to read that table set.
     """
     return paginate(list(_TABLES), page)
 
@@ -291,17 +329,24 @@ def list_tables(page: PageQuery) -> Page[str]:
     ),
 )
 def get_table(
-    name: Annotated[str, Path(description="A table name: `abilities`, `combat`, `encounters`, or `treasure`.")],
+    name: Annotated[
+        str,
+        Path(
+            description="Table set name from `GET /v1/rules/tables`: `abilities`, `combat`, `encounters`, or "
+            "`treasure`."
+        ),
+    ],
 ) -> TableSet:
-    """Return osrlib's model for one set of tables.
+    """Return osrlib's model for one printed B/X table set.
 
-    `abilities` returns `AbilityTables`: what each ability score is worth. `combat` returns `CombatTables`:
-    the attack matrix, saving throws, XP awards, turning, and reactions. `encounters` returns
-    `EncounterTables`: the wandering monsters by dungeon level. `treasure` returns `TreasureTables`: the
-    treasure types.
+    - `abilities`: `AbilityTables` (modifiers, bonus languages, and literacy by ability score).
+    - `combat`: `CombatTables` (attack matrices, saving throws, XP awards, undead turning, morale, and reactions).
+    - `encounters`: `EncounterTables` (wandering monster tables by dungeon level and NPC party tables).
+    - `treasure`: `TreasureTables` (treasure types `A` through `V`, gems, jewellery, magic item probabilities, and
+      room stocking).
 
-    In a session, osrlib rolls on these tables for you. To roll on the treasure tables outside a game, use
-    `POST /v1/generate/treasure`.
+    In a session, osrlib consults these tables automatically. To roll treasure or room stocking outside a session,
+    call `POST /v1/generate/treasure` or `POST /v1/generate/room`.
     """
     loader = _TABLES.get(name)
     if loader is None:
@@ -313,19 +358,27 @@ def get_table(
 def list_commands(
     page: PageQuery,
     kind: Annotated[
-        CommandKind | None, Query(description="Return only the play commands or only the referee commands.")
+        CommandKind | None,
+        Query(
+            description="Filter by who may send the command: `play` (any caller) or `referee` (`referee` role only). "
+            "Omit to return both."
+        ),
     ] = None,
     mode: Annotated[
-        SessionMode | None, Query(description="Return only the commands that are legal in this mode.")
+        SessionMode | None,
+        Query(
+            description="Filter to commands legal in this session mode (`town`, `exploring`, `encounter`, `battle`, "
+            "`game_over`, or `victory`). Omit to return commands for all modes."
+        ),
     ] = None,
 ) -> Page[CommandSummary]:
-    """List the commands you can send to a session, in osrlib's order.
+    """Return session commands in osrlib's catalog order, with `kind`, `allowed_modes`, and a one-line summary.
 
-    A `play` command is one a player may send, and a `referee` command is one only a referee may send.
-    `allowed_modes` lists the session modes the command is legal in. osrlib has more commands than the default
-    `limit`, so pass `limit=200` to read them all in one request.
+    osrlib defines more than 50 commands, so pass `limit=200` to fetch the entire catalog in one request. Pass any
+    `command_type` to `GET /v1/rules/commands/{command_type}` for its request body JSON Schema.
 
-    For the commands that are legal in one session now, for your role, use `GET /v1/sessions/{session_id}/commands`.
+    To list only the commands legal right now in a specific running session for your API key's role, call
+    `GET /v1/sessions/{session_id}/commands` instead.
     """
     return paginate(command_summaries(kind, mode), page)
 
@@ -339,13 +392,16 @@ def list_commands(
     ),
 )
 def get_command(
-    command_type: Annotated[str, Path(description="A `command_type` from the command list, like `move_party`.")],
+    command_type: Annotated[
+        str, Path(description="`command_type` identifier from `GET /v1/rules/commands`, such as `move_party`.")
+    ],
 ) -> CommandDetail:
-    """Return one command's summary and the JSON Schema of its request body.
+    """Return one command's summary and the JSON Schema for `POST /v1/sessions/{session_id}/commands`.
 
-    Send a body that matches `json_schema`, with `command_type` set, to `POST /v1/sessions/{session_id}/commands`. A
-    client can build a form for the command from the schema. `json_schema` describes `source` too, but only a referee
-    may send it.
+    Use `json_schema` to build dynamic command forms or validate payloads client-side. Always send `command_type` in
+    the request body even though osrlib's raw Pydantic schema lists `command_type` with a default rather than inside
+    `required`. Only a caller with the `referee` role may send commands whose `kind` is `referee` or set a non-`null`
+    `source` field.
     """
     return command_detail(command_type)
 
@@ -354,6 +410,6 @@ def get_command(
     "/license", summary="Get the license of the rules content", response_description="The license's name and text."
 )
 def get_license() -> License:
-    """Return the Open Game License 1.0a text that covers the rules content, with its Section 15 notice."""
+    """Return the Open Game License 1.0a text and Section 15 copyright notice that govern osrlib's rules content."""
     text = resources.files("osrlib.data").joinpath("LICENSE-OGL.md").read_text(encoding="utf-8")
     return License(name="Open Game License 1.0a", text=text)
