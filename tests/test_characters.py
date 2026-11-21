@@ -1,3 +1,4 @@
+import json
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
@@ -23,6 +24,8 @@ from osrlib.data import load_ability_tables, load_classes, load_equipment, load_
 
 from bxapi.db import CharacterDocumentRow, Database
 from bxapi.settings import Settings
+
+from .conftest import problem_without_id
 
 FIGHTER = {"name": "Hild", "class_id": "fighter", "alignment": "lawful"}
 CLASS_IDS = [definition.id for definition in load_classes().classes]
@@ -293,7 +296,7 @@ def test_retrying_a_refused_creation_never_changes_the_gold(referee: TestClient)
     }
     refusals = [referee.post("/v1/characters", json=greedy) for _ in range(100)]
     assert {response.status_code for response in refusals} == {422}
-    assert len({response.text for response in refusals}) == 1
+    assert len({json.dumps(problem_without_id(response)) for response in refusals}) == 1
     affordable = greedy | {"purchases": [{"item_id": "dagger", "quantity": gold // dagger}]}
     stored = referee.post("/v1/characters", json=affordable).json()
     assert stored["character"]["inventory"]["purse"]["gp"] == gold - (gold // dagger) * dagger

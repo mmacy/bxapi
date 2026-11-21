@@ -8,9 +8,9 @@ router. Serve it with the `bxapi` command, or point an ASGI server at the factor
 uvicorn bxapi.app:create_app --factory --port 8640
 ```
 
-The `bxapi` command sends bxapi's log lines, like the one about API keys at startup, to the
-same place as uvicorn's. Another ASGI server shows them only if you configure the
-`bxapi` logger.
+The `bxapi` command sends bxapi's log lines, like the one about API keys at startup and the one
+for each request, to the same place as uvicorn's. Another ASGI server shows them only if you
+configure the `bxapi` logger.
 """
 
 import asyncio
@@ -42,6 +42,7 @@ from bxapi.errors import (
     request_timeout,
 )
 from bxapi.openapi_examples import add_examples
+from bxapi.request_ids import REQUEST_ID_HEADER, RequestIdMiddleware, request_id_of
 from bxapi.routers import V1_ROUTERS, meta
 from bxapi.session_manager import SessionManager
 from bxapi.settings import Settings, SettingsError
@@ -125,6 +126,10 @@ exist.
   Where a description says that a model raises `ValueError` or `ValidationError`, the server refuses
   the request: a command or another request body gets 422 `validation_error`, and an uploaded or
   imported document, like an adventure, gets 422 `content_invalid`.
+- **Request ids.** Every response has an `X-Request-Id` header, like
+  `req_Zk3uY0mWq1x8Jr5cTt2aLw`, and the server logs the id with the request. To choose the id,
+  send `X-Request-Id` with 1 to 128 letters, digits, and the characters `.`, `_`, `~`, and `-`.
+  The server replaces any other value with an id it draws.
 - **Rate limits.** The server has none.
 
 ## Refused commands
@@ -147,15 +152,18 @@ schema lists. Each operation's responses list the codes it returns, with what to
   "status": 404,
   "detail": "No session has the id 'ses_nope'.",
   "code": "not_found",
+  "request_id": "req_Zk3uY0mWq1x8Jr5cTt2aLw",
   "resource": "session",
   "id": "ses_nope"
 }
 ```
 
+`request_id` is the id in the response's `X-Request-Id` header.
+
 Three codes can succeed when you send the same request again: 409 `session_busy`, 503
 `database_busy` after the one second in its `Retry-After` header, and 408 `request_timeout`. For
-any other code, change the request first. For a 500, report the request to whoever runs the
-server.
+any other code, change the request first. For a 500, report the `request_id` to whoever runs
+the server.
 """
 
 _TAGS = [
@@ -411,7 +419,7 @@ class BodyLimitMiddleware:
         too_slow = request_timeout(self.timeout_seconds)
         declared = Headers(scope=scope).get("content-length")
         if declared is not None and declared.isdigit() and int(declared) > self.max_bytes:
-            response = problem_response(too_large.problem())
+            response = problem_response(too_large.problem(), request_id=request_id_of(scope))
             await response(scope, receive, send)
             return
         received = 0
@@ -513,6 +521,21 @@ def _describe_problems(schema: dict[str, Any]) -> None:
             del schemas[name]
 
 
+def _describe_request_ids(schema: dict[str, Any]) -> None:
+    # One header definition, which every response of every operation refers to.
+    schema.setdefault("components", {}).setdefault("headers", {})[REQUEST_ID_HEADER] = {
+        "description": "The id of the request, like `req_Zk3uY0mWq1x8Jr5cTt2aLw`. The server logs it with the "
+        "request. It's the `X-Request-Id` the request sent, when that was 1 to 128 letters, digits, and the "
+        "characters `.`, `_`, `~`, and `-`. Otherwise the server draws it.",
+        "schema": {"type": "string"},
+    }
+    reference = {"$ref": f"#/components/headers/{REQUEST_ID_HEADER}"}
+    for path in schema.get("paths", {}).values():
+        for operation in path.values():
+            for response in operation.get("responses", {}).values():
+                response.setdefault("headers", {})[REQUEST_ID_HEADER] = reference
+
+
 def _discriminators(value: object) -> Iterator[dict[str, Any]]:
     if isinstance(value, dict):
         if isinstance(value.get("discriminator"), dict):
@@ -558,6 +581,7 @@ def _install_openapi(app: FastAPI) -> None:
                 license_info=app.license_info,
             )
             _describe_problems(schema)
+            _describe_request_ids(schema)
             _require_discriminators(schema)
             add_examples(schema)
             app.openapi_schema = schema
@@ -634,9 +658,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.db = Database(settings.database)
     app.state.sessions = SessionManager(app.state.db, cache_size=settings.session_cache_size)
     install_error_handlers(app)
-    # Each middleware added wraps the ones before it. A request passes the CORS headers first,
-    # then the API key check, then the body limits, so the server reads no body from a caller
-    # without a key.
+    # Each middleware added wraps the ones before it. A request gets its id first, then passes
+    # the CORS headers, then the API key check, then the body limits, so the server reads no body
+    # from a caller without a key.
     app.add_middleware(
         BodyLimitMiddleware, max_bytes=settings.max_body_bytes, timeout_seconds=settings.body_timeout_seconds
     )
@@ -647,8 +671,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             allow_origins=list(settings.cors_origins),
             allow_methods=["*"],
             allow_headers=["*"],
-            expose_headers=["WWW-Authenticate", "Retry-After"],
+            expose_headers=["WWW-Authenticate", "Retry-After", REQUEST_ID_HEADER],
         )
+    app.add_middleware(RequestIdMiddleware)
     app.include_router(meta.health_router)
     v1 = APIRouter(prefix="/v1", dependencies=[Depends(authenticate)], responses=_SHARED_ERRORS)
     for router in V1_ROUTERS:

@@ -30,6 +30,7 @@ from starlette.datastructures import Headers
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from bxapi.errors import ApiError, forbidden, problem_response
+from bxapi.request_ids import request_id_of
 from bxapi.settings import Role, Settings
 
 __all__ = [
@@ -158,7 +159,8 @@ class AuthMiddleware:
         principal = find_principal(self.settings, Headers(scope=scope).get("authorization"))
         if principal is None:
             error = unauthorized()
-            await problem_response(error.problem(), error.headers)(scope, receive, send)
+            response = problem_response(error.problem(), error.headers, request_id=request_id_of(scope))
+            await response(scope, receive, send)
             return
         scope.setdefault("state", {})["principal"] = principal
         await self.app(scope, receive, send)

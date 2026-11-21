@@ -287,7 +287,7 @@ curl -si http://127.0.0.1:8640/v1/saves/sav_E6NKZNiBl4c2jL_rkyY8Bg/document -H "
 ```text
 HTTP/1.1 403 Forbidden
 ...
-{"type":"about:blank","title":"Forbidden","status":403,"detail":"This request needs an API key with the referee role.","code":"referee_required"}
+{"type":"about:blank","title":"Forbidden","status":403,"detail":"This request needs an API key with the referee role.","code":"referee_required","request_id":"req_jKx8npCJb0HmgXFm7im4_Q"}
 ```
 
 ## Read the full adventure document

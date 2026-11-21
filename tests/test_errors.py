@@ -25,7 +25,7 @@ from bxapi.errors import (
 )
 from bxapi.settings import Settings
 
-from .conftest import PLAYER_KEY, bearer
+from .conftest import PLAYER_KEY, bearer, problem_without_id
 
 
 class _Body(BaseModel):
@@ -101,7 +101,7 @@ def test_every_error_is_a_problem_document(api: TestClient, kind: str, status: i
 
 
 def test_extra_members_are_sent(api: TestClient) -> None:
-    assert api.get("/raise/not-found").json() | {"title": "", "detail": ""} == {
+    assert problem_without_id(api.get("/raise/not-found")) | {"title": "", "detail": ""} == {
         "type": "about:blank",
         "title": "",
         "status": 404,
@@ -116,7 +116,7 @@ def test_extra_members_are_sent(api: TestClient) -> None:
 def test_unexpected_errors_hide_the_cause(api: TestClient) -> None:
     response = api.get("/raise/bug")
     assert "secret" not in response.text
-    assert response.json() == internal_error().problem().model_dump(mode="json")
+    assert problem_without_id(response) == internal_error().problem().model_dump(mode="json")
 
 
 def test_request_validation_lists_each_field(api: TestClient) -> None:
@@ -139,7 +139,7 @@ def test_declared_body_over_the_limit_is_413(settings: Settings, make_client: Ca
     response = client.post("/v1/meta", content=b"x" * 2048)
     assert response.status_code == 413
     assert response.headers["content-type"] == PROBLEM_MEDIA_TYPE
-    assert response.json() == content_too_large(1024).problem().model_dump(mode="json")
+    assert problem_without_id(response) == content_too_large(1024).problem().model_dump(mode="json")
 
 
 def test_streamed_body_over_the_limit_is_413(settings: Settings) -> None:
@@ -158,7 +158,7 @@ def test_streamed_body_over_the_limit_is_413(settings: Settings) -> None:
     with TestClient(app) as client:
         response = client.post("/echo", content=chunks(), headers={"Content-Type": "application/json"})
     assert response.status_code == 413
-    assert response.json() == content_too_large(1024).problem().model_dump(mode="json")
+    assert problem_without_id(response) == content_too_large(1024).problem().model_dump(mode="json")
 
 
 def test_cors_headers_only_for_configured_origins(settings: Settings, make_client: Callable[..., TestClient]) -> None:
@@ -240,7 +240,7 @@ def test_a_write_lock_held_by_another_process_is_503(
         holder.close()
     assert response.status_code == 503
     assert response.headers["retry-after"] == "1"
-    assert response.json() == database_busy().problem().model_dump(mode="json")
+    assert problem_without_id(response) == database_busy().problem().model_dump(mode="json")
     assert client.post("/v1/ability-rolls").status_code == 201
 
 
@@ -292,6 +292,7 @@ def test_a_body_that_never_arrives_is_408(keyed_settings: Settings) -> None:
 
     status, problem = _call(app, scope, receive)
     assert status == 408
+    assert problem.pop("request_id").startswith("req_")
     assert problem == request_timeout(0.2).problem().model_dump(mode="json")
     app.state.db.close()
 

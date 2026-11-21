@@ -23,6 +23,7 @@ The contract below covers version 1 of the API. For how to work in the repositor
 - **Documents.** osrlib wraps each serialized adventure, character, party, and save in an envelope with the keys `kind`, `schema_version`, `engine_version`, and `payload`. This specification calls the envelope a *document*. An endpoint that imports a document accepts the document as the whole request body.
 - **OpenAPI.** `GET /openapi.json` describes every endpoint. Each operation's `operationId` is a short snake_case name, like `roll_dice`, that doesn't change between releases. Each operation has request and response examples, including one for each error code the operation lists. `tests/test_openapi_examples.py` checks the recorded examples against the server. The interactive documentation is at `/docs` and `/redoc`. The three paths need no API key, so anyone who can reach the server can read the API's description. `BXAPI_DOCS_ENABLED=false` turns all three off.
 - **Creation.** A request that creates a stored resource returns 201 and the resource. A delete returns 204 with no body.
+- **Request ids.** The server gives every request an id and returns it in the `X-Request-Id` response header, on every response, including an error and the answer to a CORS preflight request. A request can choose its id by sending `X-Request-Id` with 1 to 128 letters, digits, and the characters `.`, `_`, `~`, and `-`. For a request with no such header, or with any other value, the server draws an id made of `req_` and 22 random URL-safe characters. A problem document repeats the id as `request_id`. The server logs one line for each request to the `bxapi.access` logger when the response is sent: the id, the method, the path without the query string, the status, the time taken in milliseconds, and the client name of the request's API key, or `-` for a request with no valid key. The traceback the server logs for 500 `internal_error` has the id too.
 
 ### Authentication and roles
 
@@ -41,7 +42,7 @@ The server checks the key before it reads the request's body. A request under `/
 
 ### Errors
 
-Every error response is an RFC 9457 problem document with the media type `application/problem+json`. `type` is always `about:blank`. A client reads `code`. `detail` is a short description for a person, at most 1,000 characters. A document has only the extra members that the table below lists for its code. A client ignores any member it doesn't know.
+Every error response is an RFC 9457 problem document with the media type `application/problem+json`. `type` is always `about:blank`. A client reads `code`. `detail` is a short description for a person, at most 1,000 characters. `request_id` is the request's id, the same as the `X-Request-Id` header. A document has only the extra members that the table below lists for its code. A client ignores any member it doesn't know.
 
 | Status | `code` | When | Extra members |
 | --- | --- | --- | --- |
@@ -329,7 +330,7 @@ Every query that reads or changes a row filters on `client`.
 | `BXAPI_DATABASE` | `bxapi.db` | The path of the SQLite file, or `:memory:`. |
 | `BXAPI_API_KEYS` | `[]` | A JSON list of `{"client", "key", "role"}`. `role` defaults to `player`, and a member other than `client`, `key`, and `role` is an error. |
 | `BXAPI_ALLOW_ANONYMOUS` | `false` | Whether a server with no API keys starts. Such a server asks for no key and treats every caller as a referee for the client `local`. |
-| `BXAPI_CORS_ORIGINS` | `[]` | A JSON list of the web origins whose pages may call the API. Each is a scheme, a host, and an optional port, like `https://game.example`, with no path and no trailing slash. `*` isn't allowed. Cross-origin responses expose the `WWW-Authenticate` and `Retry-After` headers. |
+| `BXAPI_CORS_ORIGINS` | `[]` | A JSON list of the web origins whose pages may call the API. Each is a scheme, a host, and an optional port, like `https://game.example`, with no path and no trailing slash. `*` isn't allowed. Cross-origin responses expose the `WWW-Authenticate`, `Retry-After`, and `X-Request-Id` headers. |
 | `BXAPI_SESSION_CACHE_SIZE` | `256` | How many sessions stay loaded in memory. |
 | `BXAPI_MAX_BODY_BYTES` | `8388608` | The largest request body. |
 | `BXAPI_BODY_TIMEOUT_SECONDS` | `30` | How long the server waits for a request's whole body to arrive. |

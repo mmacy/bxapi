@@ -99,7 +99,7 @@ access-control-allow-headers: authorization,content-type
 ...
 ```
 
-The server lists `WWW-Authenticate` and `Retry-After` in `access-control-expose-headers`, so a page's code can read them. A request from an origin that isn't in the list gets no `access-control-allow-origin` header, so the browser stops the page from reading the response. A key in a web page's code is readable by every player, so use a player key there and never a referee key. For more on that, see [An application with many users](authentication.md#an-application-with-many-users).
+The server lists `WWW-Authenticate`, `Retry-After`, and `X-Request-Id` in `access-control-expose-headers`, so a page's code can read them. A request from an origin that isn't in the list gets no `access-control-allow-origin` header, so the browser stops the page from reading the response. A key in a web page's code is readable by every player, so use a player key there and never a referee key. For more on that, see [An application with many users](authentication.md#an-application-with-many-users).
 
 ### Choose where the database lives and back it up
 
@@ -122,6 +122,20 @@ To restore, stop the server, put the backup where `BXAPI_DATABASE` points, and s
 ### Put a reverse proxy in front
 
 The server limits how long a request's body takes to arrive, with `BXAPI_BODY_TIMEOUT_SECONDS`, but it can't limit how long a client takes to send a request's headers or how long a connection stays open between requests. Run a deployed server behind a *reverse proxy*, a server like nginx or Caddy that accepts the connections from the internet and forwards the requests to bxapi. Set the proxy to enforce timeouts for headers and idle connections, to end TLS, and to limit the body size. Keep bxapi on the default `BXAPI_HOST` of `127.0.0.1`, so only the proxy on the same machine can reach it, or on a private network address.
+
+### Find a request in the log
+
+The `bxapi` command logs one line for each request, when it sends the response:
+
+```text
+INFO:     request_id=req_Zk3uY0mWq1x8Jr5cTt2aLw method=POST path=/v1/sessions/ses_BVmUCi5oRTQ0qSr1NadnJw/commands status=200 duration_ms=2.3 client=my-game
+```
+
+`request_id` is the id in the response's `X-Request-Id` header and in a problem document's `request_id`, so a client developer who reports an error can give you the id to search for. `duration_ms` is the time the server took. `client` is the client name of the request's API key, or `-` for a request with no valid key. The line never contains a key, a query string, or a body. When a request fails with 500 `internal_error`, the server also logs the traceback, in a line that states the same id.
+
+A client can send its own `X-Request-Id`, so don't treat an id as unique or as proof of who sent a request.
+
+The line goes to the Python logger `bxapi.access`, at the level `INFO`. If you serve the application with another ASGI server instead of the `bxapi` command, configure the `bxapi` logger to see it.
 
 ### Run more than one process
 

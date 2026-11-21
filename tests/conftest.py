@@ -3,6 +3,7 @@
 import os
 from collections.abc import Callable, Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -19,6 +20,13 @@ API_KEYS = (
     ApiKey.model_validate({"client": "game", "key": REFEREE_KEY, "role": Role.REFEREE}),
     ApiKey.model_validate({"client": "other", "key": OTHER_KEY, "role": Role.REFEREE}),
 )
+
+
+def problem_without_id(response: Any) -> dict[str, Any]:
+    """Return a problem response's body without `request_id`, after checking that the header has the same id."""
+    body = response.json()
+    assert body.pop("request_id") == response.headers["x-request-id"]
+    return body
 
 
 def bearer(key: str) -> dict[str, str]:

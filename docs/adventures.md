@@ -123,7 +123,7 @@ curl -si -X POST http://127.0.0.1:8640/v1/adventures -H "Authorization: Bearer $
 ```text
 HTTP/1.1 422 Unprocessable Content
 ...
-{"type":"about:blank","title":"Unprocessable Content","status":422,"detail":"adventure validation failed:\nbarrow level 1: area 'guard_room' references unknown monster 'gobbin'","code":"content_invalid"}
+{"type":"about:blank","title":"Unprocessable Content","status":422,"detail":"adventure validation failed:\nbarrow level 1: area 'guard_room' references unknown monster 'gobbin'","code":"content_invalid","request_id":"req_afuWebB7a8-GKDxXczaG9Q"}
 ```
 
 Each upload stores a new adventure, even when the document is one you uploaded before. The body can be up to 8 MiB by default. See [Configuration](configuration.md) to change the limit.
@@ -159,7 +159,7 @@ curl -si http://127.0.0.1:8640/v1/adventures/adv_WGPW5ae_3LkxU1F45n24Aw/document
 ```text
 HTTP/1.1 403 Forbidden
 ...
-{"type":"about:blank","title":"Forbidden","status":403,"detail":"This request needs an API key with the referee role.","code":"referee_required"}
+{"type":"about:blank","title":"Forbidden","status":403,"detail":"This request needs an API key with the referee role.","code":"referee_required","request_id":"req_xHBXV9VUPmxOEm1Pa1egfw"}
 ```
 
 ## Play an uploaded adventure
@@ -203,7 +203,7 @@ curl -si -X DELETE http://127.0.0.1:8640/v1/adventures/builtin-barrow -H "Author
 ```text
 HTTP/1.1 403 Forbidden
 ...
-{"type":"about:blank","title":"Forbidden","status":403,"detail":"The adventure 'builtin-barrow' comes with the server.","code":"adventure_read_only"}
+{"type":"about:blank","title":"Forbidden","status":403,"detail":"The adventure 'builtin-barrow' comes with the server.","code":"adventure_read_only","request_id":"req_mbGvc16Ft6ylytZ6JL3GVw"}
 ```
 
 ## Next steps

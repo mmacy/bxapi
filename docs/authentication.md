@@ -75,7 +75,7 @@ HTTP/1.1 401 Unauthorized
 www-authenticate: Bearer
 content-type: application/problem+json
 
-{"type":"about:blank","title":"Unauthorized","status":401,"detail":"Send a valid API key as a bearer token in the Authorization header.","code":"unauthorized"}
+{"type":"about:blank","title":"Unauthorized","status":401,"detail":"Send a valid API key as a bearer token in the Authorization header.","code":"unauthorized","request_id":"req_pewzocxFBnn9U0Tb3_JQiQ"}
 ```
 
 Your application can't fix a 401 by trying again. Check the key your application sends.
@@ -100,7 +100,7 @@ HTTP/1.1 403 Forbidden
 ...
 content-type: application/problem+json
 
-{"type":"about:blank","title":"Forbidden","status":403,"detail":"This request needs an API key with the referee role.","code":"referee_required"}
+{"type":"about:blank","title":"Forbidden","status":403,"detail":"This request needs an API key with the referee role.","code":"referee_required","request_id":"req_HM0yFc_Skx2W4peAo6cCFg"}
 ```
 
 The same request with the referee key works:
@@ -166,7 +166,7 @@ HTTP/1.1 404 Not Found
 ...
 content-type: application/problem+json
 
-{"type":"about:blank","title":"Not Found","status":404,"detail":"No session has the id 'ses_Bq2lhAvBgBLVtCRWuWkVUQ'.","code":"not_found","resource":"session","id":"ses_Bq2lhAvBgBLVtCRWuWkVUQ"}
+{"type":"about:blank","title":"Not Found","status":404,"detail":"No session has the id 'ses_Bq2lhAvBgBLVtCRWuWkVUQ'.","code":"not_found","request_id":"req_biSalP_FWxiKOYf0axyAlA","resource":"session","id":"ses_Bq2lhAvBgBLVtCRWuWkVUQ"}
 ```
 
 ```sh

@@ -11,6 +11,7 @@ Every error response has a 4xx or 5xx status and the media type `application/pro
 - `status` is the HTTP status.
 - `code` is a short fixed name for the error. Read `code` in your client to decide what to do.
 - `detail` is a sentence for a person, at most 1,000 characters. Show it to a developer or put it in a log, and don't match on its text, because the wording can change.
+- `request_id` is the id the server gave the request. The `X-Request-Id` response header has the same id.
 - Some codes add members, like `revision` or `resource`. The table below lists them. Have your client ignore any member it doesn't recognize.
 
 For example, a request for a character that doesn't exist:
@@ -24,10 +25,28 @@ HTTP/1.1 404 Not Found
 ...
 content-type: application/problem+json
 
-{"type":"about:blank","title":"Not Found","status":404,"detail":"No character has the id 'chr_doesnotexist'.","code":"not_found","resource":"character","id":"chr_doesnotexist"}
+{"type":"about:blank","title":"Not Found","status":404,"detail":"No character has the id 'chr_doesnotexist'.","code":"not_found","request_id":"req_C1tg5yjlBBxBDofQPlRXoQ","resource":"character","id":"chr_doesnotexist"}
 ```
 
 These examples use a player key, a key with the `player` role, in the shell variable `KEY`, as [Play a game](play-a-game.md#start-a-server-with-a-player-key) sets up. For more about keys and roles, see [Authentication](authentication.md). The `-i` option makes curl print the status line and headers.
+
+## Report a failed request
+
+Every response, successful or not, has an `X-Request-Id` header, and the server logs that id with the request. Have your client log the `request_id` of each problem document. When you report an error to whoever runs the server, include the id, so they can find the request in the server's log. For a 500 `internal_error`, the server logs the cause with the same id.
+
+To follow one request through your own systems and the server's log, choose the id yourself. Send an `X-Request-Id` header with 1 to 128 letters, digits, and the characters `.`, `_`, `~`, and `-`:
+
+```sh
+curl -si http://127.0.0.1:8640/v1/meta -H "Authorization: Bearer $KEY" -H "X-Request-Id: checkout-7f3a"
+```
+
+```text
+HTTP/1.1 200 OK
+...
+x-request-id: checkout-7f3a
+```
+
+The server replaces any other value with an id it draws, which starts with `req_`.
 
 ## Tell a refused command from an error
 
@@ -50,7 +69,7 @@ HTTP/1.1 422 Unprocessable Content
 ...
 content-type: application/problem+json
 
-{"type":"about:blank","title":"Unprocessable Content","status":422,"detail":"The request failed validation. See `errors` for each field.","code":"validation_error","errors":[{"loc":["body"],"msg":"'fly' isn't a value that 'command_type' accepts.","type":"union_tag_invalid"}],"error_count":1}
+{"type":"about:blank","title":"Unprocessable Content","status":422,"detail":"The request failed validation. See `errors` for each field.","code":"validation_error","request_id":"req_G8f0xBMB3wTR7-DqjdMQjA","errors":[{"loc":["body"],"msg":"'fly' isn't a value that 'command_type' accepts.","type":"union_tag_invalid"}],"error_count":1}
 ```
 
 Handle a refusal as a result of play: read `rejections` and tell the player. Handle an error as a bug in your client or as a reason to retry. The table below lists what to do for each code.
@@ -78,8 +97,8 @@ Unlike the commands endpoint, the endpoints that create a character, `POST /v1/c
 | 422 | `content_invalid` | The rules engine refused a value or a document as malformed, like a dice expression it can't parse or an adventure that refers to a monster that doesn't exist. | Fix the value or the document. Read `detail`. | |
 | 422 | `character_invalid` | The choices for a new character break a rule, or name a class or an item that doesn't exist. | Show the player the `rejections` and let them choose again. | `rejections`, or `field`, `index`, and `id` |
 | 422 | `party_invalid` | The characters named for a new session can't form a party: the rules refuse the party, it has more than 20 members, or two members have the same id. | Change the party. | |
-| 500 | `internal_error` | A bug in the server. The response says nothing about the cause, and the server logs it. | Report it. Retrying a command with `expected_revision` is safe. | |
-| 500 | `session_unreadable` | The server can't load a stored session or save, for example because a server with a different osrlib release wrote it. The response has no detail from the stored state. | Don't retry. Report it to whoever runs the server. | |
+| 500 | `internal_error` | A bug in the server. The response says nothing about the cause, and the server logs it. | Report it, with the `request_id`. Retrying a command with `expected_revision` is safe. | |
+| 500 | `session_unreadable` | The server can't load a stored session or save, for example because a server with a different osrlib release wrote it. The response has no detail from the stored state. | Don't retry. Report it to whoever runs the server, with the `request_id`. | |
 | 503 | `database_busy` | Another process held the database's write lock longer than the server waits, which is 5 seconds. The response has the header `Retry-After: 1`. | Wait the number of seconds in `Retry-After`, then send the request again. | |
 
 For `validation_error`, `errors` lists the first 20 problems. Each has `loc`, the place in the request, `msg`, and `type`. For example, a dice request that asks for zero rolls:
@@ -91,7 +110,7 @@ curl -si -X POST http://127.0.0.1:8640/v1/dice/roll -H "Authorization: Bearer $K
 ```text
 HTTP/1.1 422 Unprocessable Content
 ...
-{"type":"about:blank","title":"Unprocessable Content","status":422,"detail":"The request failed validation. See `errors` for each field.","code":"validation_error","errors":[{"loc":["body","times"],"msg":"Input should be greater than or equal to 1","type":"greater_than_equal"}],"error_count":1}
+{"type":"about:blank","title":"Unprocessable Content","status":422,"detail":"The request failed validation. See `errors` for each field.","code":"validation_error","request_id":"req_E8rrNKpRWiOqYKkv08gtoA","errors":[{"loc":["body","times"],"msg":"Input should be greater than or equal to 1","type":"greater_than_equal"}],"error_count":1}
 ```
 
 A request body with a field that the endpoint doesn't define is a `validation_error` too, except in a command, where the server ignores a field the command doesn't define.
@@ -105,7 +124,7 @@ curl -si -X POST http://127.0.0.1:8640/v1/sessions/ses_69rujo4njhlTcX0L0EgfEw/co
 ```text
 HTTP/1.1 403 Forbidden
 ...
-{"type":"about:blank","title":"Forbidden","status":403,"detail":"Only an API key with the referee role can set a command's source.","code":"referee_required"}
+{"type":"about:blank","title":"Forbidden","status":403,"detail":"Only an API key with the referee role can set a command's source.","code":"referee_required","request_id":"req_MrYTOpV06fNG4ovJevhzrw"}
 ```
 
 A caller with a player key who sends a referee command gets `referee_command`, with the command's name:
@@ -117,7 +136,7 @@ curl -si -X POST http://127.0.0.1:8640/v1/sessions/ses_69rujo4njhlTcX0L0EgfEw/co
 ```text
 HTTP/1.1 403 Forbidden
 ...
-{"type":"about:blank","title":"Forbidden","status":403,"detail":"Only an API key with the referee role can send 'grant_item'.","code":"referee_command","command_type":"grant_item"}
+{"type":"about:blank","title":"Forbidden","status":403,"detail":"Only an API key with the referee role can send 'grant_item'.","code":"referee_command","request_id":"req_85m_8BdAXuKAR4A4imjy2Q","command_type":"grant_item"}
 ```
 
 ## Handle the three conflicts
@@ -131,7 +150,7 @@ A session has a *revision*, a count of the commands that the session has accepte
 ```text
 HTTP/1.1 409 Conflict
 ...
-{"type":"about:blank","title":"Conflict","status":409,"detail":"The session is at revision 1, not 0. Read the view and decide whether to send the command again.","code":"revision_conflict","revision":1}
+{"type":"about:blank","title":"Conflict","status":409,"detail":"The session is at revision 1, not 0. Read the view and decide whether to send the command again.","code":"revision_conflict","request_id":"req_OTRODr6Qm2o2f5m56PotAQ","revision":1}
 ```
 
 When the revision is higher than the one you sent, the session accepted a command after you read the revision. There are two ways that can happen:
@@ -153,7 +172,7 @@ The problem document includes the session's current `revision`:
 ```text
 HTTP/1.1 409 Conflict
 ...
-{"type":"about:blank","title":"Conflict","status":409,"detail":"Another server process wrote the session after this request read it and before this request wrote it, so the command had no effect. The session is at revision 11. If you sent expected_revision, read the session before you decide what to do: when the revision has changed, the same request gets revision_conflict. If you didn't, send the request again.","code":"session_busy","revision":11}
+{"type":"about:blank","title":"Conflict","status":409,"detail":"Another server process wrote the session after this request read it and before this request wrote it, so the command had no effect. The session is at revision 11. If you sent expected_revision, read the session before you decide what to do: when the revision has changed, the same request gets revision_conflict. If you didn't, send the request again.","code":"session_busy","request_id":"req_NmLg5cAIh3LnK2XI_Dps1w","revision":11}
 ```
 
 Handle it this way:
@@ -172,7 +191,7 @@ curl -si -X POST http://127.0.0.1:8640/v1/characters -H "Authorization: Bearer $
 ```text
 HTTP/1.1 409 Conflict
 ...
-{"type":"about:blank","title":"Conflict","status":409,"detail":"A character was already created from the ability roll 'rol_yQsuUWgqmzpnDA6Sm51kQA'.","code":"ability_roll_used"}
+{"type":"about:blank","title":"Conflict","status":409,"detail":"A character was already created from the ability roll 'rol_yQsuUWgqmzpnDA6Sm51kQA'.","code":"ability_roll_used","request_id":"req_OF7V4g893HeodzfygO6keA"}
 ```
 
 Your client either asks for a new roll with `POST /v1/ability-rolls`, or it finds the character the roll created with `GET /v1/characters`. A request that failed with `character_invalid` doesn't use up the roll, so the player can try again with the same one.

@@ -44,6 +44,7 @@ from bxapi.settings import Settings
 
 __all__ = [
     "EXAMPLES_FILE",
+    "EXAMPLE_REQUEST_ID",
     "SharedProblem",
     "add_examples",
     "error_codes",
@@ -55,6 +56,9 @@ __all__ = [
 
 EXAMPLES_FILE = "openapi_examples.json"
 """The name of the file in the `bxapi` package that lists the examples."""
+
+EXAMPLE_REQUEST_ID = "req_Zk3uY0mWq1x8Jr5cTt2aLw"
+"""The `request_id` in each example from [`shared_problems`][bxapi.openapi_examples.shared_problems]."""
 
 
 @cache
@@ -91,7 +95,8 @@ def shared_problems() -> tuple[SharedProblem, ...]:
     """Return the examples of the errors that the recorded exchanges don't cover.
 
     Each example's problem document comes from the function that the server calls to build that
-    error, with the default settings where the detail states a limit.
+    error, with the default settings where the detail states a limit. Its `request_id` is
+    [`EXAMPLE_REQUEST_ID`][bxapi.openapi_examples.EXAMPLE_REQUEST_ID].
 
     Returns:
         One example for each error code, except `session_unreadable`, which has one for a
@@ -110,7 +115,8 @@ def shared_problems() -> tuple[SharedProblem, ...]:
     missing = {"type": "missing", "loc": ("body", "expression"), "msg": "Field required"}
 
     def shared(name: str, summary: str, description: str, error: ApiError, *operations: str) -> SharedProblem:
-        return SharedProblem(name, summary, description, error.problem(), frozenset(operations))
+        problem = error.problem().model_copy(update={"request_id": EXAMPLE_REQUEST_ID})
+        return SharedProblem(name, summary, description, problem, frozenset(operations))
 
     return (
         shared(
