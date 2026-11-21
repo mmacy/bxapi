@@ -10,16 +10,15 @@ bxapi is an HTTP API for the rules of B/X (Basic/Expert), a fantasy adventure ga
 
 ## Get it running
 
-Clone the repository, install the dependencies, and start the server:
+Clone the repository and start the server:
 
 ```sh
 git clone https://github.com/mmacy/bxapi.git
 cd bxapi
-uv sync
 BXAPI_ALLOW_ANONYMOUS=true uv run bxapi
 ```
 
-The server listens on <http://127.0.0.1:8640>.
+The server listens on <http://127.0.0.1:8640>. The first time you run `uv run bxapi`, it takes longer to start, because uv installs the dependencies, and Python 3.14 if you don't have it.
 
 A server with no API keys refuses to start unless `BXAPI_ALLOW_ANONYMOUS` is `true`. With that setting, the server asks for no key and treats every caller as a *referee*, a caller who may see a game's hidden state and change the game directly. Use the setting only on your own machine. To run a server for other people, see [Run it for other people](docs/configuration.md#run-it-for-other-people).
 

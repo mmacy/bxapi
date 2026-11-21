@@ -4,7 +4,7 @@ Upload your own adventure so a session can play it, and check an adventure docum
 
 An *adventure* is the content that a *session*, one game in progress, plays: a town, dungeons with maps, monsters and treasure, and the triggers and quests that drive them. An *adventure document* is an adventure written as JSON.
 
-You don't need to write a document by hand. Two tools write adventure documents: [osr-forge](https://github.com/mmacy/osr-forge) converts a tabletop adventure module PDF into a document, and [osr-editor](https://github.com/mmacy/osr-editor) is a graphical editor for creating and changing one. Both write the `adventure.json` file that bxapi accepts as a request body. A program that uses [osrlib](https://mmacy.github.io/osrlib-python/), the Python rules engine that bxapi runs, can also write one.
+You don't need to write a document by hand. Two separate projects by osrlib's author write adventure documents: [osr-forge](https://github.com/mmacy/osr-forge) converts a tabletop adventure module PDF into a document, and [osr-editor](https://github.com/mmacy/osr-editor) is a graphical editor for creating and changing one. Both write the `adventure.json` file that bxapi accepts as a request body. A program that uses [osrlib](https://mmacy.github.io/osrlib-python/), the Python rules engine that bxapi runs, can also write one.
 
 The document has four members:
 

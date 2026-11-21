@@ -63,7 +63,7 @@ Every error response is an RFC 9457 problem document with the media type `applic
 | 422 | `character_invalid` | The choices for a new character break a rule, or name a class or an item osrlib doesn't have. | `rejections`, when osrlib reports them. Otherwise `field` (the request field that's wrong, like `equip_item_ids`), `index` (the entry's position, when `field` is a list), and `id` (the value of that entry). |
 | 422 | `party_invalid` | The characters named for a new session can't form a party: osrlib refused the party, a `party_document` has more than 20 members, or two members end up with the same id. | |
 | 500 | `internal_error` | A bug. The response says nothing about the cause, and the server logs the traceback. | |
-| 500 | `session_unreadable` | The server's osrlib can't load a stored session, or a stored save to restore. The response contains nothing from the stored state, and the server logs the cause with the id. | |
+| 500 | `session_unreadable` | The server's osrlib can't load a stored session, or a stored save to restore. The `detail` says whether it's the session's or the save's stored state. The response contains nothing else from the stored state, and the server logs the cause with the id. | |
 | 503 | `database_busy` | Another process held the database's write lock for longer than the 5 seconds the server waits. The response has the header `Retry-After: 1`. Send the request again. | |
 
 ## Endpoints
@@ -174,7 +174,7 @@ An import also gets 422 `content_invalid` when the character has a stat modifier
 
 ### Adventures
 
-An adventure is the content a session plays: a town, dungeons, and the triggers and quests that drive them. Tools like osr-forge and osr-editor write adventure documents. The server also includes at least one small adventure, so a new client can start a game without uploading anything.
+An adventure is the content a session plays: a town, dungeons, and the triggers and quests that drive them. Two separate projects by osrlib's author write adventure documents: osr-forge converts adventure module PDFs into them, and osr-editor is a local graphical application for writing and editing them. The server also includes at least one small adventure, so a new client can start a game without uploading anything.
 
 | Method and path | Role | Returns |
 | --- | --- | --- |

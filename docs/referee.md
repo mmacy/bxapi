@@ -137,7 +137,7 @@ curl -s http://127.0.0.1:8640/v1/sessions/ses_0VOivRW_xUk35SOGrfDwDA/referee-vie
 }
 ```
 
-Compared with the player view, it has the monsters' hit points and ids, the whole adventure and its map, the treasure in each cache, the state of the dice-driven parts of the game, and every event, including the ones only a referee may see. From a group's `monster_ids`, you can tell which monsters in the battle messages, like `monster-0001`, belong to the group.
+Compared with the player view, it has the monsters' hit points and ids, the whole adventure and its map, the treasure in each cache, the session's flags and the triggers that have fired, the effects that are running and the round each one expires at, the state of the battle, the log of every command, and every event, including the ones only a referee may see. From a group's `monster_ids`, you can tell which monsters in the battle messages, like `monster-0001`, belong to the group.
 
 ## End an encounter
 
