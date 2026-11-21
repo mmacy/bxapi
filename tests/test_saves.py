@@ -1,8 +1,12 @@
 import copy
+import json
+import logging
+import sqlite3
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 from osrlib.core.character import party_to_document
 from osrlib.core.events import Visibility
@@ -29,7 +33,7 @@ from .test_sessions import (
     start,
 )
 
-SAVE_KEYS = {"id", "session_id", "adventure_name", "label", "mode", "clock", "created_at"}
+SAVE_KEYS = {"id", "session_id", "adventure_id", "adventure_name", "label", "mode", "clock", "created_at"}
 
 
 def save(client: TestClient, session_id: str, **body: Any) -> dict[str, Any]:
@@ -57,8 +61,9 @@ def test_a_save_copies_the_session_and_changes_nothing(player: TestClient, refer
     assert set(labelled) == SAVE_KEYS
     assert labelled["id"].startswith("sav_")
     session = ok(player.get(f"/v1/sessions/{session_id}"))
-    assert (labelled["session_id"], labelled["adventure_name"], labelled["label"]) == (
+    assert (labelled["session_id"], labelled["adventure_id"], labelled["adventure_name"], labelled["label"]) == (
         session_id,
+        BARROW_ID,
         BARROW.name,
         "Inside the door",
     )
@@ -67,6 +72,7 @@ def test_a_save_copies_the_session_and_changes_nothing(player: TestClient, refer
     assert save(player, session_id)["label"] is None
     no_body = player.post(f"/v1/sessions/{session_id}/saves")
     assert ok(no_body, 201)["label"] is None
+    assert ok(player.post(f"/v1/sessions/{session_id}/saves", json={}), 201)["label"] is None
     assert ok(player.get(f"/v1/saves/{labelled['id']}")) == labelled
     assert ok(player.get(f"/v1/sessions/{session_id}"))["revision"] == 1
     problem(player.post(f"/v1/sessions/{session_id}/saves", json={"lable": "x"}), 422, "validation_error")
@@ -134,20 +140,22 @@ def test_a_save_outlives_its_session(player: TestClient, referee: TestClient) ->
     ok(player.delete(f"/v1/sessions/{created['session_id']}"), 204)
     assert ok(player.get(f"/v1/saves/{created['id']}")) == created
     restored = ok(player.post(f"/v1/saves/{created['id']}/restore"), 201)
-    assert restored["adventure_id"] == BARROW_ID, "the barrow's content identifies the built-in adventure"
+    assert restored["adventure_id"] == BARROW_ID
 
 
-def test_a_restored_session_of_an_unknown_adventure_has_no_adventure_id(referee: TestClient) -> None:
-    renamed = BARROW.model_copy(update={"name": "A copy of the barrow"})
-    stored = ok(referee.post("/v1/adventures", json=adventure_document(renamed)), 201)
+def test_a_restore_keeps_the_adventure_id_after_the_session_and_the_adventure_are_deleted(referee: TestClient) -> None:
+    # The copy has the built-in barrow's content, so only the recorded id tells them apart.
+    stored = ok(referee.post("/v1/adventures", json=adventure_document(BARROW)), 201)
     session = start(referee, adventure_id=stored["id"])
     created = save(referee, session["id"])
-    assert ok(referee.post(f"/v1/saves/{created['id']}/restore"), 201)["adventure_id"] == stored["id"]
+    assert created["adventure_id"] == stored["id"]
     ok(referee.delete(f"/v1/sessions/{session['id']}"), 204)
-    orphan = ok(referee.post(f"/v1/saves/{created['id']}/restore"), 201)
-    assert (orphan["adventure_id"], orphan["adventure_name"]) == (None, renamed.name)
-    assert ok(referee.get(f"/v1/sessions/{orphan['id']}"))["adventure_id"] is None
-    assert send(referee, orphan["id"], ENTER)["accepted"]
+    ok(referee.delete(f"/v1/adventures/{stored['id']}"), 204)
+    restored = ok(referee.post(f"/v1/saves/{created['id']}/restore"), 201)
+    assert (restored["adventure_id"], restored["adventure_name"]) == (stored["id"], BARROW.name)
+    assert ok(referee.get(f"/v1/sessions/{restored['id']}"))["adventure_id"] == stored["id"]
+    assert send(referee, restored["id"], ENTER)["accepted"]
+    assert save(referee, restored["id"])["adventure_id"] == stored["id"]
 
 
 def test_the_document_is_for_referees(player: TestClient, referee: TestClient) -> None:
@@ -170,12 +178,13 @@ def test_import_validates_and_restores_on_another_server(
     assert imported == created | {
         "id": imported["id"],
         "session_id": None,
+        "adventure_id": None,
         "label": None,
         "created_at": imported["created_at"],
     }
-    assert ok(elsewhere.get(f"/v1/saves/{imported['id']}/document")) == save_game(load_game(document))
     restored = ok(elsewhere.post(f"/v1/saves/{imported['id']}/restore"), 201)
-    assert (restored["adventure_id"], restored["revision"]) == (BARROW_ID, 0)
+    assert (restored["adventure_id"], restored["revision"]) == (None, 0)
+    assert save(elsewhere, restored["id"])["adventure_id"] is None
     oracle = loaded_oracle(document)
     for command in (EAST, WEST):
         assert send(elsewhere, restored["id"], command) == oracle.execute(command)
@@ -232,3 +241,47 @@ def test_a_player_never_receives_the_seed_from_a_save(player: TestClient, refere
     restored = player.post(f"/v1/saves/{save_id}/restore", json={})
     bodies += [restored.text, player.get(f"/v1/sessions/{restored.json()['id']}/view").text]
     assert str(seed) not in "\n".join(bodies)
+
+
+def test_import_stores_the_document_osrlib_writes_back(referee: TestClient) -> None:
+    received = save_game(Oracle(roll_characters()).game)
+    received["engine_version"] = "2.3.0"
+    received["payload"]["written_by_an_older_server"] = True
+    imported = ok(referee.post("/v1/saves/import", json=received), 201)
+    stored = ok(referee.get(f"/v1/saves/{imported['id']}/document"))
+    assert stored == save_game(load_game(copy.deepcopy(received)))
+    assert stored != received
+
+
+def test_import_refuses_an_adventure_osrlib_refuses(referee: TestClient) -> None:
+    document = save_game(Oracle(roll_characters()).game)
+    broken = json.loads(json.dumps(document).replace('"template_id": "goblin"', '"template_id": "no_such_monster"'))
+    assert broken != document
+    load_game(copy.deepcopy(broken))
+    found = problem(referee.post("/v1/saves/import", json=broken), 422, "content_invalid")
+    assert "no_such_monster" in found["detail"]
+    assert ok(referee.get("/v1/saves"))["total"] == 0
+
+
+def test_import_refuses_a_clock_the_database_cannot_store(referee: TestClient) -> None:
+    document = save_game(Oracle(roll_characters()).game)
+    document["payload"]["clock_rounds"] = 10**30
+    problem(referee.post("/v1/saves/import", json=document), 422, "content_invalid")
+    assert ok(referee.get("/v1/saves"))["total"] == 0
+
+
+def test_a_stored_save_osrlib_cannot_load_is_unreadable_without_details(
+    referee: TestClient, keyed_settings: Settings, caplog: pytest.LogCaptureFixture
+) -> None:
+    created = save(referee, entered(referee))
+    document = ok(referee.get(f"/v1/saves/{created['id']}/document"))
+    document["payload"]["mode"] = "SECRET-TRAP-AT-3,4"
+    with sqlite3.connect(keyed_settings.database) as connection:
+        connection.execute("UPDATE saves SET document = ? WHERE id = ?", (json.dumps(document), created["id"]))
+    with caplog.at_level(logging.ERROR, logger="bxapi"):
+        response = referee.post(f"/v1/saves/{created['id']}/restore")
+    found = problem(response, 500, "session_unreadable")
+    assert found["detail"] == "The server can't load this save's stored state."
+    assert "SECRET" not in response.text
+    assert created["id"] in caplog.text and "SECRET-TRAP-AT-3,4" in caplog.text
+    assert ok(referee.get("/v1/sessions"))["total"] == 1

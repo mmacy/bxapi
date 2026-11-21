@@ -9,7 +9,7 @@ read and write the database directly.
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Annotated, Any
 
-from fastapi import APIRouter, Path, Query, Request, Response
+from fastapi import APIRouter, Body, Path, Query, Request, Response
 from osrlib.core.character import Character, party_from_document
 from osrlib.core.clock import GameClock
 from osrlib.core.events import Event, Visibility
@@ -27,11 +27,11 @@ from bxapi.adventures import find_adventure
 from bxapi.auth import CurrentPrincipal, Principal, RefereePrincipal
 from bxapi.commands import CommandKind, command_kind
 from bxapi.db import Database, JsonObject, SaveRow, SessionRow
-from bxapi.errors import forbidden, invalid, not_found, problem_responses
+from bxapi.errors import ApiError, forbidden, invalid, not_found, problem_responses
 from bxapi.models import ApiModel, RequestModel
 from bxapi.pagination import Page, PageQuery
 from bxapi.seeds import Seed, referee_seed
-from bxapi.session_manager import UNKNOWN_ADVENTURE_ID, SessionManager
+from bxapi.session_manager import MAX_PARTY_SIZE, SessionManager
 
 __all__ = [
     "NAME_MAX_LENGTH",
@@ -57,7 +57,7 @@ NAME_MAX_LENGTH = 200
 
 type _LoggedEvent = Event | dict[str, Any]
 """An entry of a session's event log. A save from a newer osrlib can have an event type this osrlib has no class
-for, and osrlib's `load_game` keeps that entry as the dict it was stored as."""
+for, and osrlib's `load_game` returns that entry as a dict."""
 
 if TYPE_CHECKING:
     # osrlib builds `AnyCommand` and `AnyEvent` from tuples of classes at run time, so a type checker can't read
@@ -101,19 +101,18 @@ class Clock(ApiModel):
 
 
 class SessionInfo(ApiModel):
-    """A session's state as a list or a menu shows it. It contains nothing a player may not see."""
+    """A session's name, adventure, mode, revision, clock, versions, and times: what a list or a menu shows."""
 
     id: str
     """The session's id, which starts with `ses_`."""
     name: str
     """The session's name. It defaults to the adventure's name, and `PATCH` changes it."""
     adventure_id: str | None
-    """The id of the adventure the session plays, or `null` when the server can't tell which adventure that is.
+    """The id of the adventure the session plays, or `null` for a session restored from an imported save.
 
-    A session restored from a save gets the adventure id of the session the save was made from. When that session
-    was deleted, or the save was imported, the server uses the id of a built-in adventure whose content is the same
-    as the save's, and `null` when there's none. The session plays the copy of the adventure in its save either way,
-    so a `null` changes nothing in play.
+    A session restored from a save has the save's `adventure_id`. The adventure may have been deleted since the
+    session started. Neither case changes play, because the session plays the copy of the adventure in its save
+    document.
     """
     adventure_name: str
     """The name of the adventure the session plays."""
@@ -143,6 +142,9 @@ class SaveInfo(ApiModel):
     """The save's id, which starts with `sav_`."""
     session_id: str | None
     """The session the save was made from, which may have been deleted since. `null` for an imported save."""
+    adventure_id: str | None
+    """The id of the adventure the save's session played, which may have been deleted since. `null` for an
+    imported save, and for a save of a session restored from one."""
     adventure_name: str
     """The name of the adventure the save plays."""
     label: str | None
@@ -163,12 +165,13 @@ class CreateSessionRequest(RequestModel):
 
     adventure_id: str = Field(min_length=1, max_length=128)
     """The id of the adventure to play: a built-in adventure, like `builtin-barrow`, or one you uploaded."""
-    character_ids: list[str] | None = None
+    character_ids: list[str] | None = Field(default=None, max_length=MAX_PARTY_SIZE)
     """The ids of stored characters, in marching order: the first one walks in front. The session plays copies,
-    so the stored characters don't change. osrlib requires at least one member and sets no upper limit. You can name
-    a character twice to play two copies of it."""
+    so the stored characters don't change. osrlib requires at least one member, and this server allows at most 20.
+    You can name a character twice to play two copies of it."""
     party_document: JsonObject | None = None
-    """Referee only. A party document from osrlib's `party_to_document`, in place of stored characters."""
+    """Referee only. A party document from osrlib's `party_to_document`, in place of stored characters. It has at
+    most 20 characters."""
     name: str | None = Field(default=None, min_length=1, max_length=NAME_MAX_LENGTH)
     """A name for the session. Defaults to the adventure's name."""
     ruleset: Ruleset | None = None
@@ -213,7 +216,8 @@ class SessionCommands(ApiModel):
     mode: SessionMode
     """The session's mode."""
     revision: int
-    """The session's revision. Pass it as `expected_revision` to send a command only if nothing changed since."""
+    """The session's revision. Pass it as `expected_revision` to send a command only if the session has accepted no
+    command since you read this list."""
     commands: list[CommandChoice]
     """Each command that's legal in the mode and that the caller may send, in osrlib's order. A player gets only
     `play` commands. The rules can still refuse a legal command, for a reason they check when you send it."""
@@ -262,14 +266,13 @@ def session_info(row: SessionRow) -> SessionInfo:
         row: The session's row.
 
     Returns:
-        The info. `adventure_id` is `None` when the row has
-        [`UNKNOWN_ADVENTURE_ID`][bxapi.session_manager.UNKNOWN_ADVENTURE_ID].
+        The info.
     """
     mode = SessionMode(row.mode)
     return SessionInfo(
         id=row.id,
         name=row.name,
-        adventure_id=None if row.adventure_id == UNKNOWN_ADVENTURE_ID else row.adventure_id,
+        adventure_id=row.adventure_id,
         adventure_name=row.adventure_name,
         mode=mode,
         ended=mode.terminal,
@@ -294,6 +297,7 @@ def save_info(row: SaveRow) -> SaveInfo:
     return SaveInfo(
         id=row.id,
         session_id=row.session_id,
+        adventure_id=row.adventure_id,
         adventure_name=row.adventure_name,
         label=row.label,
         mode=SessionMode(row.mode),
@@ -330,8 +334,17 @@ def _message(event: _LoggedEvent) -> str:
     return format_message(event) if isinstance(event, Event) else str(event.get("code", ""))
 
 
+def _too_large() -> ApiError:
+    return invalid("party_invalid", f"A party on this server has at most {MAX_PARTY_SIZE} members.")
+
+
 def _party(db: Database, principal: Principal, body: CreateSessionRequest) -> Party:
     if body.party_document is not None:
+        # Count before osrlib parses the characters, so a huge document costs no more than the count.
+        listed = body.party_document.get("payload")
+        characters = listed.get("characters") if isinstance(listed, dict) else None
+        if isinstance(characters, list) and len(characters) > MAX_PARTY_SIZE:
+            raise _too_large()
         members = party_from_document(body.party_document)
     else:
         members = []
@@ -340,6 +353,8 @@ def _party(db: Database, principal: Principal, body: CreateSessionRequest) -> Pa
             if row is None:
                 raise not_found("character", character_id)
             members.append(Character.from_document(row.document))
+    if len(members) > MAX_PARTY_SIZE:
+        raise _too_large()
     try:
         return Party(members=members)
     except ValidationError as error:
@@ -454,7 +469,9 @@ def list_session_commands(request: Request, principal: CurrentPrincipal, session
 
 
 @router.post(
-    "/{session_id}/commands", summary="Send a command to a session", responses=problem_responses(403, 404, 409)
+    "/{session_id}/commands",
+    summary="Send a command to a session",
+    responses=problem_responses(403, 404, 409, 500),
 )
 def send_command(
     request: Request,
@@ -481,11 +498,17 @@ def send_command(
     `rejections`, and the session doesn't change. When they accept it, the server stores the new state before it
     responds, and the revision goes up by 1.
 
-    The session runs one command at a time. A player who sends a referee command gets 403 `referee_command`, and a
-    player who passes `visibility=referee` gets 403 `referee_required`. Neither request runs the command. With
-    `expected_revision`, a session at another revision runs nothing and returns 409 `revision_conflict`. When
-    another server process changes the session at the same moment, the command has no effect and the response is
-    409 `session_busy`. Send the command again.
+    A player who sends a referee command gets 403 `referee_command`. A player who passes `visibility=referee`, or
+    sends a command with a `source`, gets 403 `referee_required`. None of those requests runs the command. With
+    `expected_revision`, a session at another revision runs nothing and returns 409 `revision_conflict`.
+
+    The session runs one command at a time. The response is 409 `session_busy`, with the session's `revision`, when
+    the command waited more than 5 seconds for the request ahead of it, or when another server process wrote the
+    session after this request read it and before this request wrote it. In both cases the command had no effect. If
+    you sent `expected_revision`, read the session before you decide what to do: when the revision has changed, the
+    same request gets `revision_conflict`. If you didn't, send the command again.
+
+    A 500 `session_unreadable` means the server's osrlib can't load the session's stored state.
     """
     _require_visibility(visibility, principal)
     command_type = command.command_type
@@ -495,6 +518,8 @@ def send_command(
             f"Only an API key with the referee role can send {command_type!r}.",
             command_type=command_type,
         )
+    if command.source is not None and not principal.is_referee:
+        raise forbidden("referee_required", "Only an API key with the referee role can set a command's source.")
     executed = _sessions(request).execute(principal.client, session_id, command, expected_revision=expected_revision)
     shown = [event for event in _shown(executed.result.events, visibility) if isinstance(event, Event)]
     return CommandOutcome(
@@ -508,7 +533,7 @@ def send_command(
     )
 
 
-@router.get("/{session_id}/view", summary="Get the player view", responses=problem_responses(404))
+@router.get("/{session_id}/view", summary="Get the player view", responses=problem_responses(404, 409, 500))
 def get_player_view(request: Request, principal: CurrentPrincipal, session_id: SessionId) -> PlayerView:
     """Return osrlib's `PlayerView` of the session: what the players may see now.
 
@@ -516,20 +541,30 @@ def get_player_view(request: Request, principal: CurrentPrincipal, session_id: S
     battle in progress, the journal, and the active quests. It never has unexplored map, monster hit points, or the
     referee's rolls. The server builds the view while no command runs on the session, so it shows the session
     between two commands.
+
+    A request that waits more than 5 seconds for a command running on the session gets 409 `session_busy`, with the
+    session's `revision`. Send it again. A 500 `session_unreadable` means the server's osrlib can't load the
+    session's stored state.
     """
     return _sessions(request).read(principal.client, session_id, build_player_view)
 
 
-@router.get("/{session_id}/referee-view", summary="Get the referee view", responses=problem_responses(403, 404))
+@router.get(
+    "/{session_id}/referee-view", summary="Get the referee view", responses=problem_responses(403, 404, 409, 500)
+)
 def get_referee_view(request: Request, principal: RefereePrincipal, session_id: SessionId) -> RefereeView:
     """Return osrlib's `RefereeView` of the session: the whole state except the master seed and the dice streams.
 
     Only a referee may read it. A player gets 403 `referee_required`.
+
+    A request that waits more than 5 seconds for a command running on the session gets 409 `session_busy`, with the
+    session's `revision`. Send it again. A 500 `session_unreadable` means the server's osrlib can't load the
+    session's stored state.
     """
     return _sessions(request).read(principal.client, session_id, build_referee_view)
 
 
-@router.get("/{session_id}/events", summary="Read the event log", responses=problem_responses(403, 404))
+@router.get("/{session_id}/events", summary="Read the event log", responses=problem_responses(403, 404, 409, 500))
 def list_events(
     request: Request,
     principal: CurrentPrincipal,
@@ -545,6 +580,10 @@ def list_events(
     `after` counts the events of the requested visibility that you've read, so pass the `next_after` of the last
     page to read what's new. A client that reconnects reads from its last `next_after` to catch up. A player who
     passes `visibility=referee` gets 403 `referee_required`.
+
+    A request that waits more than 5 seconds for a command running on the session gets 409 `session_busy`, with the
+    session's `revision`. Send it again. A 500 `session_unreadable` means the server's osrlib can't load the
+    session's stored state.
     """
     _require_visibility(visibility, principal)
 
@@ -563,7 +602,10 @@ def list_events(
 
 @router.post("/{session_id}/saves", status_code=201, summary="Save a session", responses=problem_responses(404))
 def save_session(
-    request: Request, principal: CurrentPrincipal, session_id: SessionId, body: CreateSaveRequest | None = None
+    request: Request,
+    principal: CurrentPrincipal,
+    session_id: SessionId,
+    body: Annotated[CreateSaveRequest, Body(default_factory=CreateSaveRequest)],
 ) -> SaveInfo:
     """Store a copy of the session as it is after its last accepted command, and return the save's info.
 
@@ -577,8 +619,9 @@ def save_session(
     saved = db.insert_save(
         principal.client,
         session_id=row.id,
+        adventure_id=row.adventure_id,
         adventure_name=row.adventure_name,
-        label=body.label if body is not None else None,
+        label=body.label,
         mode=row.mode,
         clock_rounds=row.clock_rounds,
         document=row.document,

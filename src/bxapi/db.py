@@ -26,6 +26,8 @@ from bxapi.ids import new_id
 __all__ = [
     "BUSY_TIMEOUT_SECONDS",
     "LAYOUT_VERSION",
+    "SQLITE_INTEGER_MAX",
+    "SQLITE_INTEGER_MIN",
     "AbilityRollRow",
     "AdventureRow",
     "CharacterDocumentRow",
@@ -37,6 +39,7 @@ __all__ = [
     "SaveRow",
     "SessionDocumentRow",
     "SessionRow",
+    "fits_integer_column",
     "utc_now",
 ]
 
@@ -50,6 +53,13 @@ LAYOUT_VERSION = 1
 """The version of the table layout, which the server writes to the file's `PRAGMA user_version`.
 
 A server opens only a file with this version, or an empty file."""
+
+
+SQLITE_INTEGER_MIN = -(2**63)
+"""The smallest integer an `INTEGER` column stores."""
+
+SQLITE_INTEGER_MAX = 2**63 - 1
+"""The largest integer an `INTEGER` column stores. `sqlite3` raises `OverflowError` for a larger one."""
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS ability_rolls (
@@ -88,7 +98,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     id TEXT NOT NULL UNIQUE,
     client TEXT NOT NULL,
     name TEXT NOT NULL,
-    adventure_id TEXT NOT NULL,
+    adventure_id TEXT,
     adventure_name TEXT NOT NULL,
     mode TEXT NOT NULL,
     revision INTEGER NOT NULL,
@@ -105,6 +115,7 @@ CREATE TABLE IF NOT EXISTS saves (
     id TEXT NOT NULL UNIQUE,
     client TEXT NOT NULL,
     session_id TEXT,
+    adventure_id TEXT,
     adventure_name TEXT NOT NULL,
     label TEXT,
     mode TEXT NOT NULL,
@@ -134,6 +145,30 @@ def _create_private_file(path: str) -> None:
     except FileExistsError:
         return
     os.close(descriptor)
+
+
+def fits_integer_column(value: int) -> bool:
+    """Return whether an `INTEGER` column can store a value.
+
+    Check an integer that comes from a client's document before you store it, like the clock of an
+    imported save, so that a value out of range is refused instead of failing the insert.
+
+    Args:
+        value: The integer to store.
+
+    Returns:
+        `True` if the value is from [`SQLITE_INTEGER_MIN`][bxapi.db.SQLITE_INTEGER_MIN] to
+        [`SQLITE_INTEGER_MAX`][bxapi.db.SQLITE_INTEGER_MAX].
+
+    Examples:
+        ```python
+        from bxapi.db import fits_integer_column
+
+        assert fits_integer_column(2**63 - 1)
+        assert not fits_integer_column(10**30)
+        ```
+    """
+    return SQLITE_INTEGER_MIN <= value <= SQLITE_INTEGER_MAX
 
 
 def utc_now() -> str:
@@ -228,8 +263,9 @@ class SessionRow:
     """The session's id, which starts with `ses_`."""
     name: str
     """The session's name."""
-    adventure_id: str
-    """The id of the adventure the session plays."""
+    adventure_id: str | None
+    """The id of the adventure the session plays, or `None` when the server doesn't know it. The adventure may
+    have been deleted since the session started."""
     adventure_name: str
     """The name of the adventure the session plays."""
     mode: str
@@ -264,6 +300,8 @@ class SaveRow:
     """The save's id, which starts with `sav_`."""
     session_id: str | None
     """The session the save was made from, or `None` for an imported save."""
+    adventure_id: str | None
+    """The id of the adventure the save's session played, or `None` for an imported save."""
     adventure_name: str
     """The name of the adventure the save plays."""
     label: str | None
@@ -599,7 +637,7 @@ class Database:
         client: str,
         *,
         name: str,
-        adventure_id: str,
+        adventure_id: str | None,
         adventure_name: str,
         mode: str,
         clock_rounds: int,
@@ -613,7 +651,8 @@ class Database:
         Args:
             client: The client the session belongs to.
             name: The session's name.
-            adventure_id: The id of the adventure the session plays.
+            adventure_id: The id of the adventure the session plays, or `None` when the caller doesn't
+                know it.
             adventure_name: The name of the adventure the session plays.
             mode: The session's mode.
             clock_rounds: The game clock, in rounds.
@@ -752,6 +791,7 @@ class Database:
         client: str,
         *,
         session_id: str | None,
+        adventure_id: str | None,
         adventure_name: str,
         label: str | None,
         mode: str,
@@ -763,6 +803,7 @@ class Database:
         Args:
             client: The client the save belongs to.
             session_id: The session the save was made from, or `None` for an imported save.
+            adventure_id: The id of the adventure the session played, or `None` for an imported save.
             adventure_name: The name of the adventure the save plays.
             label: The player's label, or `None`.
             mode: The session's mode when the save was made.
@@ -775,6 +816,7 @@ class Database:
         row = SaveRow(
             id=new_id("sav"),
             session_id=session_id,
+            adventure_id=adventure_id,
             adventure_name=adventure_name,
             label=label,
             mode=mode,

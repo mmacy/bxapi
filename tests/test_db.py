@@ -12,7 +12,15 @@ import pytest
 from fastapi.testclient import TestClient
 
 from bxapi.app import create_app
-from bxapi.db import LAYOUT_VERSION, Database, DatabaseOpenError, utc_now
+from bxapi.db import (
+    LAYOUT_VERSION,
+    SQLITE_INTEGER_MAX,
+    SQLITE_INTEGER_MIN,
+    Database,
+    DatabaseOpenError,
+    fits_integer_column,
+    utc_now,
+)
 from bxapi.settings import Settings
 
 ME = "game"
@@ -339,7 +347,14 @@ def test_no_write_is_lost_across_processes(path: str) -> None:
 def test_delete_session_filters_on_client_and_leaves_saves(db: Database) -> None:
     session_id = _session(db)
     save = db.insert_save(
-        ME, session_id=session_id, adventure_name="The Keep", label=None, mode="town", clock_rounds=0, document={}
+        ME,
+        session_id=session_id,
+        adventure_id="builtin-keep",
+        adventure_name="The Keep",
+        label=None,
+        mode="town",
+        clock_rounds=0,
+        document={},
     )
     assert not db.delete_session(OTHER, session_id)
     assert db.get_session(ME, session_id) is not None
@@ -354,6 +369,7 @@ def test_save_round_trip_and_client_filter(db: Database) -> None:
     row = db.insert_save(
         ME,
         session_id="ses_gone",
+        adventure_id="adv_gone",
         adventure_name="The Keep",
         label="Before the stairs",
         mode="dungeon",
@@ -363,10 +379,19 @@ def test_save_round_trip_and_client_filter(db: Database) -> None:
     assert row.id.startswith("sav_")
     assert db.get_save(ME, row.id) == row
     assert db.get_save_document(ME, row.id) == document
+    assert row.adventure_id == "adv_gone"
     imported = db.insert_save(
-        ME, session_id=None, adventure_name="The Keep", label=None, mode="town", clock_rounds=0, document=document
+        ME,
+        session_id=None,
+        adventure_id=None,
+        adventure_name="The Keep",
+        label=None,
+        mode="town",
+        clock_rounds=0,
+        document=document,
     )
     assert db.get_save(ME, imported.id) == imported
+    assert imported.adventure_id is None
 
     assert db.get_save(OTHER, row.id) is None
     assert db.get_save_document(OTHER, row.id) is None
@@ -430,7 +455,14 @@ def test_session_pages_filter_on_mode(db: Database) -> None:
 def test_save_pages_filter_on_session(db: Database) -> None:
     def save(client: str, session_id: str | None) -> str:
         return db.insert_save(
-            client, session_id=session_id, adventure_name="a", label=None, mode="town", clock_rounds=0, document={}
+            client,
+            session_id=session_id,
+            adventure_id=None,
+            adventure_name="a",
+            label=None,
+            mode="town",
+            clock_rounds=0,
+            document={},
         ).id
 
     first = [save(ME, "ses_a") for _ in range(3)]
@@ -566,3 +598,23 @@ def test_processes_that_open_a_new_file_together_all_succeed(tmp_path: Path) -> 
             db = Database(path)
             assert db.get_session_revision(ME, _session(db)) == 0
             db.close()
+
+
+def test_a_session_with_no_adventure_id_stores_null(db: Database) -> None:
+    row = db.insert_session(
+        ME,
+        name="Imported",
+        adventure_id=None,
+        adventure_name="The Keep",
+        mode="town",
+        clock_rounds=0,
+        document=_document(0),
+    )
+    assert row.adventure_id is None
+    assert db.get_session(ME, row.id) == row
+
+
+def test_the_integer_range_of_a_column() -> None:
+    assert fits_integer_column(SQLITE_INTEGER_MAX) and fits_integer_column(SQLITE_INTEGER_MIN)
+    assert not fits_integer_column(SQLITE_INTEGER_MAX + 1)
+    assert not fits_integer_column(SQLITE_INTEGER_MIN - 1)

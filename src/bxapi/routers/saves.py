@@ -1,25 +1,23 @@
 """Saved games: listing and labelling them, starting new sessions from them, and moving save documents.
 
-A save is osrlib's save document for one moment of a session, stored beside the save's info. Only a
-referee reads or imports the document itself, because it contains the master seed and everything
-the referee knows.
+A save is osrlib's save document for one moment of a session, stored beside the save's info. The document
+contains the master seed, the state only the referee may see, like the unexplored map and the monsters' hit
+points, and the logs of every command and event. Only a referee reads or imports a save document.
 """
 
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Path, Query, Request, Response
-from osrlib.crawl.adventure import Adventure
 from osrlib.persistence import load_game, save_game
 from pydantic import Field
 
-from bxapi.adventures import builtin_adventures
 from bxapi.auth import CurrentPrincipal, RefereePrincipal
-from bxapi.db import Database, JsonObject, SaveRow
-from bxapi.errors import not_found, problem_responses
+from bxapi.db import Database, JsonObject, SaveRow, fits_integer_column
+from bxapi.errors import invalid, not_found, problem_responses
 from bxapi.models import RequestModel
 from bxapi.pagination import Page, PageQuery
 from bxapi.routers.sessions import NAME_MAX_LENGTH, SaveInfo, SessionInfo, save_info, session_info
-from bxapi.session_manager import SessionManager
+from bxapi.session_manager import SessionManager, load_stored_save, validate_loaded_adventure
 
 __all__ = ["RelabelSaveRequest", "RestoreSaveRequest", "router"]
 
@@ -53,22 +51,6 @@ def _found(db: Database, client: str, save_id: str) -> SaveRow:
     return row
 
 
-def _adventure_id(db: Database, client: str, row: SaveRow, adventure: Adventure) -> str | None:
-    """Return the id of the adventure a save plays, or `None` when the server can't tell.
-
-    The save's session records the id. A save whose session was deleted, or an imported save, gets the id of a
-    built-in adventure with the same content as the save's copy of the adventure, if there's one.
-    """
-    if row.session_id is not None:
-        origin = db.get_session(client, row.session_id)
-        if origin is not None:
-            return origin.adventure_id
-    for builtin in builtin_adventures().values():
-        if builtin.adventure == adventure:
-            return builtin.id
-    return None
-
-
 @router.get("", summary="List the saves")
 def list_saves(
     request: Request,
@@ -89,15 +71,21 @@ def import_save(
 ) -> SaveInfo:
     """Store a save document, like one from `GET /v1/saves/{save_id}/document` on another server, as a new save.
 
-    Only a referee may import a save. The server loads the document with osrlib's `load_game` first, and stores the
-    document osrlib writes back out of the loaded game, in the installed osrlib's format. A document osrlib can't
-    load gets 422 `content_invalid`, and one stamped with a newer `schema_version` gets 409 `version_unsupported`.
-    The new save has no session and no label.
+    Only a referee may import a save. The server loads the document with osrlib's `load_game`, runs osrlib's
+    `validate_adventure` on the adventure in it, and stores the document osrlib writes back out of the loaded game,
+    in the installed osrlib's format. A document osrlib can't load, an adventure that refers to something osrlib
+    doesn't have, or a game clock larger than the server stores gets 422 `content_invalid`. A document stamped with
+    a newer `schema_version` gets 409 `version_unsupported`. The new save has no session, no adventure id, and no
+    label.
     """
     game = load_game(document)
+    validate_loaded_adventure(game)
+    if not fits_integer_column(game.clock.rounds):
+        raise invalid("content_invalid", "The save's game clock is larger than the server stores.")
     row = _db(request).insert_save(
         principal.client,
         session_id=None,
+        adventure_id=None,
         adventure_name=game.adventure.name,
         label=None,
         mode=game.mode.value,
@@ -109,7 +97,7 @@ def import_save(
 
 @router.get("/{save_id}", summary="Get a save", responses=problem_responses(404))
 def get_save(request: Request, principal: CurrentPrincipal, save_id: SaveId) -> SaveInfo:
-    """Return a save's info: its session, label, mode, and clock."""
+    """Return a save's info: its session, adventure, label, mode, and clock."""
     return save_info(_found(_db(request), principal.client, save_id))
 
 
@@ -130,14 +118,20 @@ def delete_save(request: Request, principal: CurrentPrincipal, save_id: SaveId) 
     return Response(status_code=204)
 
 
-@router.post("/{save_id}/restore", status_code=201, summary="Restore a save", responses=problem_responses(404))
+@router.post("/{save_id}/restore", status_code=201, summary="Restore a save", responses=problem_responses(404, 500))
 def restore_save(
-    request: Request, principal: CurrentPrincipal, save_id: SaveId, body: RestoreSaveRequest | None = None
+    request: Request,
+    principal: CurrentPrincipal,
+    save_id: SaveId,
+    body: Annotated[RestoreSaveRequest, Body(default_factory=RestoreSaveRequest)],
 ) -> SessionInfo:
     """Start a new session at the moment of the save, and return its info.
 
-    The new session starts at revision 0 and plays on from the save as the original session would have. The save,
-    and the session it was made from, don't change. The body is optional.
+    The new session starts at revision 0, has the save's `adventure_id`, and plays on from the save as the original
+    session would have. The save, and the session it was made from, don't change. The body is optional.
+
+    A 500 `session_unreadable` means the server's osrlib can't load the save's stored document, or refuses the
+    adventure in it.
     """
     db = _db(request)
     row = _found(db, principal.client, save_id)
@@ -145,12 +139,8 @@ def restore_save(
     if document is None:
         raise not_found("save", save_id)
     sessions: SessionManager = request.app.state.sessions
-    game = load_game(document)
     restored = sessions.restore(
-        principal.client,
-        name=body.name if body is not None else None,
-        adventure_id=_adventure_id(db, principal.client, row, game.adventure),
-        game=game,
+        principal.client, name=body.name, adventure_id=row.adventure_id, game=load_stored_save(save_id, document)
     )
     return session_info(restored)
 
@@ -159,8 +149,8 @@ def restore_save(
 def get_save_document(request: Request, principal: RefereePrincipal, save_id: SaveId) -> JsonObject:
     """Return the save document, osrlib's `save_game` output, to keep or to import on another server.
 
-    Only a referee may read it, because it contains the master seed and the whole state of the game. A player gets
-    403 `referee_required`.
+    Only a referee may read it, because it contains the master seed, the state only the referee may see, and the
+    logs of every command and event. A player gets 403 `referee_required`.
     """
     document = _db(request).get_save_document(principal.client, save_id)
     if document is None:
