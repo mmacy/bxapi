@@ -77,6 +77,7 @@ happened.
 6. `GET /v1/sessions/{session_id}/commands` lists the commands that are legal now.
 7. `POST /v1/sessions/{session_id}/commands` sends one command and returns what happened.
 8. `GET /v1/sessions/{session_id}/view` returns what the players can see. Draw the screen from it.
+   To get the view in step 7's response instead, pass `include=view` there.
 
 Repeat steps 6 to 8 until `ended` is `true` in a command's response.
 
@@ -332,7 +333,8 @@ the game ends in the mode `game_over` or `victory`.
 3. `POST /v1/sessions/{session_id}/commands` sends one command and returns the outcome: whether
    osrlib accepted it, the events, one line of text for each event, and the new mode and
    revision.
-4. `GET /v1/sessions/{session_id}/view` returns the player view. Draw the screen from it.
+4. `GET /v1/sessions/{session_id}/view` returns the player view. Draw the screen from it. With
+   `include=view`, step 3's response has the view, and you can leave this step out.
 5. Repeat steps 2 to 4 until `ended` is `true`.
 
 `GET /v1/sessions/{session_id}/events` reads the event log, to catch up after a reconnect.

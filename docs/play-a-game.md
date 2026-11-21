@@ -408,6 +408,30 @@ The session is in the `encounter` mode and no battle has started, so `in_battle`
 
 The view also has what a town screen needs, like `town_healing_prices`, the price in gold pieces of each service that the `purchase_healing` command buys from the temple. The view doesn't include monster hit points or the dice rolls that only a *referee* sees. A referee is a caller whose key has the role that may see a game's hidden state, as [Run games as a referee](referee.md) describes.
 
+To get the view in the same response as a command's outcome, add `include=view` to the command request. The outcome then has a `view` member, the player view at the outcome's `revision`, and your client doesn't send a second request. With `include=view`, the move that started this encounter is this request:
+
+```sh
+curl -s -X POST "http://127.0.0.1:8640/v1/sessions/ses_Bq2lhAvBgBLVtCRWuWkVUQ/commands?include=view" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"command_type": "move_party", "direction": "east"}'
+```
+
+Its outcome ends with the view above:
+
+```json
+{
+  "accepted": true,
+  ...
+  "mode": "encounter",
+  "ended": false,
+  "revision": 3,
+  "view": {
+    "adventure_name": "The Barrow of the Forgotten King",
+    ...
+  }
+}
+```
+
+A refused command with `include=view` has the unchanged view.
+
 ## Start the battle
 
 Fight:

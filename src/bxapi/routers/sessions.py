@@ -7,7 +7,7 @@ read and write the database directly.
 """
 
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from fastapi import APIRouter, Body, Path, Query, Request, Response
 from osrlib.core.character import Character, party_from_document
@@ -22,6 +22,7 @@ from osrlib.crawl.session import GameSession
 from osrlib.crawl.views import PlayerView, RefereeView, build_player_view, build_referee_view
 from osrlib.messages import format_message
 from pydantic import Field, ValidationError, model_validator
+from pydantic.json_schema import SkipJsonSchema
 
 from bxapi.adventures import find_adventure
 from bxapi.auth import CurrentPrincipal, Principal, RefereePrincipal
@@ -29,7 +30,7 @@ from bxapi.commands import CommandKind, command_kind
 from bxapi.db import Database, JsonObject, SaveRow, SessionRow
 from bxapi.errors import INTERNAL_ERROR, VALIDATION_ERROR, ApiError, forbidden, invalid, not_found, problem_responses
 from bxapi.idempotency import IdempotentRoute
-from bxapi.models import ApiModel, RequestModel
+from bxapi.models import ApiModel, RequestModel, left_out_when_none
 from bxapi.pagination import Page, PageQuery
 from bxapi.seeds import Seed, referee_seed
 from bxapi.session_manager import MAX_PARTY_SIZE, SessionManager
@@ -265,6 +266,9 @@ class CommandOutcome(ApiModel):
     """Whether the session is over."""
     revision: int
     """The session's revision after the command."""
+    view: PlayerView | SkipJsonSchema[None] = left_out_when_none()
+    """osrlib's `PlayerView` of the session after the command: what `GET /v1/sessions/{session_id}/view` returns
+    at this `revision`. The response has it only when the request has `include=view`."""
 
 
 class EventPage(ApiModel):
@@ -607,13 +611,23 @@ def send_command(
         ),
     ] = None,
     visibility: VisibilityQuery = Visibility.PLAYER,
+    include: Annotated[
+        Literal["view"] | None,
+        Query(
+            description="Pass `view` to get the player view after the command, as the response's `view`. It "
+            "replaces the `GET /v1/sessions/{session_id}/view` that a client sends after each command. The server "
+            "builds the view before any other request can change the session, so it's the view at the response's "
+            "`revision`.",
+        ),
+    ] = None,
 ) -> CommandOutcome:
     """Execute one osrlib command, like `{"command_type": "move_party", "direction": "north"}`, and return the outcome.
 
     The body is one of osrlib's commands, chosen by `command_type`. `GET /v1/sessions/{session_id}/commands` lists
     the ones that are legal now, and `GET /v1/rules/commands/{command_type}` has each one's fields. osrlib ignores a
-    field that the command doesn't define. After the response, show the player `messages`, and read
-    `GET /v1/sessions/{session_id}/view` to draw the screen.
+    field that the command doesn't define. After the response, show the player `messages`, and draw the screen from
+    the player view. Pass `include=view` to get the view in the same response, or read it with
+    `GET /v1/sessions/{session_id}/view`.
 
     When osrlib refuses the command, the response is a 200 with `accepted` set to `false` and osrlib's
     `rejections`, and the session doesn't change. Show the player why, from each rejection's `code` and `params`.
@@ -636,7 +650,9 @@ def send_command(
         )
     if command.source is not None and not principal.is_referee:
         raise forbidden("referee_required", "Only an API key with the referee role can set a command's source.")
-    executed = _sessions(request).execute(principal.client, session_id, command, expected_revision=expected_revision)
+    executed = _sessions(request).execute(
+        principal.client, session_id, command, expected_revision=expected_revision, with_view=include == "view"
+    )
     shown = [event for event in _shown(executed.result.events, visibility) if isinstance(event, Event)]
     return CommandOutcome(
         accepted=executed.result.accepted,
@@ -646,6 +662,7 @@ def send_command(
         mode=executed.mode,
         ended=executed.mode.terminal,
         revision=executed.revision,
+        view=executed.view,
     )
 
 

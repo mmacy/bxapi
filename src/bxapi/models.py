@@ -2,12 +2,51 @@
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic.config import JsonDict
 from pydantic_core import PydanticCustomError
 
-__all__ = ["ApiModel", "RequestModel"]
+__all__ = ["ApiModel", "RequestModel", "left_out_when_none"]
 
 _MAX_UNKNOWN_FIELDS = 20
+
+
+def _leave_out_default(schema: JsonDict) -> None:
+    schema.pop("default", None)
+
+
+def _is_none(value: object) -> bool:
+    return value is None
+
+
+def left_out_when_none() -> Any:
+    """Return the definition of a response field that the server leaves out of the JSON instead of sending `null`.
+
+    Annotate the field as `SomeType | SkipJsonSchema[None]`, so its schema in the OpenAPI document
+    is `SomeType`, with no `null` and no default.
+
+    Returns:
+        A pydantic field with the default `None`.
+
+    Examples:
+        ```python
+        from pydantic import BaseModel
+        from pydantic.json_schema import SkipJsonSchema
+
+        from bxapi.models import left_out_when_none
+
+
+        class Outcome(BaseModel):
+            revision: int
+            note: str | SkipJsonSchema[None] = left_out_when_none()
+
+
+        assert Outcome(revision=1).model_dump() == {"revision": 1}
+        assert Outcome(revision=1, note="saved").model_dump() == {"revision": 1, "note": "saved"}
+        assert Outcome.model_json_schema()["properties"]["note"] == {"title": "Note", "type": "string"}
+        ```
+    """
+    return Field(default=None, exclude_if=_is_none, json_schema_extra=_leave_out_default)
 
 
 class ApiModel(BaseModel):
