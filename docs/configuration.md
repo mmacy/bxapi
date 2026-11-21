@@ -99,7 +99,7 @@ access-control-allow-headers: authorization,content-type
 ...
 ```
 
-The server lists `WWW-Authenticate`, `Retry-After`, and `X-Request-Id` in `access-control-expose-headers`, so a page's code can read them. A request from an origin that isn't in the list gets no `access-control-allow-origin` header, so the browser stops the page from reading the response. A key in a web page's code is readable by every player, so use a player key there and never a referee key. For more on that, see [An application with many users](authentication.md#an-application-with-many-users).
+The server lists `WWW-Authenticate`, `Retry-After`, `ETag`, and `X-Request-Id` in `access-control-expose-headers`, so a page's code can read them. A request from an origin that isn't in the list gets no `access-control-allow-origin` header, so the browser stops the page from reading the response. A key in a web page's code is readable by every player, so use a player key there and never a referee key. For more on that, see [An application with many users](authentication.md#an-application-with-many-users).
 
 ### Choose where the database lives and back it up
 

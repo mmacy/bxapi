@@ -187,6 +187,9 @@ def test_the_shared_examples_are_what_the_server_returns() -> None:
             "unauthorized": client.get("/v1/meta", headers=request_id),
             "validation_error": client.post("/v1/dice/roll", json={}, headers=key),
             "bad_request": client.post("/v1/dice/roll", content=b'{"expression": "\xff1d6"}', headers=json_body),
+            "unsupported_media_type": client.post(
+                "/v1/dice/roll", content=b'{"expression": "1d6"}', headers={**key, "Content-Type": "text/plain"}
+            ),
             "content_too_large": client.post(
                 "/v1/dice/roll", content=b" " * (settings.max_body_bytes + 1), headers=json_body
             ),

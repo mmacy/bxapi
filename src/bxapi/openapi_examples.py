@@ -37,6 +37,7 @@ from bxapi.errors import (
     database_busy,
     internal_error,
     request_timeout,
+    unsupported_media_type,
     validation_error,
 )
 from bxapi.session_manager import LOCK_TIMEOUT_SECONDS, session_busy, session_unreadable
@@ -144,6 +145,12 @@ def shared_problems() -> tuple[SharedProblem, ...]:
             "Send a body that's too large",
             f"The response to a body larger than {max_bytes} bytes, the server's default limit.",
             content_too_large(max_bytes),
+        ),
+        shared(
+            "unsupported_media_type",
+            "Send a body that isn't declared as JSON",
+            "The response to a request with a body and the header `Content-Type: text/plain`.",
+            unsupported_media_type(),
         ),
         shared(
             "validation_error",
