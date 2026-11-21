@@ -70,6 +70,16 @@ def _increment_until_done(path: str, session_id: str, attempts: int) -> int:
     return won
 
 
+def _open_and_close(path: str) -> str:
+    """Wait for the other processes, open a database on `path`, and return what went wrong, if anything."""
+    _start.wait()
+    try:
+        Database(path).close()
+    except Exception as error:
+        return repr(error)
+    return ""
+
+
 @pytest.fixture(params=["memory", "file"])
 def db(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Database]:
     database = Database(":memory:" if request.param == "memory" else str(tmp_path / "bxapi.db"))
@@ -542,3 +552,17 @@ def test_the_database_files_are_private(path: str) -> None:
         mode = stat.S_IMODE(Path(path + suffix).stat().st_mode)
         assert mode == 0o600, f"{path + suffix} has mode {mode:o}"
     db.close()
+
+
+def test_processes_that_open_a_new_file_together_all_succeed(tmp_path: Path) -> None:
+    processes, rounds = 4, 30
+    context = multiprocessing.get_context("spawn")
+    start = context.Barrier(processes)
+    with ProcessPoolExecutor(processes, mp_context=context, initializer=_set_start, initargs=(start,)) as pool:
+        for round_number in range(rounds):
+            path = str(tmp_path / f"new-{round_number}.db")
+            failures = [problem for problem in pool.map(_open_and_close, [path] * processes) if problem]
+            assert not failures, f"round {round_number}: {failures[0]}"
+            db = Database(path)
+            assert db.get_session_revision(ME, _session(db)) == 0
+            db.close()

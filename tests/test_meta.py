@@ -202,3 +202,29 @@ def test_every_v1_route_needs_a_key(keyed_settings: Settings, make_client: Calla
 def test_a_trailing_slash_is_not_redirected(client: TestClient) -> None:
     response = client.get("/v1/meta/", follow_redirects=False)
     assert (response.status_code, response.json()["code"]) == (404, "not_found")
+
+
+def _union_members(union: dict[str, object]) -> tuple[str, list[str]]:
+    discriminator = union["discriminator"]
+    assert isinstance(discriminator, dict)
+    return discriminator["propertyName"], sorted(set(discriminator["mapping"].values()))
+
+
+def test_every_union_member_requires_its_tag(client: TestClient) -> None:
+    schema = client.get("/openapi.json").json()
+    schemas = schema["components"]["schemas"]
+    body = schema["paths"]["/v1/sessions/{session_id}/commands"]["post"]["requestBody"]["content"]["application/json"]
+    events = schemas["CommandOutcome"]["properties"]["events"]["items"]
+    for union, tag in ((body["schema"], "command_type"), (events, "event_type")):
+        name, members = _union_members(union)
+        assert name == tag
+        assert len(members) > 10
+        for ref in members:
+            member = schemas[ref.removeprefix("#/components/schemas/")]
+            assert tag in member["required"], f"{ref} doesn't require {tag}"
+    assert set(schemas["MoveParty"]["required"]) == {"direction", "command_type"}
+
+
+def test_a_command_without_its_tag_is_refused(client: TestClient) -> None:
+    response = client.post("/v1/sessions/ses_x/commands", json={"direction": "north"})
+    assert (response.status_code, response.json()["code"]) == (422, "validation_error")

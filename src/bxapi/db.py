@@ -14,6 +14,7 @@ import json
 import os
 import sqlite3
 import threading
+import time
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, fields
@@ -386,7 +387,7 @@ class Database:
         try:
             self._connection.row_factory = sqlite3.Row
             if path != ":memory:":
-                self._connection.execute("PRAGMA journal_mode = WAL")
+                self._use_write_ahead_log()
             self._create_tables(path)
         except sqlite3.Error as error:
             self._connection.close()
@@ -394,6 +395,20 @@ class Database:
         except BaseException:
             self._connection.close()
             raise
+
+    def _use_write_ahead_log(self) -> None:
+        # While another process creates the same file, the pragma fails at once instead of waiting
+        # for the busy timeout. Retry it for as long as a statement waits.
+        deadline = time.monotonic() + BUSY_TIMEOUT_SECONDS
+        while True:
+            try:
+                self._connection.execute("PRAGMA journal_mode = WAL")
+                return
+            except sqlite3.OperationalError as error:
+                busy = error.sqlite_errorcode & 0xFF in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED)
+                if not busy or time.monotonic() >= deadline:
+                    raise
+            time.sleep(0.01)
 
     def _create_tables(self, path: str) -> None:
         if self._layout_version() == LAYOUT_VERSION:

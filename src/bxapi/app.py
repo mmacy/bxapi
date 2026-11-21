@@ -208,6 +208,36 @@ def _describe_problems(schema: dict[str, Any]) -> None:
             del schemas[name]
 
 
+def _discriminators(value: object) -> Iterator[dict[str, Any]]:
+    if isinstance(value, dict):
+        if isinstance(value.get("discriminator"), dict):
+            yield value
+        for item in value.values():
+            yield from _discriminators(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from _discriminators(item)
+
+
+def _require_discriminators(schema: dict[str, Any]) -> None:
+    # osrlib gives each tag field, like `command_type`, a default, so pydantic leaves it out of
+    # `required`. A union can't be narrowed on an optional property, and the server needs the tag
+    # to pick the member anyway, so each member a discriminator refers to requires it.
+    schemas = schema.get("components", {}).get("schemas", {})
+    for union in list(_discriminators(schema)):
+        tag = union["discriminator"]["propertyName"]
+        members = set(union["discriminator"].get("mapping", {}).values())
+        members.update(option.get("$ref") for option in union.get("oneOf", []) if isinstance(option, dict))
+        for ref in members:
+            if not isinstance(ref, str) or not ref.startswith(_SCHEMAS):
+                continue
+            member = schemas.get(ref.removeprefix(_SCHEMAS))
+            if member is not None and tag in member.get("properties", {}):
+                required = member.setdefault("required", [])
+                if tag not in required:
+                    required.append(tag)
+
+
 def _install_openapi(app: FastAPI) -> None:
     """Make the application's OpenAPI document describe error responses as problem documents."""
 
@@ -222,6 +252,7 @@ def _install_openapi(app: FastAPI) -> None:
                 license_info=app.license_info,
             )
             _describe_problems(schema)
+            _require_discriminators(schema)
             app.openapi_schema = schema
         return app.openapi_schema
 
