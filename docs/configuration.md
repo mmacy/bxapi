@@ -18,17 +18,20 @@ BXAPI_DATABASE=/var/lib/bxapi/game.db
 BXAPI_API_KEYS=[{"client": "my-game", "key": "player-key-0123456789", "role": "player"}]
 ```
 
-The server reads each setting once, when it starts. To change one, stop the server and start it again. Write a setting that has a list value as JSON. A value the server can't accept stops it from starting. The message states the setting and the problem but doesn't repeat the value, so an API key doesn't end up in a log:
+The server reads each setting once, when it starts. To change one, stop the server and start it again. Write a setting that has a list value as JSON. A value the server can't accept stops it from starting. The server prints one line for each problem, with the name of the environment variable and what's wrong, and it doesn't repeat the value, so an API key doesn't end up in a log:
 
 ```sh
 BXAPI_SESSION_CACHE_SIZE=0 BXAPI_ALLOW_ANONYMOUS=true uv run bxapi
 ```
 
 ```text
-bxapi: 1 validation error for Settings
-session_cache_size
-  Input should be greater than or equal to 1 [type=greater_than_equal]
-    For further information visit https://errors.pydantic.dev/2.14/v/greater_than_equal
+bxapi: BXAPI_SESSION_CACHE_SIZE: Input should be greater than or equal to 1
+```
+
+For a problem in one entry of `BXAPI_API_KEYS`, the line contains the entry's number, counting from 1, and the field's name:
+
+```text
+bxapi: BXAPI_API_KEYS, entry 1, key: the key must be at least 16 characters long
 ```
 
 The server exits with status 1.
@@ -135,7 +138,7 @@ All processes need the same keys, so give them the same `BXAPI_API_KEYS`. Run th
 The pages at `/docs` and `/redoc` and the document at `/openapi.json` need no key, so anyone who can reach the server can read the API's description. To turn them off:
 
 ```sh
-BXAPI_DOCS_ENABLED=false BXAPI_ALLOW_ANONYMOUS=true uv run bxapi
+BXAPI_API_KEYS='[{"client": "my-game", "key": "player-key-0123456789", "role": "player"}]' BXAPI_DOCS_ENABLED=false uv run bxapi
 ```
 
 The three paths then return 404:

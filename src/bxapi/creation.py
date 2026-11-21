@@ -104,7 +104,9 @@ class CharacterChoices(RequestModel):
     """The ids of the extra languages the character learns, from `GET /v1/rules/languages`. A high Intelligence allows
     extra languages."""
     purchases: list[Purchase] = []
-    """Starting gear to buy, in order, with the starting gold."""
+    """Starting gear to buy, in order, with the starting gold. The server rolls the gold in this same request, so to
+    choose gear after you see the gold, leave `purchases` empty and send `purchase_equipment` and `equip_item` commands
+    to a session in `town` mode."""
     equip_item_ids: list[str] = []
     """The ids of purchased items to wear or wield. The server equips them in order."""
     hp_reroll_at_first_level: bool = False

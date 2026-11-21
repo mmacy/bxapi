@@ -117,6 +117,70 @@ curl -s -X POST http://127.0.0.1:8640/v1/characters -H "Authorization: Bearer $K
 
 Each response has the same fields as Brenna's. The ids in the rest of this page are `chr_XSWUBj-UjQauxKNeDtopIg` for Brenna, `chr_yqskEJZy5UoVvqCBN3Hbkw` for Tomas, and `chr_5EZYSIgQNlMz7w7p1GwFlA` for Wren.
 
+### Choose gear after you see the gold
+
+The server rolls a character's starting gold in the same request that creates the character. A player who sends `purchases` therefore chooses gear before they know how much gold they have. To show the gold first, create the character with no `purchases`. The response contains the gold in `character.inventory.purse`:
+
+```sh
+curl -s -X POST http://127.0.0.1:8640/v1/characters -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"name": "Garrick", "class_id": "fighter", "alignment": "lawful"}'
+```
+
+```json
+{
+  "id": "chr_TQ3lbVawOCFDMolAfMU0Ug",
+  "name": "Garrick",
+  "class_id": "fighter",
+  "level": 1,
+  "created_at": "2026-11-21T01:30:40Z",
+  "character": {"name": "Garrick", "scores": {...}, "max_hp": 8, "current_hp": 8, "inventory": {"items": [], "purse": {"pp": 0, "gp": 130, "ep": 0, "sp": 0, "cp": 0}, ...}, ...},
+  "derived": {...}
+}
+```
+
+Garrick has 130 gold pieces (`gp`). Show the gold to the player, then buy the gear in a session while the session is in the `town` mode, which is the mode every session starts in. The next sections describe sessions and commands in detail. Start a session with Garrick as the only member of the party:
+
+```sh
+curl -s -X POST http://127.0.0.1:8640/v1/sessions -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"adventure_id": "builtin-barrow", "character_ids": ["chr_TQ3lbVawOCFDMolAfMU0Ug"]}'
+```
+
+The response has `"id": "ses_wVJYbf4M5UehXiLUy6Z0Ew"` and `"mode": "town"`. The `purchase_equipment` command buys equipment for one party member, and the session gives the first member of the party the id `character-0001`. Each entry in `item_ids` is one purchase of an item from the shop:
+
+```sh
+curl -s -X POST http://127.0.0.1:8640/v1/sessions/ses_wVJYbf4M5UehXiLUy6Z0Ew/commands -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"command_type": "purchase_equipment", "character_id": "character-0001", "item_ids": ["chainmail", "shield", "sword"]}'
+```
+
+```json
+{
+  "accepted": true,
+  "rejections": [],
+  "events": [{"code": "exploration.item.acquired", "visibility": "player", "event_type": "item_acquired", "character_id": "character-0001", "item_ids": ["chainmail", "shield", "sword"], "coins_gp_value": 0, "origin": "purchase"}],
+  "messages": ["character-0001 acquires chainmail, shield, sword."],
+  "mode": "town",
+  "ended": false,
+  "revision": 1
+}
+```
+
+The purchased items are in Garrick's pack. The `equip_item` command makes a member wear or wield one item, so send it once for each item. Here it is for the chainmail:
+
+```sh
+curl -s -X POST http://127.0.0.1:8640/v1/sessions/ses_wVJYbf4M5UehXiLUy6Z0Ew/commands -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"command_type": "equip_item", "character_id": "character-0001", "item_id": "chainmail"}'
+```
+
+```json
+{
+  "accepted": true,
+  "rejections": [],
+  "events": [],
+  "messages": [],
+  "mode": "town",
+  "ended": false,
+  "revision": 2
+}
+```
+
+Send the same command with `"item_id": "shield"` and then with `"item_id": "sword"`. The player view then shows 70 gold in `purse`, the chainmail in `worn_armour`, the shield in `shield`, and the sword in `wielded`. If the total price is more than the purse, the session refuses the whole purchase with the rejection `items.purchase.insufficient_funds` and buys nothing. A session plays a copy of the character, so the purchases don't change the stored character.
+
 ## Start a session
 
 A *session* is one game in progress. Start one with the ids of the characters in the *party*, the group that plays, and the id of an adventure. The order of `character_ids` is the party's *marching order*. The first character walks in front, and only the characters at the front can fight in *melee*, hand to hand. A session plays copies of the characters, so the stored characters don't change.
@@ -334,7 +398,7 @@ The session is in the `encounter` mode and no battle has started, so `in_battle`
 
 - `party` lists each member's `id`, `name`, hit points, `conditions` (like `dead`), and inventory. Use it to turn the ids in messages into names. The `character-0001` in a message is Brenna.
 - `location` and `explored` contain the party's position and the cells it has seen. The view doesn't include the parts of the map the party hasn't explored.
-- `encounter.groups` lists the groups of monsters. A group has an `id` to attack, a `label` with the kind of monster, a `count`, and its `distance_feet` from the party. The view doesn't list the individual monsters. A message about `monster-0001` doesn't say which group it belongs to, so use the group's label and count.
+- `encounter.groups` lists the groups of monsters. A group has an `id` to attack, a `label` with the kind of monster, a `count`, and its `distance_feet` from the party. The player view lists groups, not individual monsters. When a message refers to `monster-0001` and the encounter has one group, the monster is in that group. When the encounter has more than one group, the player view doesn't say which group the monster is in. Only the [referee view](referee.md#read-the-referee-view) lists each group's `monster_ids`.
 - `encounter.declarers` lists the members who must choose an action this round.
 - `encounter.front_rank` lists the members who can fight in melee. The others can't attack monsters in melee.
 
@@ -500,7 +564,7 @@ curl -s -X POST http://127.0.0.1:8640/v1/saves/sav_aJfDsAPQJJMycBUJySEXRA/restor
   "mode": "battle",
   "ended": false,
   "revision": 0,
-  "clock": {"rounds": 122, "turns": 2, "days": 0},
+  "clock": {"rounds": 121, "turns": 2, "days": 0},
   ...
 }
 ```

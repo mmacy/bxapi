@@ -8,6 +8,7 @@ from fastapi import APIRouter, FastAPI
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
+from bxapi.__main__ import main
 from bxapi.app import create_app
 from bxapi.auth import RefereePrincipal
 from bxapi.errors import PROBLEM_MEDIA_TYPE, install_error_handlers
@@ -194,3 +195,84 @@ def test_settings_read_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_the_tests_see_no_bxapi_variables() -> None:
     assert not [name for name in os.environ if name.startswith("BXAPI_")]
+
+
+def _run_main_with(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, **environment: str) -> SystemExit:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("BXAPI_DATABASE", str(tmp_path / "bxapi.db"))
+    monkeypatch.setenv("BXAPI_ALLOW_ANONYMOUS", "true")
+    for name, value in environment.items():
+        monkeypatch.setenv(name, value)
+    with pytest.raises(SystemExit) as exited:
+        main()
+    return exited.value
+
+
+def test_a_bad_setting_names_its_environment_variable(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    exited = _run_main_with(monkeypatch, tmp_path, BXAPI_SESSION_CACHE_SIZE="0")
+    assert exited.code == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == "bxapi: BXAPI_SESSION_CACHE_SIZE: Input should be greater than or equal to 1\n"
+    assert not (tmp_path / "bxapi.db").exists()
+
+
+def test_a_short_key_is_reported_by_entry_and_field_without_the_key(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    keys = '[{"client": "ok", "key": "0123456789abcdef"}, {"client": "short", "key": "s3cret"}]'
+    exited = _run_main_with(monkeypatch, tmp_path, BXAPI_API_KEYS=keys)
+    assert exited.code == 1
+    err = capsys.readouterr().err
+    assert err == "bxapi: BXAPI_API_KEYS, entry 2, key: the key must be at least 16 characters long\n"
+    assert "s3cret" not in err
+
+
+def test_every_bad_setting_gets_its_own_line(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    exited = _run_main_with(monkeypatch, tmp_path, BXAPI_PORT="99999", BXAPI_MAX_BODY_BYTES="5")
+    assert exited.code == 1
+    assert capsys.readouterr().err.splitlines() == [
+        "bxapi: BXAPI_MAX_BODY_BYTES: Input should be greater than or equal to 1024",
+        "bxapi: BXAPI_PORT: Input should be less than or equal to 65535",
+    ]
+
+
+def test_a_problem_with_no_location_is_printed_without_a_variable_name(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    keys = '[{"client": "a", "key": "0123456789abcdef"}, {"client": "b", "key": "0123456789abcdef"}]'
+    exited = _run_main_with(monkeypatch, tmp_path, BXAPI_API_KEYS=keys)
+    assert exited.code == 1
+    err = capsys.readouterr().err
+    assert err == "bxapi: two entries in BXAPI_API_KEYS have the same key\n"
+    assert "0123456789abcdef" not in err
+
+
+def test_a_server_with_no_keys_exits_with_its_reason(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    exited = _run_main_with(monkeypatch, tmp_path, BXAPI_ALLOW_ANONYMOUS="false")
+    assert isinstance(exited.code, str)
+    assert exited.code.startswith("bxapi: ")
+    assert "BXAPI_ALLOW_ANONYMOUS=true" in exited.code
+
+
+@pytest.mark.parametrize("variable", ["BXAPI_API_KEYS", "BXAPI_CORS_ORIGINS"])
+@pytest.mark.parametrize("value", ["not json", "", "[1, 2", "{'client': 'x'}"])
+def test_a_list_that_is_not_json_gets_one_line_naming_both_list_variables(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str], variable: str, value: str
+) -> None:
+    exited = _run_main_with(monkeypatch, tmp_path, **{variable: value})
+    assert exited.code == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    [line] = captured.err.splitlines()
+    assert line.startswith("bxapi: a BXAPI_ variable that takes a list isn't valid JSON")
+    assert 'BXAPI_API_KEYS takes a JSON list, like \'[{"client": "my-game"' in line
+    assert "BXAPI_CORS_ORIGINS takes a JSON list, like '[\"https://game.example\"]'" in line
+    assert "Traceback" not in captured.err
+    if value:
+        assert value not in captured.err
+    assert not (tmp_path / "bxapi.db").exists()

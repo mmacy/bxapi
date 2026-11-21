@@ -101,6 +101,22 @@ def test_every_field_bxapi_defines_has_a_description(client: TestClient) -> None
     assert {"Meta", "Problem", "FieldError", "Health"} <= set(checked)
 
 
+def test_every_path_parameter_has_a_description(client: TestClient) -> None:
+    paths = client.get("/openapi.json").json()["paths"]
+    checked = 0
+    for path, operations in paths.items():
+        if not path.startswith("/v1"):
+            continue
+        for method, operation in operations.items():
+            for parameter in operation.get("parameters", []):
+                if parameter["in"] == "path":
+                    checked += 1
+                    assert parameter.get("description"), (
+                        f"{method.upper()} {path}: {parameter['name']} has no description"
+                    )
+    assert checked >= 20
+
+
 def test_problem_documents_its_extra_members(client: TestClient) -> None:
     problem = client.get("/openapi.json").json()["components"]["schemas"]["Problem"]
     assert problem["additionalProperties"] is True

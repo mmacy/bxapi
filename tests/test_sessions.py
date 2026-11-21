@@ -397,6 +397,37 @@ def test_an_unknown_or_malformed_command_is_422(player: TestClient, referee: Tes
     assert state(player, session["id"]) == before
 
 
+def test_an_unknown_command_type_gets_a_short_message(referee: TestClient) -> None:
+    session = start(referee)
+    refused = problem(
+        referee.post(f"/v1/sessions/{session['id']}/commands", json={"command_type": "fly"}), 422, "validation_error"
+    )
+    [error] = refused["errors"]
+    assert error["type"] == "union_tag_invalid"
+    assert error["msg"] == "'fly' isn't a value that 'command_type' accepts."
+
+
+def test_a_long_unknown_command_type_is_cut_in_the_message(referee: TestClient) -> None:
+    session = start(referee)
+    refused = problem(
+        referee.post(f"/v1/sessions/{session['id']}/commands", json={"command_type": "x" * 500}),
+        422,
+        "validation_error",
+    )
+    [error] = refused["errors"]
+    assert error["msg"] == f"'{'x' * 61}...' isn't a value that 'command_type' accepts."
+
+
+def test_a_command_with_no_command_type_gets_a_short_message(referee: TestClient) -> None:
+    session = start(referee)
+    refused = problem(
+        referee.post(f"/v1/sessions/{session['id']}/commands", json={"direction": "north"}), 422, "validation_error"
+    )
+    [error] = refused["errors"]
+    assert error["type"] == "union_tag_not_found"
+    assert error["msg"] == "The body needs 'command_type'."
+
+
 def test_an_unknown_field_in_a_command_is_ignored(referee: TestClient) -> None:
     session = start(referee)
     assert send(referee, session["id"], ENTER | {"from_a_newer_client": 1}) == Oracle(roll_characters()).execute(ENTER)

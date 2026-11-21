@@ -2,7 +2,7 @@
 
 from typing import Annotated, Any, Self
 
-from fastapi import APIRouter, Body, Request, Response
+from fastapi import APIRouter, Body, Path, Request, Response
 from osrlib.core.abilities import AbilityScore
 from osrlib.core.character import Character, roll_ability_scores
 from pydantic import model_validator
@@ -37,6 +37,9 @@ __all__ = [
 ]
 
 router = APIRouter()
+
+RollId = Annotated[str, Path(description="The ability roll's id, which starts with `rol_`.")]
+CharacterId = Annotated[str, Path(description="The character's id, which starts with `chr_`.")]
 """The character routes. The router sets no tag, because the character generator is in the
 `generate` group of the OpenAPI document and every other route is in `characters`."""
 
@@ -229,7 +232,11 @@ def create_ability_roll(
 @router.get(
     "/ability-rolls/{roll_id}", tags=["characters"], summary="Get an ability roll", responses=problem_responses(404)
 )
-def get_ability_roll(request: Request, principal: CurrentPrincipal, roll_id: str) -> AbilityRoll:
+def get_ability_roll(
+    request: Request,
+    principal: CurrentPrincipal,
+    roll_id: RollId,
+) -> AbilityRoll:
     """Return an ability roll, with `used` set to whether a character was created from it."""
     row = _db(request).get_ability_roll(principal.client, roll_id)
     if row is None:
@@ -337,7 +344,7 @@ def list_characters(request: Request, principal: CurrentPrincipal, page: PageQue
     summary="Get a stored character",
     responses=problem_responses(404),
 )
-def get_character(request: Request, principal: CurrentPrincipal, character_id: str) -> StoredCharacter:
+def get_character(request: Request, principal: CurrentPrincipal, character_id: CharacterId) -> StoredCharacter:
     """Return a stored character, with the values osrlib derives from it."""
     row = _db(request).get_character(principal.client, character_id)
     if row is None:
@@ -353,7 +360,7 @@ def get_character(request: Request, principal: CurrentPrincipal, character_id: s
     summary="Delete a stored character",
     responses=problem_responses(404),
 )
-def delete_character(request: Request, principal: CurrentPrincipal, character_id: str) -> Response:
+def delete_character(request: Request, principal: CurrentPrincipal, character_id: CharacterId) -> Response:
     """Delete a stored character. A session that started with the character has a copy and isn't affected."""
     if not _db(request).delete_character(principal.client, character_id):
         raise not_found("character", character_id)

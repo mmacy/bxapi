@@ -26,6 +26,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 __all__ = ["ApiKey", "Role", "Settings", "SettingsError"]
 
 _KEY_CHARACTERS = re.compile(r"[\x21-\x7e]+")
+_MIN_KEY_LENGTH = 16
 
 _ORIGIN_RULE = (
     "each CORS origin must be a scheme, a host, and an optional port, like 'https://game.example' or "
@@ -71,7 +72,7 @@ class ApiKey(BaseModel):
     with many users either gives each user only the ids of that user's resources, which are
     random and can't be guessed, or sends the users' requests to bxapi through a server that the
     application runs."""
-    key: SecretStr = Field(min_length=16)
+    key: SecretStr
     """The secret the client sends as a bearer token: at least 16 printable ASCII characters,
     with no spaces."""
     role: Role = Role.PLAYER
@@ -79,8 +80,11 @@ class ApiKey(BaseModel):
 
     @field_validator("key")
     @classmethod
-    def _key_fits_in_a_header(cls, key: SecretStr) -> SecretStr:
-        if not _KEY_CHARACTERS.fullmatch(key.get_secret_value()):
+    def _key_is_long_enough_and_fits_in_a_header(cls, key: SecretStr) -> SecretStr:
+        secret = key.get_secret_value()
+        if len(secret) < _MIN_KEY_LENGTH:
+            raise ValueError(f"the key must be at least {_MIN_KEY_LENGTH} characters long")
+        if not _KEY_CHARACTERS.fullmatch(secret):
             raise ValueError("an API key may contain only printable ASCII characters, with no spaces")
         return key
 
@@ -159,7 +163,7 @@ class Settings(BaseSettings):
     def _keys_are_distinct(self) -> Self:
         secrets = [entry.key.get_secret_value() for entry in self.api_keys]
         if len(set(secrets)) != len(secrets):
-            raise ValueError("two entries in api_keys have the same key")
+            raise ValueError("two entries in BXAPI_API_KEYS have the same key")
         return self
 
     @property
