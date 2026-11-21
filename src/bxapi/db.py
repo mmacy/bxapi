@@ -53,8 +53,8 @@ BUSY_TIMEOUT_SECONDS = 5.0
 LAYOUT_VERSION = 2
 """The version of the table layout, which the server writes to the file's `PRAGMA user_version`.
 
-A server opens a file with this version, an empty file, or a file with an earlier version, which it
-brings up to this version first. Version 2 added the `idempotency_keys` table."""
+A server opens only a file with this version, or an empty file. The server has no migrations, so a
+change to the tables changes this number."""
 
 
 SQLITE_INTEGER_MIN = -(2**63)
@@ -63,19 +63,8 @@ SQLITE_INTEGER_MIN = -(2**63)
 SQLITE_INTEGER_MAX = 2**63 - 1
 """The largest integer an `INTEGER` column stores. `sqlite3` raises `OverflowError` for a larger one."""
 
-_IDEMPOTENCY_SCHEMA = """
-CREATE TABLE IF NOT EXISTS idempotency_keys (
-    client TEXT NOT NULL,
-    key TEXT NOT NULL,
-    fingerprint TEXT NOT NULL,
-    status INTEGER,
-    body BLOB,
-    claimed_at INTEGER NOT NULL,
-    PRIMARY KEY (client, key)
-) STRICT, WITHOUT ROWID;
-CREATE INDEX IF NOT EXISTS idempotency_keys_by_age ON idempotency_keys (claimed_at);
-"""
-
+# The closing quotes are on the last statement's line, because pytest-examples reads a line that starts with
+# three quotes as the start of a docstring, and then finds no example in the docstrings after it.
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS ability_rolls (
     seq INTEGER PRIMARY KEY,
@@ -140,17 +129,23 @@ CREATE TABLE IF NOT EXISTS saves (
 ) STRICT;
 CREATE INDEX IF NOT EXISTS saves_by_client ON saves (client, created_at, seq);
 CREATE INDEX IF NOT EXISTS saves_by_session ON saves (client, session_id, created_at, seq);
-"""
-
-_UPGRADES = {1: _IDEMPOTENCY_SCHEMA}
-"""For each earlier layout version, the statements that change a file of that version into the next one."""
+CREATE TABLE IF NOT EXISTS idempotency_keys (
+    client TEXT NOT NULL,
+    key TEXT NOT NULL,
+    fingerprint TEXT NOT NULL,
+    status INTEGER,
+    body BLOB,
+    claimed_at INTEGER NOT NULL,
+    PRIMARY KEY (client, key)
+) STRICT, WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS idempotency_keys_by_age ON idempotency_keys (claimed_at);"""
 
 
 class DatabaseOpenError(Exception):
     """The server can't use a database file.
 
     [`Database`][bxapi.db.Database] raises it when SQLite can't open the file, when the file
-    isn't a SQLite database, and when the file's table layout version is later than
+    isn't a SQLite database, and when the file's table layout version isn't
     [`LAYOUT_VERSION`][bxapi.db.LAYOUT_VERSION]. The message states the path.
     """
 
@@ -408,9 +403,8 @@ class Database:
     """The server's SQLite database.
 
     The constructor opens the file, creates the tables in an empty file, and turns on write-ahead
-    logging for a file database. It adds the tables that a file with an earlier table layout version
-    lacks, and refuses a file whose version is later than [`LAYOUT_VERSION`][bxapi.db.LAYOUT_VERSION].
-    One `Database` uses one connection, and a lock
+    logging for a file database. It refuses a file whose table layout version isn't
+    [`LAYOUT_VERSION`][bxapi.db.LAYOUT_VERSION]. One `Database` uses one connection, and a lock
     lets one thread at a time run a query on it, so every endpoint thread can share it. With `":memory:"`, every thread
     sees the same data, and the data is gone when you close the database.
 
@@ -491,20 +485,14 @@ class Database:
             found = self._layout_version()
             if found == LAYOUT_VERSION:
                 return
-            if found == 0 and not connection.execute("SELECT count(*) FROM sqlite_schema").fetchone()[0]:
-                scripts = [_SCHEMA, _IDEMPOTENCY_SCHEMA]
-            elif found in _UPGRADES:
-                scripts = [_UPGRADES[version] for version in range(found, LAYOUT_VERSION)]
-            else:
+            if found != 0 or connection.execute("SELECT count(*) FROM sqlite_schema").fetchone()[0]:
                 raise DatabaseOpenError(
                     f"The database file {path!r} has table layout version {found}, and this server uses version "
-                    f"{LAYOUT_VERSION}. Point BXAPI_DATABASE at a new file, or at a file that this version of bxapi "
-                    "or an earlier one created."
+                    f"{LAYOUT_VERSION}. Point BXAPI_DATABASE at a new file, or at a file this version of bxapi created."
                 )
-            for script in scripts:
-                for statement in script.split(";"):
-                    if statement.strip():
-                        connection.execute(statement)
+            for statement in _SCHEMA.split(";"):
+                if statement.strip():
+                    connection.execute(statement)
             connection.execute(f"PRAGMA user_version = {LAYOUT_VERSION}")
 
     def _layout_version(self) -> int:
