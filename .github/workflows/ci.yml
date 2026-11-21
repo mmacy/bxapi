@@ -24,6 +24,24 @@ jobs:
       - run: uv run pyright
       - run: uv run pytest
 
+  # Builds the documentation site in website/: the hand-written pages, and the API reference that
+  # Speakeasy's Docs MD generates from the OpenAPI document. The build fails on a broken link.
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - run: uv sync --locked
+      - run: npm ci
+        working-directory: website
+      - run: npm run build
+        working-directory: website
+
   # Installs the lowest version that pyproject.toml allows of each direct dependency, so the
   # lower bounds stay true. The sync resolves again and rewrites uv.lock in the runner's checkout
   # only, and --no-sync keeps `uv run` from resolving back to the locked versions.

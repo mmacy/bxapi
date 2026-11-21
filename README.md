@@ -134,6 +134,14 @@ uv run pyright
 uv run pytest
 ```
 
+A pull request must also build the documentation site in `website/`, which contains these pages and an API reference generated from the OpenAPI document. The build needs [Node.js](https://nodejs.org/) 22 or later:
+
+```sh
+cd website
+npm ci
+npm run build
+```
+
 [AGENTS.md](AGENTS.md) has the rules for working in the repository, and [docs/spec.md](docs/spec.md) is the API's contract, which every endpoint must match.
 
 ## License
