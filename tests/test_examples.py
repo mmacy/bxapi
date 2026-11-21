@@ -54,7 +54,7 @@ def test_example_plays_to_the_end_of_the_first_battle(open_url: str) -> None:
     result = _run(open_url)
     assert result.returncode == 0, result.stderr
     assert "The party enters dungeon barrow" in result.stdout
-    assert "Encounter: 2 × Goblin" in result.stdout
+    assert "Encounter: 2 goblins" in result.stdout
     assert "> resolve_battle_round" in result.stdout
     assert "The battle is over." in result.stdout
 

@@ -29,6 +29,8 @@ class DiceRollRequest(RequestModel):
     times: int = Field(default=1, ge=1, le=100)
     """How many times to roll the expression."""
     seed: Seed | None = None
+    """The seed to roll with. To roll the same dice again, send the same body with the `seed` of an earlier response.
+    When you leave it out, the server draws a seed and returns it."""
 
 
 class DiceRollResponse(ApiModel):

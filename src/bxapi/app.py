@@ -15,7 +15,6 @@ same place as uvicorn's. Another ASGI server shows them only if you configure th
 
 import asyncio
 import logging
-import re
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -120,6 +119,11 @@ exist.
 - **Unknown fields.** A request body with a field the operation doesn't define gets 422
   `validation_error`. A command and a document are osrlib's models, and osrlib ignores a field it
   doesn't define.
+- **osrlib's descriptions.** The descriptions of osrlib's models, like the commands and the player
+  view, were written for osrlib's Python API. Read `None` as JSON `null`, and a tuple as an array.
+  Where a description says that a model raises `ValueError` or `ValidationError`, the server refuses
+  the request: a command or another request body gets 422 `validation_error`, and an uploaded or
+  imported document, like an adventure, gets 422 `content_invalid`.
 - **Rate limits.** The server has none.
 
 ## Refused commands
@@ -368,12 +372,6 @@ _BODY_ERRORS = {
     "sets and which is 8,388,608 bytes by default. The same body gets the same error.",
 }
 
-# osrlib's docstrings link to other code as [`Name`][osrlib.module.Name], which only osrlib's documentation site
-# can resolve. The OpenAPI document shows the name as code instead. A link followed by more code, like
-# [`load_classes`][osrlib.data.load_classes]`()`, becomes one code span.
-_DOC_LINK_THEN_CODE = re.compile(r"\[`([^`\]]+)`\]\[[\w.]*\]`([^`]*)`")
-_DOC_LINK = re.compile(r"\[`([^`\]]+)`\]\[[\w.]*\]")
-
 _SCHEMAS = "#/components/schemas/"
 _PROBLEM_REF = _SCHEMAS + "Problem"
 _FASTAPI_VALIDATION_REF = _SCHEMAS + "HTTPValidationError"
@@ -545,18 +543,6 @@ def _require_discriminators(schema: dict[str, Any]) -> None:
                     required.append(tag)
 
 
-def _plain_links(value: object) -> None:
-    if isinstance(value, dict):
-        for key, item in value.items():
-            if key == "description" and isinstance(item, str):
-                value[key] = _DOC_LINK.sub(r"`\1`", _DOC_LINK_THEN_CODE.sub(r"`\1\2`", item))
-            else:
-                _plain_links(item)
-    elif isinstance(value, list):
-        for item in value:
-            _plain_links(item)
-
-
 def _install_openapi(app: FastAPI) -> None:
     """Make the application's OpenAPI document describe error responses as problem documents."""
 
@@ -572,7 +558,6 @@ def _install_openapi(app: FastAPI) -> None:
             )
             _describe_problems(schema)
             _require_discriminators(schema)
-            _plain_links(schema)
             add_examples(schema)
             app.openapi_schema = schema
         return app.openapi_schema

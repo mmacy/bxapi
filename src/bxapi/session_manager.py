@@ -120,7 +120,9 @@ def validate_loaded_adventure(game: GameSession) -> None:
 
     Raises:
         osrlib.errors.ContentValidationError: If the adventure refers to a monster, an item, an area, or a
-            quest that doesn't exist.
+            quest that doesn't exist, or has content that a session can't play, like a treasure type letter
+            outside `A` to `V`. A save stored under an earlier osrlib can fail a check that the installed
+            osrlib added.
     """
     validate_adventure(game.adventure, load_monsters(), load_equipment())
 

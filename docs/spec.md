@@ -7,7 +7,7 @@ The contract below covers version 1 of the API. For how to work in the repositor
 ## Design rules
 
 1. **osrlib applies every rule.** bxapi never computes a rule's result, adjusts one, or re-implements one. An endpoint validates its input, calls osrlib, stores what needs storing, and returns osrlib's models unchanged wherever a model exists.
-2. **A player sees only what the players may see.** For a caller with the player role, the server builds every response about a session from osrlib's player view and its player-visible events. A session's master seed, referee events, monster hit points, and unexplored map go only to a caller with the referee role. So do save documents and full adventure documents.
+2. **A player sees only what the players may see.** For a caller with the player role, the server builds every response about a session from osrlib's player view and its player-visible events. A session's master seed, referee events, monster hit points, and unexplored map go only to a caller with the referee role. So do save documents and full adventure documents. Each member's character sheet in the player view counts every item the member wears, identified or not, because those are the numbers the monsters roll against. So a player can infer an unidentified item's bonus or curse from numbers like `armour_class` and `melee_modifier`, while the inventory keeps the item's name masked.
 3. **A refused command is a result.** When osrlib refuses a command, the response has status 200, `accepted` set to `false`, and osrlib's rejections. A refused command changes nothing in the game. An HTTP error status means the request itself failed, for example because it broke the API's contract.
 4. **The server decides the dice.** The server draws each session's seed and returns it only inside a save document, which only a referee can read. Only a referee can supply one. The stateless generators under `/v1/dice` and `/v1/generate` are different: any caller can pass a seed, and each response includes the seed it used, so the caller can repeat the roll.
 5. **A client reads and changes only the data it created.** Every stored resource belongs to the client application that created it. A request for another client's resource gets the same 404 as a request for an id that doesn't exist.
@@ -79,7 +79,7 @@ Every error response is an RFC 9457 problem document with the media type `applic
 
 Read-only views of the rules content osrlib loads with the functions in `osrlib.data`. A list returns a page of summaries. A detail endpoint returns osrlib's model for that entry, unchanged. `q` matches a substring of an entry's id or name, ignoring case. An unknown id gets 404. Every successful response under `/v1/rules` has the header `Cache-Control: private, max-age=3600`, because the content changes only when the server's osrlib does. An error response doesn't have it.
 
-The rules reference is the rulebook, so every role can read all of it, including the entries a referee would normally keep to themselves, like what a cursed item does. The player view of a session shows what that session's players have learned about a particular item.
+The rules reference is the rulebook, so every role can read all of it, including the entries a referee would normally keep to themselves, like what a cursed item does. The player view of a session shows what that session's players have learned about a particular item. Its inventory masks the name of an unidentified item, but its character sheets include the effect of every item a member wears, as design rule 2 describes.
 
 | Method and path | Returns |
 | --- | --- |
@@ -160,7 +160,7 @@ A stored character is `{id, name, class_id, level, created_at, character, derive
 - `xp_modifier_pct` and `level_title`, from the functions of those names in `osrlib.core.classes`. `level_title` is `null` past the class's last title.
 - `alignment_tongue` and `languages`.
 
-`derived` leaves out the movement rate, because the movement rate depends on the ruleset of the session the character plays in.
+`derived` leaves out the movement rate, because the movement rate depends on the ruleset of the session the character plays in. In a session, each member's character sheet in the player view includes `movement_rate_feet`, which osrlib computes under the session's ruleset.
 
 The server creates a character with osrlib's step-by-step creation functions, in the order osrlib lists them: roll the scores (unless the request names an ability roll), check the class, check and apply the adjustment, check the first spells, roll hit points, check the extra languages, roll starting gold, buy each purchase, and equip each item. If a step refuses a choice, creation stops there with 422 `character_invalid`. The response includes osrlib's `rejections` when that step returns them. A class id or an item id osrlib doesn't have gets 422 `character_invalid` with `field` and `id`, and `index` for a list field, instead of `rejections`. So does an id in `equip_item_ids` that isn't in the purchases, or that appears there more times than the purchases buy it. Equipping a purchase equips all of it, whatever its `quantity`. A malformed body, like an unknown `alignment`, a `quantity` of 0, or a name longer than 100 characters, gets 422 `validation_error`.
 
@@ -201,7 +201,7 @@ Adventure info contains only what a player may know before play:
 
 Adventure info never contains map geometry, keyed areas, monsters, treasure, triggers, or quest internals.
 
-The server stores the adventure document as uploaded, and parses it again when a session starts. Two uploads of the same document store two adventures, each with a different id. The list puts the adventures that come with the server first, in id order, and then the client's adventures, newest first. `limit`, `offset`, and `total` count the two parts as one list. An upload that osrlib refuses gets 422 `content_invalid`, and a document stamped with a newer schema version gets 409 `version_unsupported`. `POST /v1/adventures/validate` returns `valid: false` in both cases, with `code` set to the code the upload would return.
+The server stores the adventure document as uploaded, and parses it again when a session starts. Two uploads of the same document store two adventures, each with a different id. The list puts the adventures that come with the server first, in id order, and then the client's adventures, newest first. `limit`, `offset`, and `total` count the two parts as one list. An upload that osrlib refuses gets 422 `content_invalid`, and a document stamped with a newer schema version gets 409 `version_unsupported`. `POST /v1/adventures/validate` returns `valid: false` in both cases, with `code` set to the code the upload would return. osrlib checks a stored adventure again each time the server parses it, so `POST /v1/sessions` gets 422 `content_invalid` for a stored adventure that an earlier osrlib release accepted and the server's release refuses.
 
 A session embeds a copy of its adventure, so deleting an adventure doesn't affect a session that already started.
 
@@ -218,7 +218,7 @@ A session is one game in progress. It starts in town and ends in `game_over` or 
 | `DELETE /v1/sessions/{session_id}` | player | 204. The session's saves stay. |
 | `GET /v1/sessions/{session_id}/commands` | player | `mode`, `revision`, and `commands`: the `command_type` and `kind` of each command that's legal in the session's mode and that the caller's role may send. |
 | `POST /v1/sessions/{session_id}/commands` | player | The command outcome. |
-| `GET /v1/sessions/{session_id}/view` | player | osrlib's `PlayerView`. |
+| `GET /v1/sessions/{session_id}/view` | player | osrlib's `PlayerView`: each member's character sheet, the explored map, the encounter as the players see it, the journal, the quests, and the town's healing prices. |
 | `GET /v1/sessions/{session_id}/referee-view` | referee | osrlib's `RefereeView`. |
 | `GET /v1/sessions/{session_id}/events` | player | A page of the event log. |
 | `POST /v1/sessions/{session_id}/saves` | player | 201: save info. The body is `{"label": "..."}`, and both the body and `label` are optional. A save without a label has `label: null`. Saving doesn't change the session or its revision. |
@@ -258,7 +258,7 @@ The command outcome:
 | `ended` | Whether the session is over. |
 | `revision` | The session's revision after the command. |
 
-A caller sees the events with player visibility. A referee who passes `visibility=referee` sees every event. A player who passes it gets 403 `referee_required`, and the server doesn't execute the command. A player who sends a referee command gets 403 `referee_command`, and the server doesn't execute it. osrlib ignores a field that the command doesn't define.
+A caller sees the events with player visibility. A referee who passes `visibility=referee` sees every event. A player who passes it gets 403 `referee_required`, and the server doesn't execute the command. A player who sends a referee command gets 403 `referee_command`, and the server doesn't execute it. The server checks the body against the command's schema before it checks the role, so a referee command that doesn't fit its schema, like a `roll_dice` with the expression `2x7`, gets 422 `validation_error` from a player too. osrlib ignores a field that the command doesn't define.
 
 Every command has an optional `source`: a note of who or what issued the command, which osrlib logs with it and never reads. osrlib's `Interpreter` sets it to `trigger:` or `quest:` and an id on the commands it issues for the adventure's triggers and quests, so the command log shows why each one ran. Only a referee may set `source`. A player who sends a command with a `source` gets 403 `referee_required`, and the server doesn't execute the command.
 
@@ -298,9 +298,9 @@ A save is a copy of a session at one moment. Restoring a save creates a new sess
 
 Save info is `{id, session_id, adventure_id, adventure_name, label, mode, clock, created_at}`. `session_id` is the session the save was made from, which may have been deleted since. `adventure_id` is the `adventure_id` of that session when the save was made, and it can be the id of an adventure that has since been deleted. Both are `null` for an imported save, and `adventure_id` is `null` for a save of a session restored from an imported save.
 
-A restored session plays on from the save as the original session would have: the server loads the document with osrlib's `load_game`, checks its adventure with osrlib's `validate_adventure`, and registers the `Interpreter` again. A stored save that osrlib can't load, or whose adventure it refuses, gets 500 `session_unreadable`.
+A restored session plays on from the save as the original session would have: the server loads the document with osrlib's `load_game`, checks its adventure with osrlib's `validate_adventure`, and registers the `Interpreter` again. A stored save that osrlib can't load, or whose adventure it refuses, gets 500 `session_unreadable`. That includes a save stored before the server's osrlib was upgraded, when its adventure fails a check that the newer osrlib added, like the 2.5.0 check of the keys in a level's `edges`.
 
-An import loads the document and checks its adventure the same way before it stores anything, and stores the document osrlib writes back out of the loaded game, in the format of the server's osrlib. A document osrlib can't load, an adventure that refers to something osrlib doesn't have, and a game clock larger than a SQLite integer get 422 `content_invalid`. A document with a newer `schema_version` gets 409 `version_unsupported`.
+An import loads the document and checks its adventure the same way before it stores anything, and stores the document osrlib writes back out of the loaded game, in the format of the server's osrlib. A document osrlib can't load, an adventure that fails osrlib's checks, and a game clock larger than a SQLite integer get 422 `content_invalid`. The checks are the ones an upload runs: the adventure can't refer to a monster, an item, an area, or a quest that doesn't exist, and it can't have content that a session can't play, like a treasure type letter outside `A` to `V`. A document with a newer `schema_version` gets 409 `version_unsupported`.
 
 ## Storage
 
@@ -351,3 +351,4 @@ The server limits how long a request's body may take to arrive, but it can't lim
 - WebSockets or server-sent events.
 - A database other than SQLite.
 - Narration, or any call to a language model.
+- Looking monsters up by `family_id`. `GET /v1/rules/monsters/{monster_id}` takes a template id, and the monster list has no `family_id` filter.

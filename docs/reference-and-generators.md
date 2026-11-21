@@ -125,6 +125,9 @@ curl -s http://127.0.0.1:8640/v1/rules/monsters/goblin -H "Authorization: Bearer
 {
   "id": "goblin",
   "name": "Goblin",
+  "display_name": "goblin",
+  "display_name_plural": "goblins",
+  "family_id": "goblin",
   "page": "Goblin.md",
   "intro": "Small, grotesque humanoids with pallid, earth-coloured skin and glowing, red eyes. Dwell underground.",
   "ac": 6,
@@ -185,12 +188,12 @@ curl -s http://127.0.0.1:8640/v1/rules/commands/move_party -H "Authorization: Be
   "allowed_modes": ["exploring"],
   "summary": "Move the party one cell, turning to face the way it goes.",
   "json_schema": {
-    "$defs": {"Direction": {"enum": ["north", "east", "south", "west"], "title": "Direction", "type": "string", ...}},
+    "$defs": {"Direction": {"description": "The four grid directions the party faces and moves in. ...", "enum": ["north", "east", "south", "west"], "title": "Direction", "type": "string"}},
     "description": "Move the party one cell, turning to face the way it goes.\n\nThe party must already be in a dungeon. ...",
     "properties": {
-      "command_type": {"const": "move_party", "default": "move_party", "title": "Command Type", "type": "string"},
+      "command_type": {"const": "move_party", "default": "move_party", "description": "The name that identifies the command class in serialized data. ...", "title": "Command Type", "type": "string"},
       "source": {...},
-      "direction": {"$ref": "#/$defs/Direction"}
+      "direction": {"$ref": "#/$defs/Direction", "description": "Which way to step. The party turns to face that way as it goes, so a move is also a turn. ..."}
     },
     "required": ["direction"],
     "title": "MoveParty",
@@ -205,6 +208,9 @@ To build a request from a schema:
 - Send each field in `required`. Leave out the others to use their defaults.
 - A `$ref` points at a definition in `$defs`. Here, `direction` is one of the four directions in the `enum`.
 - Read `description` for the rules of the command. It describes the modes the command works in, the `rejections` it can return, and the events it causes.
+- Read each property's `description` for what the field means and the values it takes.
+
+The descriptions come from osrlib's documentation for Python. The `command_type` description says you never pass the field yourself, because constructing a command in Python sets it, but a request body has to include `command_type`. A body without it gets 422 `validation_error`.
 
 A command's `source` field is for referees. A player who sets it gets 403 `referee_required`.
 
@@ -240,10 +246,10 @@ curl -s -X POST http://127.0.0.1:8640/v1/dice/roll -H "Authorization: Bearer $KE
 ```
 
 ```json
-{"expression":"3d6","seed":4905287810713684,"rolls":[{"rolls":[3,3,6],"modifier":0,"multiplier":1,"total":12}]}
+{"expression":"3d6","seed":2678468627358632,"rolls":[{"rolls":[1,3,3],"modifier":0,"multiplier":1,"total":7}]}
 ```
 
-Your seed and roll differ from these. Send the same body with the seed from your response, and the server returns the same dice again. With the seed above, it rolls 3, 3, and 6. To show a roll again later, store its seed. A request with `times` set to 3 returns the first three results of the same request with `times` set to 5.
+Your seed and roll differ from these. Send the same body with the seed from your response, and the server returns the same dice again. With the seed above, it rolls 1, 3, and 3. To show a roll again later, store its seed. A request with `times` set to 3 returns the first three results of the same request with `times` set to 5.
 
 The seeds on this page are for requests that store nothing. A session has a separate seed. The server picks a random seed for each session unless a referee chooses one. The only response that contains a session's seed is a save's document, which only a referee can read. For more information, see [Run games as a referee](referee.md#start-a-repeatable-session).
 
@@ -337,7 +343,7 @@ curl -s -X POST http://127.0.0.1:8640/v1/generate/character -H "Authorization: B
 ```json
 {
   "seed": 7,
-  "character": {"id": null, "name": "Garr", "class_id": "dwarf", "race": "dwarf", "level": 1, "scores": {"str": 14, "int": 6, "wis": 9, "dex": 10, "con": 11, "cha": 11}, "max_hp": 3, ...},
+  "character": {"id": null, "name": "Garr", "class_id": "dwarf", "custom_class": null, "race": "dwarf", "level": 1, "scores": {"str": 14, "int": 6, "wis": 9, "dex": 10, "con": 11, "cha": 11}, "max_hp": 3, ...},
   "derived": {"thac0": 19, "armour_class": 9, ...},
   "rolls": {"ability_rolls": {...}, "hit_point_roll": {...}, "gold_roll": {...}}
 }
