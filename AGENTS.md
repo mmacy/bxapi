@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Guidance for agents working on bxapi, an HTTP API for the 1981 B/X rules. Other applications use it as their backend.
+bxapi is an HTTP API for the 1981 B/X rules. Other applications use it as their backend.
 
 ## Architecture in one paragraph
 
@@ -58,7 +58,7 @@ The sync rewrites `uv.lock`, so run it in a copy of the worktree, or restore `uv
 - **Filter every query on the caller's client.** A resource that belongs to another client is a 404.
 - **Raise `ApiError`** (or use the helpers in `bxapi.errors`) for every failure. Never return an error as a plain dict or raise FastAPI's `HTTPException`. Add a new error code to the table in `docs/spec.md`.
 - **Endpoints are plain `def`.** No `async def` endpoint, and no hidden global state. Everything an endpoint needs comes from `request.app.state` or a dependency.
-- **Every route has a `summary`, a docstring, and typed request and response models.** They become the OpenAPI document, which is the reference clients read. A response model that bxapi defines extends `bxapi.models.ApiModel`, and a request body model extends `bxapi.models.RequestModel`, which also refuses unknown fields. Document each field with a docstring on the line after it: both base classes copy it into the OpenAPI document. The endpoint function's name becomes the operation's `operationId`, so give it a name that reads well as a client method (`roll_dice`, `get_session`), keep it unique across the application, and don't rename it once it's merged.
+- **Every route has a `summary`, a docstring, and typed request and response models.** They become the OpenAPI document, which is the reference clients read. A response model that bxapi defines extends `bxapi.models.ApiModel`, and a request body model extends `bxapi.models.RequestModel`, which also forbids unknown fields. Document each field with a docstring on the line after it. With either base class, that docstring becomes the field's description in the OpenAPI document. The endpoint function's name becomes the operation's `operationId`, so give it a name that reads well as a client method (`roll_dice`, `get_session`), keep it unique across the application, and don't rename it once it's merged.
 - **Tests go through HTTP.** Test an endpoint with the `client`, `player`, `referee`, and `other` fixtures in `tests/conftest.py`. Assert on structure and on what osrlib returned, and never on a particular die roll unless the test passes a seed.
 - Refactor freely and update every call site. Keep no alias for an old name and no code "just in case".
 

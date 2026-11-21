@@ -2,20 +2,20 @@
 
 bxapi is an HTTP API for the 1981 B/X (Basic/Expert) rules. Other applications call it as their backend: games that run a dungeon crawl, and utilities that look up a monster or roll a treasure. [osrlib](https://github.com/mmacy/osrlib-python), a Python library, implements the rules. bxapi adds what a network service needs around it: authentication, storage, one-at-a-time access to each game, and an error format.
 
-This file is the contract for version 1 of the API. `AGENTS.md` is the guide for working in the repository.
+The contract below covers version 1 of the API. For how to work in the repository, see `AGENTS.md`.
 
 ## Design rules
 
 1. **osrlib applies every rule.** bxapi never computes a rule's result, adjusts one, or re-implements one. An endpoint validates its input, calls osrlib, stores what needs storing, and returns osrlib's models unchanged wherever a model exists.
-2. **A player sees only what the players may see.** For a caller with the player role, the server builds every response from osrlib's player view and its player-visible events. The master seed, referee events, monster hit points, unexplored map, save documents, and full adventure documents go only to a caller with the referee role.
-3. **A refused command is a result.** When the rules refuse a command, the response has status 200, `accepted` set to `false`, and osrlib's rejections. A refused command changes nothing in the game. An HTTP error status means the caller broke the API's contract.
-4. **The server decides the dice.** The server draws each session's seed and never returns it. Only a referee can supply one. The stateless generators under `/v1/dice` and `/v1/generate` are different: any caller can pass a seed, and each response includes the seed it used, so the caller can repeat the roll.
+2. **A player sees only what the players may see.** For a caller with the player role, the server builds every response about a session from osrlib's player view and its player-visible events. A session's master seed, referee events, monster hit points, and unexplored map go only to a caller with the referee role. So do save documents and full adventure documents.
+3. **A refused command is a result.** When osrlib refuses a command, the response has status 200, `accepted` set to `false`, and osrlib's rejections. A refused command changes nothing in the game. An HTTP error status means the request itself failed, for example because it broke the API's contract.
+4. **The server decides the dice.** The server draws each session's seed and returns it only inside a save document, which only a referee can read. Only a referee can supply one. The stateless generators under `/v1/dice` and `/v1/generate` are different: any caller can pass a seed, and each response includes the seed it used, so the caller can repeat the roll.
 5. **A client reads and changes only the data it created.** Every stored resource belongs to the client application that created it. A request for another client's resource gets the same 404 as a request for an id that doesn't exist.
-6. **Endpoints are synchronous.** osrlib is synchronous and CPU-bound, so endpoints are plain `def` functions that FastAPI runs in its thread pool. The session manager makes sure one session executes one command at a time.
+6. **Endpoints are synchronous.** osrlib is synchronous and CPU-bound, so endpoints are plain `def` functions that FastAPI runs in its thread pool. The session manager (`bxapi.session_manager`) makes sure that the server runs one command at a time on each session.
 
 ## Conventions
 
-- **Base path.** Every endpoint except `GET /health` is under `/v1`, and every request under `/v1` needs an API key.
+- **Base path.** Every endpoint except `GET /health` and the documentation paths in **OpenAPI** below is under `/v1`, and every request under `/v1` needs an API key, unless the server allows anonymous callers.
 - **Bodies.** Requests and responses are JSON. Field names are snake_case. A request body with a field the endpoint doesn't define gets 422 `validation_error`. A body or a field that is an osrlib model, like a command or a character's `adjustment`, is the exception: osrlib ignores unknown fields.
 - **Identifiers.** A stored resource has an id made of a prefix and 22 random URL-safe characters: `chr_` for a character, `rol_` for an ability roll, `adv_` for an adventure, `ses_` for a session, and `sav_` for a save. An adventure that comes with the server has an id that starts with `builtin-`.
 - **Timestamps.** UTC, in RFC 3339 format with whole seconds, like `2026-11-20T22:01:05Z`.
@@ -28,7 +28,7 @@ This file is the contract for version 1 of the API. `AGENTS.md` is the guide for
 
 A client sends an API key as a bearer token: `Authorization: Bearer <key>`. The scheme name `Bearer` is case-insensitive. The server's `BXAPI_API_KEYS` setting lists each key with a client name and a role. A key is at least 16 printable ASCII characters, with no spaces.
 
-bxapi has no user accounts. A key identifies a client application, not a person. Everyone who has one of an application's keys shares that application's data: they can read, command, rename, and delete all of its characters, adventures, sessions, and saves. An application with many users gives each user only the ids of that user's own resources, which nobody can guess, or sends its users' requests to bxapi through a server of its own. The role limits what the holder of a key can see and do in a game, not whose data they can reach.
+bxapi has no user accounts. A key identifies a client application, not a person. Everyone who has one of an application's keys shares that application's data: they can read and delete all of its characters, adventures, sessions, and saves, send commands to its sessions, rename its sessions, and relabel its saves. An application with many users either gives each user only the ids of that user's resources, which are random and can't be guessed, or sends its users' requests to bxapi through a server that the application runs. The role limits what the holder of a key can see and do in a game, not whose data they can reach.
 
 | Role | May do |
 | --- | --- |
@@ -41,11 +41,11 @@ The server checks the key before it reads the request's body. A request under `/
 
 ### Errors
 
-Every error response is an RFC 9457 problem document with the media type `application/problem+json`. `type` is always `about:blank`. A client reads `code`. `detail` is a short description for a person, at most 1,000 characters. A document has only the extra members its code uses, and a client ignores any member it doesn't know.
+Every error response is an RFC 9457 problem document with the media type `application/problem+json`. `type` is always `about:blank`. A client reads `code`. `detail` is a short description for a person, at most 1,000 characters. A document has only the extra members that the table below lists for its code. A client ignores any member it doesn't know.
 
 | Status | `code` | When | Extra members |
 | --- | --- | --- | --- |
-| 400 | `bad_request` | The server can't decode the body: it isn't UTF-8, or it has an integer with more than 4,300 digits. | |
+| 400 | `bad_request` | The server can't decode the body's bytes as text, or the body has an integer with more than 4,300 digits. The server decodes a body as UTF-8, or as UTF-16 or UTF-32 when the body starts with that encoding's byte order mark or zero bytes. | |
 | 401 | `unauthorized` | The key is missing or unknown. | |
 | 403 | `referee_required` | A player asked for something only a referee may do, including a field like `seed`. | |
 | 403 | `referee_command` | A player sent a referee command. | `command_type` |
@@ -58,10 +58,10 @@ Every error response is an RFC 9457 problem document with the media type `applic
 | 409 | `version_unsupported` | A document is stamped with a schema version newer than the server's osrlib. | |
 | 408 | `request_timeout` | The request body didn't arrive within `BXAPI_BODY_TIMEOUT_SECONDS`. | |
 | 413 | `content_too_large` | The request body is larger than `BXAPI_MAX_BODY_BYTES`. | |
-| 422 | `validation_error` | The request doesn't match the endpoint's schema. | `errors`, the first 20 of pydantic's errors. Each has `loc`, `msg`, and `type`, and no copy of the value sent. The server cuts each name in `loc` and each `msg` to 128 characters. `error_count` is how many errors there are. An object with more than 20 fields the endpoint doesn't define gets one error, whose `msg` states how many there are. |
+| 422 | `validation_error` | The request doesn't match the endpoint's schema, or its body decodes as text but isn't valid JSON. A body that isn't valid JSON gets one error with the type `json_invalid`. | `errors`, the first 20 of pydantic's errors. Each has `loc`, `msg`, and `type`, and no copy of the value sent. The server cuts each name in `loc` and each `msg` to 128 characters. `error_count` is how many errors there are. An object with more than 20 fields the endpoint doesn't define gets one error, whose `msg` states how many there are. |
 | 422 | `content_invalid` | osrlib refused a document or a value as malformed, or the server refused an imported character. | |
-| 422 | `character_invalid` | The choices for a new character break a rule, or name a class or an item osrlib doesn't have. | `rejections`, when osrlib reports them. Otherwise `field`, the request field that's wrong, like `equip_item_ids`, `index`, the entry's position when `field` is a list, and `id`, the value of that entry. |
-| 422 | `party_invalid` | The characters named for a new session can't form a party: osrlib refused the party, the party has more than 20 members, or two members have the same id. | |
+| 422 | `character_invalid` | The choices for a new character break a rule, or name a class or an item osrlib doesn't have. | `rejections`, when osrlib reports them. Otherwise `field` (the request field that's wrong, like `equip_item_ids`), `index` (the entry's position, when `field` is a list), and `id` (the value of that entry). |
+| 422 | `party_invalid` | The characters named for a new session can't form a party: osrlib refused the party, a `party_document` has more than 20 members, or two members end up with the same id. | |
 | 500 | `internal_error` | A bug. The response says nothing about the cause, and the server logs the traceback. | |
 | 500 | `session_unreadable` | The server's osrlib can't load a stored session, or a stored save to restore. The response contains nothing from the stored state, and the server logs the cause with the id. | |
 | 503 | `database_busy` | Another process held the database's write lock for longer than the 5 seconds the server waits. The response has the header `Retry-After: 1`. Send the request again. | |
@@ -79,7 +79,7 @@ Every error response is an RFC 9457 problem document with the media type `applic
 
 Read-only views of the rules content osrlib loads with the functions in `osrlib.data`. A list returns a page of summaries. A detail endpoint returns osrlib's model for that entry, unchanged. `q` matches a substring of an entry's id or name, ignoring case. An unknown id gets 404. Every successful response under `/v1/rules` has the header `Cache-Control: private, max-age=3600`, because the content changes only when the server's osrlib does. An error response doesn't have it.
 
-The rules reference is the rulebook, so every role can read all of it, including the entries a referee would normally keep to themselves, like what a cursed item does. What a session's players have learned about a particular item is a different matter, and the player view covers it.
+The rules reference is the rulebook, so every role can read all of it, including the entries a referee would normally keep to themselves, like what a cursed item does. The player view of a session shows what that session's players have learned about a particular item.
 
 | Method and path | Returns |
 | --- | --- |
@@ -109,7 +109,7 @@ Stateless. Any role. Every request body accepts an optional `seed` (an integer f
 | Method and path | Body | Returns |
 | --- | --- | --- |
 | `POST /v1/dice/roll` | `expression`, `times` (1 to 100, default 1) | `expression`, `seed`, and `rolls`: one osrlib `RollResult` (`rolls`, `modifier`, `multiplier`, `total`) for each time. |
-| `POST /v1/generate/character` | The choices `POST /v1/characters` accepts, except `ability_roll_id`. | `seed`, `character`, `derived`, and the creation `rolls`. Nothing is stored. |
+| `POST /v1/generate/character` | The choices `POST /v1/characters` accepts, except `ability_roll_id`. | `seed`, `character`, `derived`, and the creation `rolls`. The server stores nothing. |
 | `POST /v1/generate/treasure` | `treasure_type` (a letter), `tier` (`basic` or `expert`) | `seed` and `treasure`, osrlib's generated treasure. |
 | `POST /v1/generate/npc-party` | `kind` (`basic` or `expert`), `count` (1 to 100) | `seed` and `party`, osrlib's NPC party. |
 | `POST /v1/generate/room` | `level_number` (1 or more) | `seed` and `room`, the stocked area osrlib rolled. |
@@ -119,13 +119,13 @@ A dice expression osrlib can't parse gets 422 `content_invalid`. An unknown mons
 
 ### Characters
 
-The server rolls a character and stores it. A session copies the characters it starts with, so a stored character stays as it was created and can start any number of sessions.
+The server rolls a character and stores it. When a session starts, the server copies its characters into it, so a stored character stays as it was created, and you can start any number of sessions with it.
 
-B/X players roll ability scores before they choose a class. To support that, a client first asks for an *ability roll*, shows the player the scores and the classes they qualify for, and then creates the character from that roll. The server rolls the scores from a seed and stores the seed with the roll, and it never returns that seed. The character created from the roll gets its hit point and gold rolls from the same seed, so every attempt to create a character from one roll gets the same rolls. bxapi doesn't limit how many ability rolls a client asks for, so a game that wants a limit enforces it.
+B/X players roll ability scores before they choose a class. To support that, a client first asks for an *ability roll*, shows the player the scores and the classes they qualify for, and then creates the character from that roll. The server rolls the scores from a seed and stores the seed with the roll, and it never returns that seed. The character created from the roll gets its hit point and gold rolls from the same seed, so every attempt to create a character from one roll, like a retry after osrlib refuses a choice, gets the same rolls. bxapi doesn't limit how many ability rolls a client asks for, so a game that wants a limit enforces it.
 
 | Method and path | Role | Body | Returns |
 | --- | --- | --- | --- |
-| `POST /v1/ability-rolls` | player | `seed` (referee only), which decides the scores and the hit point and gold rolls. The body is optional. | 201: the roll: `id`, `scores`, `eligible_class_ids`, `used` (`false`), `created_at` |
+| `POST /v1/ability-rolls` | player | `seed` (referee only), which determines the scores and the hit point and gold rolls. The body is optional. | 201: the roll: `id`, `scores`, `eligible_class_ids`, `used` (`false`), `created_at` |
 | `GET /v1/ability-rolls/{roll_id}` | player | | The roll, with `used` set to whether a character was created from it. |
 | `POST /v1/characters` | player | See below. | 201: the stored character. |
 | `POST /v1/characters/import` | referee | A character document. | 201: the stored character. |
@@ -140,14 +140,14 @@ The body of `POST /v1/characters`:
 | `name` | yes | The character's name, 1 to 100 characters. osrlib accepts a name of spaces. |
 | `class_id` | yes | A class id from `/v1/rules/classes`. |
 | `alignment` | yes | `lawful`, `neutral`, or `chaotic`. |
-| `ability_roll_id` | no | Create the character from these scores, with the hit point and gold rolls of the roll's seed. Without it, the server rolls the scores as part of the request. |
+| `ability_roll_id` | no | Create the character from the roll's scores, with the hit point and gold rolls of the roll's seed. Without it, the server rolls the scores as part of the request. |
 | `adjustment` | no | A trade of ability points, as osrlib's `AbilityAdjustment`: `lowered` and `raised`, each a map from an ability to a number of points. osrlib checks the trade. |
 | `starting_spell_ids` | no | An arcane caster's first spells. |
 | `extra_languages` | no | The extra languages a high Intelligence allows. |
 | `purchases` | no | Starting gear to buy, in order: a list of `{item_id, quantity}`. `quantity` is a number of osrlib's purchase lots, from 1 to 10,000, and defaults to 1. osrlib sells weapons and armour one at a time, and gear and ammunition in bundles, so one lot of torches is six torches. |
 | `equip_item_ids` | no | Which purchased items to equip. |
 | `hp_reroll_at_first_level` | no | The optional rule that rerolls a first hit die of 1 or 2. Default `false`. |
-| `seed` | no | Referee only. A request with both `seed` and `ability_roll_id` gets 422 `validation_error`, because the roll's seed decides the rolls. |
+| `seed` | no | Referee only. A request with both `seed` and `ability_roll_id` gets 422 `validation_error`, because the roll's seed determines the rolls. |
 
 `scores` is osrlib's score table, keyed by `str`, `int`, `wis`, `dex`, `con`, and `cha`. `eligible_class_ids` lists, in osrlib's class order, each class for which osrlib's `validate_class_choice` returns no rejections.
 
@@ -160,13 +160,13 @@ A stored character is `{id, name, class_id, level, created_at, character, derive
 - `xp_modifier_pct` and `level_title`, from the functions of those names in `osrlib.core.classes`. `level_title` is `null` past the class's last title.
 - `alignment_tongue` and `languages`.
 
-`derived` leaves out the movement rate, because it depends on the ruleset of the session that plays the character.
+`derived` leaves out the movement rate, because the movement rate depends on the ruleset of the session the character plays in.
 
-The server creates a character with osrlib's step-by-step creation functions, in the order osrlib lists them: roll the scores (unless the request names an ability roll), check the class, check and apply the adjustment, check the first spells, roll hit points, check the extra languages, roll starting gold, buy each purchase, and equip each item. The first step that refuses a choice ends the creation with 422 `character_invalid`. The response includes osrlib's `rejections` when that step returns them. A class id or an item id osrlib doesn't have, and an id in `equip_item_ids` that the purchases don't buy, or don't buy as many times, get 422 `character_invalid` with `field`, `index`, and `id` instead of `rejections`. Equipping a purchase equips all of it, whatever its `quantity`. A malformed body, like an unknown `alignment`, a `quantity` of 0, or a name longer than 100 characters, gets 422 `validation_error`.
+The server creates a character with osrlib's step-by-step creation functions, in the order osrlib lists them: roll the scores (unless the request names an ability roll), check the class, check and apply the adjustment, check the first spells, roll hit points, check the extra languages, roll starting gold, buy each purchase, and equip each item. If a step refuses a choice, creation stops there with 422 `character_invalid`. The response includes osrlib's `rejections` when that step returns them. A class id or an item id osrlib doesn't have gets 422 `character_invalid` with `field` and `id`, and `index` for a list field, instead of `rejections`. So does an id in `equip_item_ids` that isn't in the purchases, or that appears there more times than the purchases buy it. Equipping a purchase equips all of it, whatever its `quantity`. A malformed body, like an unknown `alignment`, a `quantity` of 0, or a name longer than 100 characters, gets 422 `validation_error`.
 
 When a choice breaks a rule, an ability roll named in the request stays unused. A successful creation marks the roll used and stores the character in one database transaction, so two creations from one roll never both succeed, and a failed creation never marks the roll used. Deleting the character doesn't free the roll. A second creation from the same roll gets 409 `ability_roll_used`. An `ability_roll_id` that matches no roll of the caller's client gets 404.
 
-The `document` column of a `characters` row is what osrlib's `Character.to_document` returns for the stored character. `POST /v1/characters/import` accepts the same document, with any character osrlib's `Character` model accepts, like a fighter at level 14. It stores the character with its `id` cleared, because a session assigns each party member an id when it starts. The server builds `derived` before it stores anything. A document that isn't a valid character document gets 422 `content_invalid`, and so does a character osrlib can't compute `derived` for, like one that wears a magic item osrlib doesn't have. A document stamped with a newer schema version gets 409 `version_unsupported`.
+The `document` column of a `characters` row is what osrlib's `Character.to_document` returns for the stored character. `POST /v1/characters/import` accepts the same document, with any character osrlib's `Character` model accepts, like a fighter at level 14. The endpoint stores the character with a new `chr_` id. It clears the `id` field of the `character` itself, because osrlib gives each party member without an id a new one when a session starts. The server builds `derived` before it stores anything. A document that isn't a valid character document gets 422 `content_invalid`, and so does a character osrlib can't compute `derived` for, like one that wears a magic item osrlib doesn't have. A document stamped with a newer schema version gets 409 `version_unsupported`.
 
 An import also gets 422 `content_invalid` when the character has a stat modifier, or a condition with an `effect_id`. Each of these refers to an effect in the game the character came from. In a new session such a condition would never end, and osrlib would remove such a modifier when an unrelated effect with the same `effect_id` ended. A condition with no `effect_id`, like `dead`, is accepted.
 
@@ -199,9 +199,9 @@ Adventure info contains only what a player may know before play:
 | `town` | `{name, description}` of the town. |
 | `dungeons` | A list of `{id, name}`, one for each dungeon. Info leaves out how many levels a dungeon has, because osrlib's player view shows only the levels the party has explored. |
 
-It never contains map geometry, keyed areas, monsters, treasure, triggers, or quest internals.
+Adventure info never contains map geometry, keyed areas, monsters, treasure, triggers, or quest internals.
 
-The server stores the adventure document as uploaded, and parses it again when a session starts. Two uploads of the same document store two adventures, each with its own id. The list puts the adventures that come with the server first, in id order, and then the client's adventures, newest first. `limit`, `offset`, and `total` count the two parts as one list. An upload that osrlib refuses gets 422 `content_invalid`, and a document stamped with a newer schema version gets 409 `version_unsupported`. `POST /v1/adventures/validate` returns `valid: false` in both cases, with `code` set to the code the upload would return.
+The server stores the adventure document as uploaded, and parses it again when a session starts. Two uploads of the same document store two adventures, each with a different id. The list puts the adventures that come with the server first, in id order, and then the client's adventures, newest first. `limit`, `offset`, and `total` count the two parts as one list. An upload that osrlib refuses gets 422 `content_invalid`, and a document stamped with a newer schema version gets 409 `version_unsupported`. `POST /v1/adventures/validate` returns `valid: false` in both cases, with `code` set to the code the upload would return.
 
 A session embeds a copy of its adventure, so deleting an adventure doesn't affect a session that already started.
 
@@ -228,19 +228,19 @@ The body of `POST /v1/sessions`:
 | Field | Required | Meaning |
 | --- | --- | --- |
 | `adventure_id` | yes | The adventure to play. |
-| `character_ids` | one of the two | The stored characters that form the party, in marching order, at most 20. The session plays copies, so a list can name a character more than once. |
+| `character_ids` | one of the two | The stored characters that form the party, in marching order, at most 20. The session uses copies, so the list can contain a character more than once. |
 | `party_document` | one of the two | Referee only. A party document, in place of stored characters, with at most 20 characters. |
 | `name` | no | A label for the session, 1 to 200 characters. Defaults to the adventure's name. |
 | `ruleset` | no | osrlib's `Ruleset` fields, to change optional rules. Defaults to the rules as written. |
 | `seed` | no | Referee only. |
 
-A request with both `character_ids` and `party_document`, or with neither, gets 422 `validation_error`. A player who sends `party_document` or `seed` gets 403 `referee_required`. An unknown adventure or character id gets 404 `not_found`, with `resource` set to `adventure` or `character`. osrlib requires a party of at least one member, and a party it refuses gets 422 `party_invalid`. A party in which two members have the same id gets 422 `party_invalid` too, because a command identifies a party member by id. A malformed `party_document` gets 422 `content_invalid`.
+A request with both `character_ids` and `party_document`, or with neither, gets 422 `validation_error`. A player who sends `party_document` or `seed` gets 403 `referee_required`. An unknown adventure or character id gets 404 `not_found`, with `resource` set to `adventure` or `character`. osrlib requires a party of at least one member, and a party it refuses gets 422 `party_invalid`. A `party_document` in which two members end up with the same id gets 422 `party_invalid` too, because a command identifies a party member by id. A malformed `party_document` gets 422 `content_invalid`.
 
-The server allows at most 20 members in a new session's party. The limit belongs to the server, not to the rules of the game: every accepted command writes the whole party into the session's save document, so a larger party slows every command for the server's other clients. More than 20 `character_ids` gets 422 `validation_error`, and a `party_document` with more than 20 characters gets 422 `party_invalid`.
+The server allows at most 20 members in a new session's party. The server sets this limit, and it isn't a rule of the game. After every accepted command, the server writes the whole party into the session's save document, so a larger party slows every command for the server's other clients. More than 20 `character_ids` gets 422 `validation_error`, and a `party_document` with more than 20 characters gets 422 `party_invalid`.
 
-Session info is `{id, name, adventure_id, adventure_name, mode, ended, revision, clock, schema_version, engine_version, created_at, updated_at}`. `clock` is `{rounds, turns, days}`, with the turns and days that osrlib's `GameClock` counts. `ended` is `true` in the modes `game_over` and `victory`. `updated_at` is the time of the last accepted command, or `created_at` before the first one. Renaming the session doesn't change it.
+Session info is `{id, name, adventure_id, adventure_name, mode, ended, revision, clock, schema_version, engine_version, created_at, updated_at}`. `clock` is `{rounds, turns, days}`, with the turns and days that osrlib's `GameClock` counts. `ended` is `true` in the modes `game_over` and `victory`. `updated_at` is the time of the last accepted command, or `created_at` before the first one. Renaming the session doesn't change `updated_at`.
 
-`adventure_id` is the id of the adventure the session started with, and it can be the id of an adventure that has since been deleted. A session restored from a save has the save's `adventure_id`, which is `null` for an imported save. Neither case changes play, because a session plays the copy of the adventure in its save document.
+`adventure_id` is the id of the adventure the session started with, and it can be the id of an adventure that has since been deleted. A session restored from a save has the save's `adventure_id`, which is `null` for an imported save. Neither a deleted adventure nor a `null` id changes play, because a session uses the copy of the adventure in its save document.
 
 #### Commands
 
@@ -250,37 +250,37 @@ The command outcome:
 
 | Field | Meaning |
 | --- | --- |
-| `accepted` | Whether the rules accepted the command. |
-| `rejections` | osrlib's rejections when they didn't: each a `code` and `params`. |
+| `accepted` | Whether osrlib accepted the command. |
+| `rejections` | osrlib's rejections when it didn't: each a `code` and `params`. |
 | `events` | The events the command caused, as osrlib serializes them, in order. |
 | `messages` | One line of English for each event, in the same order, from osrlib's `format_message`. |
 | `mode` | The session's mode after the command. |
 | `ended` | Whether the session is over. |
 | `revision` | The session's revision after the command. |
 
-A caller sees the events with player visibility. A referee who passes `visibility=referee` sees every event. A player who passes it gets 403 `referee_required`, and the session doesn't execute the command. A player who sends a referee command gets 403 `referee_command`, and the session never executes it. A field the command doesn't define is ignored, because osrlib's commands ignore unknown fields.
+A caller sees the events with player visibility. A referee who passes `visibility=referee` sees every event. A player who passes it gets 403 `referee_required`, and the server doesn't execute the command. A player who sends a referee command gets 403 `referee_command`, and the server doesn't execute it. osrlib ignores a field that the command doesn't define.
 
-Every command has an optional `source`: a note of who or what issued the command, which osrlib logs with it and never reads. osrlib's `Interpreter` sets it to `trigger:` or `quest:` and an id on the commands it issues for the adventure's triggers and quests, so the command log shows why each one ran. Only a referee may set `source`. A player who sends a command with a `source` gets 403 `referee_required`, and the session doesn't execute the command.
+Every command has an optional `source`: a note of who or what issued the command, which osrlib logs with it and never reads. osrlib's `Interpreter` sets it to `trigger:` or `quest:` and an id on the commands it issues for the adventure's triggers and quests, so the command log shows why each one ran. Only a referee may set `source`. A player who sends a command with a `source` gets 403 `referee_required`, and the server doesn't execute the command.
 
-**Revisions.** A session's revision starts at 0 and goes up by 1 each time the session accepts a command request. A refused command leaves it unchanged. The revision and `updated_at` count every accepted command, a referee's too, so a player can tell that something happened without seeing what. A client that might send a request twice, like a retry after a timeout, passes `expected_revision` as a query parameter. If the session's revision is different, the server executes nothing and returns 409 `revision_conflict` with the current `revision`. The client then reads the view and decides what to do.
+**Revisions.** A session's revision starts at 0 and goes up by 1 for each command request that osrlib accepts, whatever commands the adventure's triggers run in response. A refused command leaves it unchanged. The revision and `updated_at` count every accepted command, a referee's too, so a player can tell that something happened without seeing what. A client that might send a request twice, like a retry after a timeout, passes `expected_revision` as a query parameter. If the session's revision is different, the server executes nothing and returns 409 `revision_conflict` with the current `revision`. The client then reads the view and decides what to do.
 
 **Busy sessions.** 409 `session_busy` means the command had no effect, and the problem has the session's current `revision`. If you sent `expected_revision`, read the session before you decide what to do: when the revision has changed, sending the same request again gets `revision_conflict`. If you didn't send `expected_revision`, send the command again.
 
 #### Events
 
-`GET /v1/sessions/{session_id}/events` takes `after` (default 0), `limit` (1 to 500, default 100), and `visibility` (`player` by default, and `referee` for a referee). It returns `{events, messages, next_after, total}`. `after` is the number of events of the requested visibility that the client has already read, and `next_after` is the value to pass next time. A client that reconnects reads from its last `next_after` to catch up.
+`GET /v1/sessions/{session_id}/events` takes `after` (default 0), `limit` (1 to 500, default 100), and `visibility` (`player` by default, and a referee can pass `referee`). It returns `{events, messages, next_after, total}`. `after` is the number of events of the requested visibility that the client has already read, and `next_after` is the value to pass next time. A client that reconnects reads from its last `next_after` to catch up.
 
 #### How the server runs a session
 
 - The server registers osrlib's `Interpreter` on every session it creates, restores, or loads, so the adventure's triggers and quests run.
-- After every accepted command, the server writes the session's save document, its mode, and its revision to the database before it responds. A server that restarts loses no accepted command. A command whose response didn't reach the client, because the connection or the server failed, may have been applied. Send `expected_revision` with every command you might send twice, so that a retry of an applied command gets `revision_conflict` instead of running again.
-- Each accepted command writes the whole save document, event log included, so a command takes longer as the game goes on. On the built-in adventure, a command request takes about 2 ms at revision 5, 5 ms at revision 600, and 9 ms at revision 2,000, when the document is about 510 kB. A game of tens of thousands of commands can have a save document larger than `BXAPI_MAX_BODY_BYTES`, and a server with the same setting can't import that document.
+- After every accepted command, the server writes the session's save document, its mode, and its revision to the database before it responds. A server that restarts loses no accepted command. If a command's response didn't reach the client, because the connection or the server failed, the server may have applied the command. Send `expected_revision` with every command you might send twice, so that a retry of an applied command gets `revision_conflict` instead of running again.
+- After each accepted command, the server writes the whole save document, event log included, so a command takes longer as the game goes on. On the built-in adventure `builtin-barrow`, a command request takes about 2 ms at revision 5, 5 ms at revision 600, and 9 ms at revision 2,000, when the document is about 510 kB. A game of tens of thousands of commands can have a save document larger than `BXAPI_MAX_BODY_BYTES`, and a server with the same setting can't import that document.
 - The server keeps up to `BXAPI_SESSION_CACHE_SIZE` sessions loaded in memory, each with a lock. A request takes the session's lock to execute a command, read a view, or read the event log, so a view or a page of events always shows the session between two commands. A request waits at most 5 seconds for the lock, and then gets 409 `session_busy` without having executed or read anything. The limit keeps requests for one slow session from taking every worker thread the server has. When the cache is full, the server drops the session used longest ago and loads it from the database when a request next needs it. A request that's using a dropped session finishes with its copy, and a request that arrives meanwhile waits for the same lock.
 - Before each request uses a loaded session, the server compares the revision in the database with the revision of the loaded copy. If they differ, another process changed the session, and the server loads it again.
 - The write after a command succeeds only if the database still has the revision the command started from. If it doesn't, another process wrote first, so the server drops its loaded copy and returns 409 `session_busy`. Two processes that share one database file can therefore serve the same session without losing or repeating a command.
 - If osrlib raises an exception while it executes a command, the server drops the loaded copy, writes nothing, and returns 500 `internal_error`. The next request loads the session from the database.
 - If osrlib can't load a session's stored document, for example because a server with another osrlib release wrote it to a shared file, the request gets 500 `session_unreadable`. The response contains nothing from osrlib's message, which can quote the stored state, and the server logs the message with the session's id.
-- Session info, the session list, the commands endpoint, renaming, and saving read the `sessions` table and don't take the lock. A save copies the save document of the last accepted command.
+- The endpoints for session info, the session list, the commands list, renaming, and saving read the `sessions` table and don't take the lock. A save copies the save document of the last accepted command.
 
 ### Saves
 
@@ -314,7 +314,7 @@ The server creates a new database file readable and writable only by the user th
 | `characters` | `seq`, `id`, `client`, `name`, `class_id`, `level`, `max_hp`, `document` (JSON), `created_at` |
 | `adventures` | `seq`, `id`, `client`, `name`, `info` (JSON), `document` (JSON), `created_at` |
 | `sessions` | `seq`, `id`, `client`, `name`, `adventure_id` (can be null), `adventure_name`, `mode`, `revision`, `clock_rounds`, `schema_version`, `engine_version`, `document` (JSON), `created_at`, `updated_at` |
-| `saves` | `seq`, `id`, `client`, `session_id` (can be null), `adventure_id` (can be null), `adventure_name`, `label`, `mode`, `clock_rounds`, `document` (JSON), `created_at` |
+| `saves` | `seq`, `id`, `client`, `session_id` (can be null), `adventure_id` (can be null), `adventure_name`, `label` (can be null), `mode`, `clock_rounds`, `document` (JSON), `created_at` |
 
 Every query that reads or changes a row filters on `client`.
 
@@ -327,8 +327,8 @@ Every query that reads or changes a row filters on `client`.
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `BXAPI_DATABASE` | `bxapi.db` | The path of the SQLite file, or `:memory:`. |
-| `BXAPI_API_KEYS` | `[]` | A JSON list of `{"client", "key", "role"}`. `role` defaults to `player`, and any other member is an error. |
-| `BXAPI_ALLOW_ANONYMOUS` | `false` | Whether a server with no API keys starts. |
+| `BXAPI_API_KEYS` | `[]` | A JSON list of `{"client", "key", "role"}`. `role` defaults to `player`, and a member other than `client`, `key`, and `role` is an error. |
+| `BXAPI_ALLOW_ANONYMOUS` | `false` | Whether a server with no API keys starts. Such a server asks for no key and treats every caller as a referee for the client `local`. |
 | `BXAPI_CORS_ORIGINS` | `[]` | A JSON list of the web origins whose pages may call the API. Each is a scheme, a host, and an optional port, like `https://game.example`, with no path and no trailing slash. `*` isn't allowed. Cross-origin responses expose the `WWW-Authenticate` and `Retry-After` headers. |
 | `BXAPI_SESSION_CACHE_SIZE` | `256` | How many sessions stay loaded in memory. |
 | `BXAPI_MAX_BODY_BYTES` | `8388608` | The largest request body. |
