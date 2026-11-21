@@ -1,8 +1,8 @@
 """Server settings, read from `BXAPI_` environment variables.
 
 The server reads every setting once, when [`create_app`][bxapi.app.create_app] builds the
-application. To change a setting, set its environment variable and restart the server. A `.env`
-file in the working directory supplies any variable that the environment doesn't set.
+application. To change a setting, set its environment variable and restart the server. For a
+variable that the environment doesn't set, the server reads a `.env` file in the working directory.
 
 A setting with a list value is written as JSON:
 
@@ -68,8 +68,9 @@ class ApiKey(BaseModel):
     client that created it, and no other client can read it. Everyone who has one of a client's
     keys shares all of that client's data, whatever the key's role. Two keys with the same
     client name share it too, so you can replace a key without losing anything. An application
-    with many users gives each user only the ids of that user's own resources, which nobody can
-    guess, or sends the users' requests to bxapi through a server of its own."""
+    with many users either gives each user only the ids of that user's resources, which are
+    random and can't be guessed, or sends the users' requests to bxapi through a server that the
+    application runs."""
     key: SecretStr = Field(min_length=16)
     """The secret the client sends as a bearer token: at least 16 printable ASCII characters,
     with no spaces."""
@@ -94,7 +95,8 @@ def _is_origin(origin: str) -> bool:
             and f"{parts.scheme}://{parts.netloc}" == origin
         )
     except ValueError:
-        # urlsplit raises it for a malformed host, and `port` for a port that isn't a number from 0 to 65535.
+        # urlsplit raises ValueError for a malformed host, and so does `port` for a port that isn't a number from 0
+        # to 65535.
         return False
 
 

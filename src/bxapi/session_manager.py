@@ -11,13 +11,14 @@ sessions so that a command doesn't have to load the save document each time. A l
 a copy of what the database has:
 
 - Each session has a lock. A request holds it while it executes a command or reads the session,
-  so one session runs one request at a time, and requests for separate sessions run in parallel.
+  so the server runs one request at a time on each session, and requests for separate sessions
+  run in parallel.
   A request waits at most [`LOCK_TIMEOUT_SECONDS`][bxapi.session_manager.LOCK_TIMEOUT_SECONDS]
   for the lock, and then gets 409 `session_busy` without having done anything.
 - Before a request uses a loaded copy, the manager compares the copy's revision with the
   revision in the database. When they differ, another server process changed the session, and
   the manager loads it again.
-- After the session accepts a command, the manager writes the save document, the mode, the
+- After osrlib accepts a command, the manager writes the save document, the mode, the
   clock, and the new revision with a compare-and-swap: the write happens only if the database
   still has the revision the command started from. When it doesn't, another process wrote first,
   so the manager drops its loaded copy and the request gets 409 `session_busy`.
@@ -58,14 +59,14 @@ __all__ = [
 LOCK_TIMEOUT_SECONDS = 5.0
 """How long a request waits for a session's lock before it gets 409 `session_busy`.
 
-Each waiting request occupies one of the server's worker threads, so the limit keeps a slow session from
-taking every thread and stalling requests for other sessions and other clients."""
+Each waiting request occupies one of the server's worker threads, so the limit keeps requests for one slow session
+from taking every thread and stalling requests for other sessions and other clients."""
 
 MAX_PARTY_SIZE = 20
 """The most members a new session's party may have.
 
-It's a limit of the server, not a rule of the game. Every accepted command writes the whole party in the save
-document, so a very large party makes each command slow for the server's other clients too."""
+It's a limit of the server, not a rule of the game. After every accepted command, the manager writes the whole party
+in the save document, so a very large party makes each command slow for the server's other clients too."""
 
 _log = logging.getLogger("bxapi")
 
@@ -96,8 +97,8 @@ class _Slot:
     """The lock of one session, and its loaded copy while it's in the cache.
 
     `users` counts the requests that hold the lock or wait for it. The manager removes a slot when
-    the session leaves the cache and `users` is 0, so a request that comes in while the session is
-    evicted still queues on the same lock as the request using it.
+    the session leaves the cache and `users` is 0. So a request that arrives after the manager evicts
+    a session, while another request still uses it, waits on the same lock as that request.
     """
 
     __slots__ = ("loaded", "lock", "users")
@@ -111,7 +112,7 @@ class _Slot:
 def validate_loaded_adventure(game: GameSession) -> None:
     """Run osrlib's checks on the adventure in a loaded save, the checks `GameSession.new` runs on a new game.
 
-    osrlib's `load_game` doesn't check the references the adventure makes, so a save whose adventure names an
+    osrlib's `load_game` doesn't check the references the adventure makes, so a save whose adventure refers to an
     unknown monster loads, and fails only when play reaches that monster.
 
     Args:
@@ -252,9 +253,9 @@ class SessionManager:
         Raises:
             ApiError: With status 422 and the code `party_invalid`, if the party has more than
                 [`MAX_PARTY_SIZE`][bxapi.session_manager.MAX_PARTY_SIZE] members, or if two
-                members end up with the same id. osrlib keeps an id a member already has, so two
-                copies of one character with an id, or a character whose id matches one osrlib
-                assigns, would collide, and a command identifies a party member by id.
+                members end up with the same id. osrlib keeps an id a member already has. So two
+                copies of one character with an id would collide, and so would a character whose
+                id matches one that osrlib assigns. A command identifies a party member by id.
             osrlib.errors.ContentValidationError: If `GameSession.new` refuses the adventure.
         """
         if len(party.members) > MAX_PARTY_SIZE:
@@ -272,7 +273,7 @@ class SessionManager:
             client: The client the new session belongs to.
             name: The session's name, or `None` for the adventure's name.
             adventure_id: The id of the adventure the save's session played, or `None` when the
-                server doesn't know it, as for an imported save.
+                save has no adventure id, like an imported save.
             game: The loaded session, with no listeners registered.
 
         Returns:
@@ -300,10 +301,10 @@ class SessionManager:
     def execute(
         self, client: str, session_id: str, command: Command, *, expected_revision: int | None = None
     ) -> Executed:
-        """Execute one command, and write the session to the database if the session accepted it.
+        """Execute one command, and write the session to the database if osrlib accepted it.
 
-        The database has the new state before the method returns. A refused command writes
-        nothing and leaves the revision as it was.
+        The database has the new state before the method returns. When osrlib refuses the
+        command, the method writes nothing and leaves the revision as it was.
 
         Args:
             client: The caller's client.
@@ -445,7 +446,7 @@ class SessionManager:
             "session_busy",
             f"{cause} The session is at revision {revision}. If you sent expected_revision, read the session "
             "before you decide what to do: when the revision has changed, the same request gets "
-            "revision_conflict. If you didn't, send the request again.",
+            "revision_conflict. If you didn't send expected_revision, send the request again.",
             revision=revision,
         )
 
@@ -493,5 +494,5 @@ class SessionManager:
 
 
 def _attach_listeners(game: GameSession) -> None:
-    # A save contains data and no code, so every session the server builds needs its listener again.
+    # A save contains data and no code, so the server registers the listener again on every session it builds.
     game.register_listener(Interpreter(game))

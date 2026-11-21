@@ -5,7 +5,8 @@ An *adventure document* is osrlib's `Adventure` model inside osrlib's versioned 
 client uploads one to play it.
 
 [`parse_adventure`][bxapi.adventures.parse_adventure] turns a document into an `Adventure`
-after it runs every check osrlib has on one, so an adventure that parses can start a session.
+after it runs every check osrlib has on one, so the server can start a session with any adventure
+that parses.
 [`builtin_adventures`][bxapi.adventures.builtin_adventures] returns the adventures in the
 [`bxapi.data`][bxapi.data] package, which every client can read and none can delete.
 [`find_adventure`][bxapi.adventures.find_adventure] looks an id up in both places.
@@ -192,8 +193,8 @@ def builtin_adventures() -> Mapping[str, BuiltinAdventure]:
 def find_adventure(db: Database, client: str, adventure_id: str) -> Adventure:
     """Return the adventure with an id: one that comes with the server, or one the client stored.
 
-    Call it to start a session. The function parses a stored document again, so an adventure
-    stored under an older osrlib is checked against the installed one.
+    Call it to start a session. The function parses a stored document again, so the installed
+    osrlib checks an adventure that was stored under an older one.
 
     Args:
         db: The database.

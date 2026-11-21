@@ -73,7 +73,7 @@ def command_kind(command_type: str) -> CommandKind:
 
     A command type that isn't in
     [`PLAY_COMMAND_TYPES`][bxapi.commands.PLAY_COMMAND_TYPES] counts as a referee command, so
-    a command this module has never heard of is refused to players.
+    a player can't send a command type that the list leaves out.
 
     Args:
         command_type: The command's `command_type`, like `"move_party"`.

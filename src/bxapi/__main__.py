@@ -18,7 +18,8 @@ def main() -> None:
 
     The command takes no arguments. Set `BXAPI_HOST`, `BXAPI_PORT`, and the other `BXAPI_`
     environment variables to configure it. It runs one process, and it runs until you stop it.
-    It logs the server's own lines, like the one about API keys at startup, with uvicorn's.
+    It sends bxapi's log lines, like the one about API keys at startup, to the same place as
+    uvicorn's.
 
     When the settings are invalid, the database can't be opened, or the server has no API keys
     and `BXAPI_ALLOW_ANONYMOUS` isn't set, the command prints why and exits with status 1.
