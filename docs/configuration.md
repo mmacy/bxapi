@@ -149,7 +149,7 @@ All processes need the same keys, so give them the same `BXAPI_API_KEYS`. Run th
 
 ### Turn off the documentation pages
 
-The pages at `/docs` and `/redoc` and the document at `/openapi.json` need no key, so anyone who can reach the server can read the API's description. To turn them off:
+The pages at `/docs` and `/redoc` and the document at `/openapi.json` need no key, so anyone who can reach the server can read the API's description. Each page loads its script from `cdn.jsdelivr.net`, so a browser that opens one contacts that host. The server pins the script's version and hash, and the browser refuses any other file. To turn the pages and the document off:
 
 ```sh
 BXAPI_API_KEYS='[{"client": "my-game", "key": "player-key-0123456789", "role": "player"}]' BXAPI_DOCS_ENABLED=false uv run bxapi

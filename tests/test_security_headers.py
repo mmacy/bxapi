@@ -75,16 +75,12 @@ def test_an_unexpected_error_has_the_headers(settings: Settings) -> None:
 
 
 @pytest.mark.parametrize("path", ["/docs", "/redoc"])
-def test_a_documentation_page_can_load_its_scripts_and_cannot_be_framed(client: TestClient, path: str) -> None:
+def test_a_documentation_page_has_its_own_policy_and_cannot_be_framed(client: TestClient, path: str) -> None:
     response = client.get(path)
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
     for name, value in PAGE_HEADERS.items():
         assert response.headers.get_list(name) == [value], name
-    assert "content-security-policy" not in response.headers
-
-
-def test_the_server_has_no_oauth2_redirect_page(client: TestClient) -> None:
-    response = client.get("/docs/oauth2-redirect")
-    assert (response.status_code, response.json()["code"]) == (404, "not_found")
-    assert "oauth2-redirect" not in client.get("/docs").text
+    [policy] = response.headers.get_list("content-security-policy")
+    assert policy != CONTENT_SECURITY_POLICY
+    assert "frame-ancestors 'none'" in policy

@@ -34,6 +34,7 @@ from bxapi.adventures import builtin_adventures
 from bxapi.auth import AuthMiddleware, authenticate
 from bxapi.caching import ConditionalGetMiddleware, HeadMiddleware
 from bxapi.db import Database
+from bxapi.docs_pages import install_docs_pages
 from bxapi.errors import (
     INTERNAL_ERROR,
     PROBLEM_MEDIA_TYPE,
@@ -438,6 +439,8 @@ _SMALL_BODY_TOO_LARGE = (
 
 _JSON_BODY_METHODS = frozenset({"POST", "PUT", "PATCH"})
 
+_OPENAPI_URL = "/openapi.json"
+
 _SCHEMAS = "#/components/schemas/"
 _PROBLEM_REF = _SCHEMAS + "Problem"
 _FASTAPI_VALIDATION_REF = _SCHEMAS + "HTTPValidationError"
@@ -831,12 +834,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         generate_unique_id_function=_operation_id,
         # A path with a trailing slash is a 404, not a redirect to a path that may not exist either.
         redirect_slashes=False,
-        docs_url="/docs" if settings.docs_enabled else None,
-        redoc_url="/redoc" if settings.docs_enabled else None,
-        openapi_url="/openapi.json" if settings.docs_enabled else None,
-        # The API has no OAuth2 flow, so the server doesn't serve the page that Swagger UI uses for one.
-        swagger_ui_oauth2_redirect_url=None,
+        # install_docs_pages adds the two documentation pages in place of FastAPI's.
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=_OPENAPI_URL if settings.docs_enabled else None,
     )
+    if settings.docs_enabled:
+        install_docs_pages(app, openapi_url=_OPENAPI_URL)
     _install_openapi(app)
     app.state.settings = settings
     app.state.db = Database(settings.database)
