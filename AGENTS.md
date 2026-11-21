@@ -50,6 +50,35 @@ The sync rewrites `uv.lock`, so run it in a copy of the worktree, or restore `uv
 
 `tests/test_docstring_examples.py` lints and runs every fenced `python` block in the docstrings under `src/bxapi/`.
 
+The CI workflow's `docs` job builds the documentation site. When you change a hand-written page, a route, a model, or an example, build the site as "The documentation site" describes.
+
+## The documentation site
+
+`website/` is a [Docusaurus](https://docusaurus.io/) site with two parts. The guides are the hand-written pages: `README.md`, every file in `docs/` except `docs/spec.md`, and `examples/README.md`. The API reference is a set of pages that [Docs MD](https://github.com/speakeasy-api/docs-md), Speakeasy's generator of reference pages, writes from the OpenAPI document. On a push to `main` that passes the gate, CI publishes the site to GitHub Pages at <https://mmacy.github.io/bxapi/>.
+
+Build the site and serve it at <http://localhost:3000/bxapi/>. You need [Node.js](https://nodejs.org/) 22 or later:
+
+```sh
+cd website
+npm ci
+npm run build
+npm run serve
+```
+
+`npm run build` first runs `npm run generate`, which writes everything under `website/generated/`, a directory that git ignores:
+
+- `scripts/stage-pages.mjs` copies the hand-written pages to `generated/content/`.
+- `scripts/prepare-openapi.mjs` runs `uv run python -m bxapi.openapi` and writes the document to `generated/openapi.json`. It also writes one curl command for each operation to `generated/curl-samples.json`. The command is the request of the operation's first successful exchange in `src/bxapi/openapi_examples.json`.
+- `docs-md` reads `speakeasy.config.mjs` and writes the reference pages to `generated/content/reference/`.
+
+`npm start` serves the site and reloads a page when its file under `generated/` changes. After you edit a hand-written page, run `node scripts/stage-pages.mjs` in a second terminal to copy it again.
+
+- Edit a hand-written page where git tracks it, never under `website/generated/`.
+- Link from one hand-written page to another with a relative path to the file, like `../README.md#get-it-running`. The link then works on GitHub and on the site. The build fails on a broken link or anchor.
+- When you add a file to `docs/`, add it to `website/sidebars.js` and to the list in `README.md`.
+- To change the text of the reference, change the route's summary, docstring, models, error entries, or examples in `src/bxapi/`. Docs MD copies them from the OpenAPI document.
+- `package.json` pins `@speakeasy-api/docs-md` to one version, because three parts of the build work around defects in 0.2.37. `inlineRefs` in `scripts/prepare-openapi.mjs` exists because Docs MD stops with an error on a `$ref` key in an example. `src/remark/unescape-code-braces.mjs` removes the backslash that Docs MD writes before each brace in code. `src/remark/curl-samples.mjs` replaces the curl samples that Docs MD makes up from the schemas. When you move to a newer version, remove each workaround the new version doesn't need.
+
 ## Rules for the code
 
 - **Never implement a rule.** If an endpoint needs a number, a check, or a roll, osrlib has a function for it. If osrlib doesn't, the endpoint doesn't belong in bxapi yet.

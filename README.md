@@ -100,7 +100,9 @@ On a server that allows anonymous callers, you act as a referee. A game client n
 
 ## Read the API reference
 
-The running server documents every endpoint at <http://127.0.0.1:8640/docs>, with a form to try each one, and at <http://127.0.0.1:8640/redoc>. Both pages are built from the server's OpenAPI document, a machine-readable description of the API that a tool can use to generate a client:
+The documentation site has a reference for every endpoint at <https://mmacy.github.io/bxapi/reference/>, with a tested `curl` command for each one.
+
+The running server also documents every endpoint at <http://127.0.0.1:8640/docs>, with a form to try each one, and at <http://127.0.0.1:8640/redoc>. Both pages are built from the server's OpenAPI document, a machine-readable description of the API that a tool can use to generate a client:
 
 ```sh
 curl -s http://127.0.0.1:8640/openapi.json
@@ -113,6 +115,8 @@ uv run python -m bxapi.openapi > openapi.json
 ```
 
 ## Documentation
+
+The documentation site at <https://mmacy.github.io/bxapi/> has these pages and the API reference:
 
 - [Play a game](docs/play-a-game.md): a walkthrough of one game, from an ability roll to a saved battle.
 - [Authentication](docs/authentication.md): API keys, roles, and whose data a key can reach.
@@ -132,6 +136,14 @@ uv run ruff format --check
 uv run ruff check
 uv run pyright
 uv run pytest
+```
+
+A pull request must also build the documentation site in `website/`, which contains these pages and an API reference generated from the OpenAPI document. The build needs [Node.js](https://nodejs.org/) 22 or later:
+
+```sh
+cd website
+npm ci
+npm run build
 ```
 
 [AGENTS.md](AGENTS.md) has the rules for working in the repository, and [docs/spec.md](docs/spec.md) is the API's contract, which every endpoint must match.

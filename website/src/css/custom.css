@@ -1,0 +1,21 @@
+/* The site's colors. Docusaurus derives the rest of the theme from these Infima variables. */
+:root {
+  --ifm-color-primary: #8a3324;
+  --ifm-color-primary-dark: #7c2e20;
+  --ifm-color-primary-darker: #752b1f;
+  --ifm-color-primary-darkest: #612419;
+  --ifm-color-primary-light: #983828;
+  --ifm-color-primary-lighter: #9f3b29;
+  --ifm-color-primary-lightest: #b5432f;
+  --ifm-code-font-size: 95%;
+}
+
+[data-theme="dark"] {
+  --ifm-color-primary: #e39a6f;
+  --ifm-color-primary-dark: #de8854;
+  --ifm-color-primary-darker: #db7f47;
+  --ifm-color-primary-darkest: #c96528;
+  --ifm-color-primary-light: #e8ac8a;
+  --ifm-color-primary-lighter: #ebb597;
+  --ifm-color-primary-lightest: #f2d0bf;
+}

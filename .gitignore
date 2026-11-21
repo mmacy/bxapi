@@ -12,3 +12,7 @@ dist/
 *.db-shm
 *.db-wal
 .DS_Store
+node_modules/
+website/.docusaurus/
+website/build/
+website/generated/
