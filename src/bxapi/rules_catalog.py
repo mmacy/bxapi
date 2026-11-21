@@ -70,17 +70,17 @@ class ClassSummary(ApiModel):
     """The facts a class picker shows, from osrlib's `ClassDefinition`."""
 
     id: str
-    """The class id to pass as `class_id` when you create a character, like `"fighter"`."""
+    """The class ID to pass as `class_id` when you create a character, such as `"fighter"`."""
     name: str
-    """The display name, like `"Fighter"`."""
+    """The display name, such as `"Fighter"`."""
     race: str
-    """The race of the class's characters, as a lowercase identifier like `"human"` or `"dwarf"`."""
+    """The race of the class's characters, as a lowercase identifier such as `"human"` or `"dwarf"`."""
     prime_requisites: tuple[AbilityScore, ...]
     """The ability scores that determine the class's XP bonus."""
     requirements: dict[AbilityScore, int]
-    """The lowest score a character needs in each listed ability to take the class."""
+    """The minimum score a character needs in each listed ability to take the class."""
     hit_die: int
-    """The die osrlib rolls for each level's hit points, as its number of sides."""
+    """The number of sides on the die that osrlib rolls for each level's hit points."""
     max_level: int
     """The highest level a character of the class can reach."""
 
@@ -89,35 +89,36 @@ class MonsterSummary(ApiModel):
     """The statistics a monster list shows, from osrlib's `MonsterTemplate`."""
 
     id: str
-    """The monster id, like `"goblin"`."""
+    """The monster ID, such as `"goblin"`."""
     name: str
-    """The name as the rulebook prints it, like `"Goblin"` or `"Centipede, Giant"`. To name the monster in a sentence,
-    use the `display_name` of `GET /v1/rules/monsters/{monster_id}`, like `"giant centipede"`."""
+    """The name as the rulebook prints it, such as `"Goblin"` or `"Centipede, Giant"`. To name the monster in a
+    sentence, use the `display_name` from `GET /v1/rules/monsters/{monster_id}`, such as `"giant centipede"`."""
     hit_dice: MonsterHitDice
     """The monster's hit dice, as osrlib's `MonsterHitDice`."""
     ac: int | None
-    """The armour class where lower is better. It's `null` for a creature that every attack hits without
-    a roll, when the template's `attack_roll_required` is `false`."""
+    """The armour class on the descending scale, where lower is better. It's `null` for a creature that every attack
+    hits without a roll, which is the case when the template's `attack_roll_required` is `false`."""
     ac_ascending: int | None
-    """The same armour class where higher is better. It's `null` when `ac` is."""
+    """The same armour class on the ascending scale, where higher is better. It's `null` when `ac` is `null`."""
     xp: int
-    """The experience for defeating one, as the Old-School Essentials System Reference Document (SRD) prints it."""
+    """The experience points awarded for defeating one monster, as printed in the Old-School Essentials System Reference
+    Document (SRD)."""
     alignment: AlignmentSpec
-    """The alignments the monster may have, and the usual one when the monster has one."""
+    """The alignments the monster can have, and its usual alignment when it has one."""
 
 
 class SpellSummary(ApiModel):
     """The facts a spell list shows, from osrlib's `SpellTemplate`."""
 
     id: str
-    """The spell id, like `"magic_missile"`."""
+    """The spell ID, such as `"magic_missile"`."""
     name: str
-    """The display name, like `"Magic Missile"`."""
+    """The display name, such as `"Magic Missile"`."""
     level: int
     """The spell level, from 1 to 6."""
     spell_list: str
-    """The id of the spell list the spell is on, like `"cleric"` or `"magic_user"`. A class casts the spells
-    on the list in the `spell_list` parameter of its `divine_magic` or `arcane_magic` ability."""
+    """The ID of the spell list that includes the spell, such as `"cleric"` or `"magic_user"`. A class casts the spells
+    on the list that the `spell_list` parameter of its `divine_magic` or `arcane_magic` ability names."""
     range: str
     """The range line as printed."""
     duration: str
@@ -128,11 +129,11 @@ class EquipmentSummary(ApiModel):
     """The facts an equipment list shows, from osrlib's four equipment templates."""
 
     id: str
-    """The item id to pass in a purchase, like `"sword"`."""
+    """The item ID to pass in a purchase, such as `"sword"`."""
     name: str
-    """The display name, like `"Sword"`."""
+    """The display name, such as `"Sword"`."""
     item_type: ItemType
-    """Which of the four equipment templates the item is."""
+    """The item's type, which identifies one of the four equipment templates."""
     cost_gp: int
     """The price in gold pieces."""
 
@@ -141,22 +142,22 @@ class MagicItemSummary(ApiModel):
     """The facts a magic item list shows, from osrlib's `MagicItemTemplate`."""
 
     id: str
-    """The magic item id, like `"potion_of_healing"`."""
+    """The magic item ID, such as `"potion_of_healing"`."""
     name: str
     """The display name."""
     category: MagicItemCategory
-    """The kind of item, like `potion`, `scroll`, `ring`, or `sword`."""
+    """The kind of item, such as `potion`, `scroll`, `ring`, or `sword`."""
 
 
 class CommandSummary(ApiModel):
     """One command you can send to a session, as osrlib defines it."""
 
     command_type: str
-    """The `command_type` to send in a command request body, like `"move_party"`."""
+    """The `command_type` to send in a command request body, such as `"move_party"`."""
     kind: CommandKind
-    """Whether a player may send the command (`play`), or only a referee (`referee`)."""
+    """Whether a player may send the command (`play`) or only a referee may send it (`referee`)."""
     allowed_modes: list[SessionMode]
-    """The session modes the command is legal in, in alphabetical order."""
+    """The session modes in which the command is legal, in alphabetical order."""
     summary: str
     """The first paragraph of osrlib's documentation for the command, on one line, with each link
     reduced to its text."""
@@ -166,8 +167,8 @@ class CommandDetail(CommandSummary):
     """A command's summary, with the JSON Schema of its request body."""
 
     json_schema: dict[str, Any]
-    """The JSON Schema of osrlib's command class, which pydantic generates. `command_type` is a property
-    of the schema but isn't in its `required` list. Include it in every request body anyway."""
+    """The JSON Schema of osrlib's command class, which pydantic generates. The schema lists `command_type` as a
+    property but omits it from `required`. Include `command_type` in every request body regardless."""
 
 
 class EquipmentItem(RootModel[ItemTemplate]):

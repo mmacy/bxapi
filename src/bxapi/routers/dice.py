@@ -19,19 +19,20 @@ class DiceRollRequest(RequestModel):
     """The dice expression to roll, how many times, and an optional seed."""
 
     expression: str = Field(min_length=1, max_length=64, examples=["2d6+1x10"])
-    """A dice expression like `3d6`, `d%`, `1d6+1`, or `2d6+1x10`.
+    """A dice expression such as `3d6`, `d%`, `1d6+1`, or `2d6+1x10`.
 
-    The form is the number of dice, `d`, and the number of sides, then an optional `+` or `-` modifier, then an
-    optional multiplier after `x`, `×`, or `*`. The number of dice defaults to 1, and `d%` means `d100`. The sides are
-    2, 3, 4, 6, 8, 10, 12, 20, or 100. The modifier applies before the multiplier, so `2d6+1x10` is (2d6 + 1) × 10.
-    Case and spaces around the expression don't matter, and spaces inside it aren't allowed. The number of dice is 1
-    to 999, the modifier is at most 999999 in size, and the multiplier is 1 to 999999. Numbers have no leading zeros.
+    An expression is the number of dice, `d`, and the number of sides, followed by an optional `+` or `-` modifier and
+    an optional multiplier after `x`, `×`, or `*`. The number of dice defaults to 1, and `d%` means `d100`. The number
+    of sides is 2, 3, 4, 6, 8, 10, 12, 20, or 100. The modifier applies before the multiplier, so `2d6+1x10` is
+    (2d6 + 1) × 10. The server ignores case and any spaces around the expression, but it rejects spaces inside the
+    expression. The number of dice is 1 to 999, the modifier's magnitude is at most 999999, and the multiplier is 1 to
+    999999. Numbers have no leading zeros.
     """
     times: int = Field(default=1, ge=1, le=100)
-    """How many times to roll the expression."""
+    """The number of times to roll the expression."""
     seed: Seed | None = None
-    """The seed to roll with. To roll the same dice again, send the same body with the `seed` of an earlier response.
-    When you leave it out, the server draws a seed and returns it."""
+    """The seed to roll with. To roll the same dice again, send the same body with the `seed` from an earlier response.
+    When you omit it, the server generates a seed and returns it."""
 
 
 class DiceRollResponse(ApiModel):
@@ -41,7 +42,7 @@ class DiceRollResponse(ApiModel):
     """The expression you sent, unchanged."""
     seed: Seed
     rolls: list[RollResult]
-    """One result for each time, in the order they were rolled.
+    """One result for each roll of the expression, in the order the server rolled them.
 
     Each result has the value of each die in `rolls`, the `modifier` and `multiplier` from the expression, and the
     `total`.
@@ -56,8 +57,8 @@ class DiceRollResponse(ApiModel):
         {
             422: [
                 VALIDATION_ERROR,
-                "`content_invalid`: osrlib can't read the expression, or the expression has a die size osrlib "
-                "doesn't use, like `3d7`. `detail` says which. Fix the expression.",
+                "`content_invalid`: osrlib can't parse the expression, or the expression has a die size osrlib "
+                "doesn't use, such as `3d7`. `detail` says which. Fix the expression.",
             ]
         }
     ),
@@ -65,12 +66,13 @@ class DiceRollResponse(ApiModel):
 def roll_dice(body: DiceRollRequest) -> DiceRollResponse:
     """Roll a dice expression one or more times and return every die and every total.
 
-    osrlib's `roll` function does the rolling. Use `total` of each result as the roll's value. The response includes
-    the seed the server used. Send the same body with that seed to get the same results again, or leave `seed` out to
-    get a new random seed. With the same seed, `times` of 3 returns the first three results of `times` of 5.
+    osrlib's `roll` function does the rolling. Use each result's `total` as the roll's value. The response includes the
+    seed the server used. Send the same body with that seed to get the same results again, or omit `seed` to get a new
+    random seed. With the same seed, a request with `times` set to 3 returns the first three results of a request with
+    `times` set to 5.
 
-    The roll doesn't belong to a game, and the server stores nothing. In a session, osrlib makes the rolls the rules
-    call for when you send a command, so you don't roll them here.
+    The roll doesn't belong to a game, and the server stores nothing. In a session, osrlib makes the rolls that the
+    rules call for when you send a command, so you don't roll them here.
     """
     seed = seed_or_draw(body.seed)
     stream = RngStreams(master_seed=seed).get(StreamName.ADJUDICATION)

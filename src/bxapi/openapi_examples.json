@@ -4127,7 +4127,7 @@
   {
     "name": "unknown_monster",
     "operation": "validate_adventure",
-    "summary": "A document with an unknown monster id",
+    "summary": "A document with an unknown monster ID",
     "request": {
       "method": "POST",
       "path": "/v1/adventures/validate",
@@ -4863,7 +4863,7 @@
   {
     "name": "blocked_move",
     "operation": "send_command",
-    "summary": "A move into a wall, which osrlib refuses",
+    "summary": "A move into a wall, which osrlib rejects",
     "request": {
       "method": "POST",
       "path": "/v1/sessions/{create_session.id}/commands",

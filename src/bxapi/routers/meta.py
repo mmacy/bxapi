@@ -22,47 +22,47 @@ class Health(ApiModel):
 
 
 class Storage(ApiModel):
-    """How many bytes of documents the server stores for a client, and the most it stores.
+    """The number of bytes of documents the server stores for a client, and the storage limit.
 
-    The count is the bytes of the client's characters, ability rolls, adventures, sessions, and
-    saves, and of the responses the server stores for its idempotency keys.
+    The count covers the client's characters, ability rolls, adventures, sessions, and saves, plus the responses the
+    server stores for the client's idempotency keys.
     """
 
     used_bytes: int
-    """The bytes the server stores for the client now. Deleting a session, a save, an adventure,
-    or a character lowers it."""
+    """The number of bytes the server currently stores for the client. Deleting a session, a save, an adventure, or a
+    character lowers it."""
     max_bytes: int | None
-    """The most bytes the server stores for one client, or `null` when the server has no limit.
-    When `used_bytes` reaches it, each request that would store more gets 507 `storage_full`."""
+    """The maximum number of bytes the server stores for one client, or `null` when the server has no limit. After
+    `used_bytes` reaches the maximum, each request that would store more receives `507 storage_full`."""
 
 
 class Meta(ApiModel):
-    """The server's versions, and the caller as the server sees it."""
+    """The server's versions, and the caller's identity as the server sees it."""
 
     api_version: str
-    """The version of bxapi, like `"0.1.0"`."""
+    """The version of bxapi, such as `"0.1.0"`."""
     engine_version: str
     """The version of osrlib that applies the rules."""
     schema_version: int
-    """The version of osrlib's document format. osrlib stamps adventure, character, and save
-    documents with it, and the server refuses a document stamped with a higher one."""
+    """The version of osrlib's document format. osrlib stamps adventure, character, and save documents with it, and the
+    server rejects a document stamped with a higher version."""
     auth_enabled: bool
-    """Whether the server asks for an API key."""
+    """Whether the server requires an API key."""
     client: str
-    """The client application the caller's API key identifies, or `"local"` when the server
-    allows anonymous callers."""
+    """The client application that the caller's API key identifies, or `"local"` when the server runs in anonymous
+    mode."""
     role: Role
     """The caller's role."""
     storage: Storage
-    """How much the server stores for the caller's client, and the limit."""
+    """The number of bytes the server stores for the caller's client, and the limit."""
 
 
 @health_router.get("/health", summary="Check that the server is up", response_description='`{"status": "ok"}`.')
 def get_health() -> Health:
     """Return `{"status": "ok"}` while the server can answer requests.
 
-    The endpoint needs no API key and reads no data, so a load balancer or a container's health check can call it
-    often. It doesn't check the database or the API key. To check an API key, call `GET /v1/meta`.
+    The endpoint requires no API key and reads no data, so a load balancer or a container health check can call it
+    frequently. It doesn't check the database or the API key. To verify an API key, call `GET /v1/meta`.
     """
     return Health()
 
@@ -70,18 +70,18 @@ def get_health() -> Health:
 @router.get(
     "/meta",
     summary="Get the server's versions and the caller's role",
-    response_description="The versions, whether the server asks for a key, and the caller's client and role.",
+    response_description="The versions, whether the server requires a key, and the caller's client and role.",
 )
 def get_meta(request: Request, principal: CurrentPrincipal) -> Meta:
     """Return the versions of bxapi and osrlib, and the client and role of the API key you sent.
 
-    Call it when a client starts. A 200 means the key works, and `role` says whether the client can use the
-    operations only a referee may call. If the client keeps documents, like save documents, compare
-    `schema_version` with the `schema_version` of each document. The server refuses a document with a higher one,
-    with 409 `version_unsupported`.
+    Call it when a client starts. A `200` means the key works, and `role` tells you whether the client can call the
+    referee-only operations. If the client keeps documents, such as save documents, compare `schema_version` with the
+    `schema_version` of each document. The server rejects a document with a higher version and returns
+    `409 version_unsupported`.
 
-    `storage` states how many bytes of documents the server stores for your client, and the limit. Read it to
-    find out how close the client is to 507 `storage_full`, and to see what a delete freed.
+    `storage` reports how many bytes of documents the server stores for your client, and the limit. Read it to see how
+    close the client is to `507 storage_full`, and how many bytes a delete freed.
     """
     return Meta(
         api_version=__version__,

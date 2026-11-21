@@ -27,25 +27,25 @@ router = APIRouter(prefix="/saves", tags=["saves"], route_class=IdempotentRoute)
 
 SaveId = Annotated[
     str,
-    Path(description="The save's id, which starts with `sav_`. `POST /v1/sessions/{session_id}/saves` returns it."),
+    Path(description="The save's ID, which starts with `sav_`. `POST /v1/sessions/{session_id}/saves` returns it."),
 ]
 
-_NOT_FOUND = "`not_found`: Your client has no save with this id. `GET /v1/saves` lists your saves."
+_NOT_FOUND = "`not_found`: Your client has no save with this ID. `GET /v1/saves` lists your saves."
 
 
 class RelabelSaveRequest(RequestModel):
     """The save's new label."""
 
     label: NameText | None = Field(min_length=1, max_length=NAME_MAX_LENGTH)
-    """The new label, with no control character like a tab or a newline, or `null` to remove the label."""
+    """The new label, with no control characters such as a tab or a newline, or `null` to remove the label."""
 
 
 class RestoreSaveRequest(RequestModel):
     """An optional name for the session a restore starts."""
 
     name: NameText | None = Field(default=None, min_length=1, max_length=NAME_MAX_LENGTH)
-    """A name for the new session, with no control character like a tab or a newline. Defaults to the name of the
-    adventure in the save."""
+    """A name for the new session, with no control characters such as a tab or a newline. Defaults to the name of
+    the adventure in the save."""
 
 
 def _db(request: Request) -> Database:
@@ -68,8 +68,8 @@ def list_saves(
 ) -> Page[SaveInfo]:
     """List your client's saves, newest first.
 
-    Use it for a menu of saved games. Pass `session_id` to list only the saves of one session, which works after the
-    session is deleted too. Restore a save with `POST /v1/saves/{save_id}/restore`.
+    Use it to build a menu of saved games. Pass `session_id` to list only the saves of one session, which also works
+    after the session is deleted. Restore a save with `POST /v1/saves/{save_id}/restore`.
     """
     rows = _db(request).list_saves(principal.client, limit=page.limit, offset=page.offset, session_id=session_id)
     return Page(items=[save_info(row) for row in rows.items], total=rows.total, limit=page.limit, offset=page.offset)
@@ -79,21 +79,22 @@ def list_saves(
     "/import",
     status_code=201,
     summary="Import a save document",
-    response_description="The new save's info. It has no session, no adventure id, and no label.",
+    response_description="The new save's info. It has no session, no adventure ID, and no label.",
     responses=problem_responses(
         {
-            403: ["`referee_required`: Only a referee may import a save. Use a key with the referee role."],
+            403: ["`referee_required`: Only a referee may import a save. Use a referee key."],
             409: [
-                "`version_unsupported`: The document's `schema_version` is higher than the server's osrlib reads, "
-                "which is the `schema_version` of `GET /v1/meta`. Import it on a server with a newer osrlib."
+                "`version_unsupported`: The document's `schema_version` is higher than the version the server's "
+                "osrlib reads, which `GET /v1/meta` returns as `schema_version`. Import the document on a server "
+                "with a newer osrlib."
             ],
             422: [
                 VALIDATION_ERROR,
-                "`content_invalid`: osrlib can't load the document, the adventure in it fails osrlib's checks, or "
-                "its game clock is larger than the server can store. The checks are the ones `POST /v1/adventures` "
-                "runs: the adventure refers to something that doesn't exist (a monster, an item, an area, or a "
-                "quest), or it has content that a session can't play, like a treasure type letter outside `A` to "
-                "`V`. `detail` says which.",
+                "`content_invalid`: osrlib can't load the document, the adventure in it fails osrlib's checks or has "
+                "a control character in its name, or the game clock exceeds what the server can store. The checks "
+                "are the ones that `POST /v1/adventures` runs. They fail an adventure that refers to something that "
+                "doesn't exist (a monster, an item, an area, or a quest), or that has content a session can't play, "
+                "such as a treasure type letter outside `A` to `V`. `detail` identifies the cause. Fix the document.",
             ],
         }
     ),
@@ -104,14 +105,15 @@ def import_save(
     principal: RefereePrincipal,
     document: Annotated[JsonObject, Body(description="A save document from osrlib's `save_game`.")],
 ) -> SaveInfo:
-    """Store the save document in the request body as a new save, like one from `GET /v1/saves/{save_id}/document`.
+    """Store a save document, such as one from `GET /v1/saves/{save_id}/document`, as a new save.
 
     Only a referee may import a save. Use it to move a game from one server to another: read the document on the
-    first server, send it here on the second, then restore the new save with `POST /v1/saves/{save_id}/restore`.
+    first server, send it to this operation on the second, then restore the new save with
+    `POST /v1/saves/{save_id}/restore`.
 
     The server loads the document with osrlib's `load_game`, runs osrlib's `validate_adventure` on the adventure in
-    it, and stores the document osrlib writes back out of the loaded game, in the installed osrlib's format. The new
-    save has no session, no adventure id, and no label. Set a label with `PATCH /v1/saves/{save_id}`.
+    it, and stores the document that osrlib writes back from the loaded game, in the installed osrlib's format. The
+    new save has no session, no adventure ID, and no label. Set a label with `PATCH /v1/saves/{save_id}`.
     """
     game = load_game(document)
     validate_loaded_adventure(game)
@@ -141,7 +143,7 @@ def import_save(
 def get_save(request: Request, principal: CurrentPrincipal, save_id: SaveId) -> SaveInfo:
     """Return a save's info: its session, adventure, label, mode, and clock.
 
-    The info has no game state. A referee reads the whole game in `GET /v1/saves/{save_id}/document`.
+    The info contains no game state. A referee reads the whole game with `GET /v1/saves/{save_id}/document`.
     """
     return save_info(_found(_db(request), principal.client, save_id))
 
@@ -168,7 +170,7 @@ def relabel_save(request: Request, principal: CurrentPrincipal, save_id: SaveId,
     responses=problem_responses({404: [_NOT_FOUND]}),
 )
 def delete_save(request: Request, principal: CurrentPrincipal, save_id: SaveId) -> Response:
-    """Delete a save. A session restored from the save doesn't change."""
+    """Delete a save. Deleting it doesn't affect a session that was restored from the save."""
     if not _db(request).delete_save(principal.client, save_id):
         raise not_found("save", save_id)
     return Response(status_code=204)
@@ -184,8 +186,8 @@ def delete_save(request: Request, principal: CurrentPrincipal, save_id: SaveId) 
             404: [_NOT_FOUND],
             500: [
                 INTERNAL_ERROR,
-                "`session_unreadable`: The server's osrlib can't load the save's stored document, or refuses the "
-                "adventure in it. Report the save's id to the server's operator.",
+                "`session_unreadable`: The server's osrlib can't load the save's stored document, or rejects the "
+                "adventure in it. Report the save's ID to the server operator.",
             ],
         }
     ),
@@ -199,9 +201,9 @@ def restore_save(
     """Start a new session at the moment of the save, and return the new session's info.
 
     Keep the new session's `id`, and play it with `POST /v1/sessions/{session_id}/commands`. The new session starts
-    at revision 0, has the save's `adventure_id`, and plays on from the save as the original session would have. Its
-    `clock` continues the save's clock. The save, and the session it was made from, don't change, so you can restore
-    one save any number of times. The request body is optional.
+    at revision 0, has the save's `adventure_id`, and continues from the save as the original session would have.
+    Its `clock` continues the save's clock. Restoring doesn't change the save or the session it was made from, so you
+    can restore one save any number of times. The request body is optional.
     """
     db = _db(request)
     row = _found(db, principal.client, save_id)
@@ -221,16 +223,17 @@ def restore_save(
     response_description="The save document.",
     responses=problem_responses(
         {
-            403: ["`referee_required`: Only a referee may read a save document. Use a key with the referee role."],
+            403: ["`referee_required`: Only a referee may read a save document. Use a referee key."],
             404: [_NOT_FOUND],
         }
     ),
 )
 def get_save_document(request: Request, principal: RefereePrincipal, save_id: SaveId) -> JsonObject:
-    """Return the save document, osrlib's `save_game` output, to keep or to import on another server.
+    """Return the save document, which is the output of osrlib's `save_game`, to keep or to import on another server.
 
-    Only a referee may read it, because it contains the master seed, the state only the referee may see, and the
-    logs of every command and event. Send it to `POST /v1/saves/import` on another server to move the game there.
+    Only a referee may read it, because it contains the master seed, the state that only the referee may see, and
+    the logs of every command and event. To move the game to another server, send the document to
+    `POST /v1/saves/import` on that server.
     """
     document = _db(request).get_save_document(principal.client, save_id)
     if document is None:

@@ -21,17 +21,19 @@ class PageParams(BaseModel):
     """The `limit` and `offset` query parameters of a list endpoint."""
 
     limit: int = Field(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT)
-    """The largest number of items to return."""
+    """The maximum number of items to return."""
     offset: int = Field(default=0, ge=0, le=MAX_OFFSET)
-    """How many items to skip before the first one returned, from 0 to 2^53 - 1."""
+    """The number of items to skip before the first one returned, from 0 to 2^53 - 1."""
 
 
 def _page_params(
-    limit: Annotated[int, Query(ge=1, le=MAX_LIMIT, description="The largest number of items to return.")] = 50,
+    limit: Annotated[int, Query(ge=1, le=MAX_LIMIT, description="The maximum number of items to return.")] = 50,
     offset: Annotated[
         int,
         Query(
-            ge=0, le=MAX_OFFSET, description="How many items to skip before the first one returned, from 0 to 2^53 - 1."
+            ge=0,
+            le=MAX_OFFSET,
+            description="The number of items to skip before the first one returned, from 0 to 2^53 - 1.",
         ),
     ] = 0,
 ) -> PageParams:
@@ -44,14 +46,14 @@ PageQuery = Annotated[PageParams, Depends(_page_params)]
 
 _PAGE_DESCRIPTION = (
     "One page of a list, with the size of the whole list. To read the next page, send the same request with `offset` "
-    "increased by `limit`. You have read the whole list when `offset` plus `limit` is `total` or more."
+    "increased by `limit`. You've read the whole list when `offset` plus `limit` is `total` or more."
 )
 
 
 class Page[Item](ApiModel):
     """One page of a list, with the size of the whole list.
 
-    To read the next page, send the same request with `offset` increased by `limit`. You have read the whole list
+    To read the next page, send the same request with `offset` increased by `limit`. You've read the whole list
     when `offset` plus `limit` is `total` or more.
     """
 
@@ -62,11 +64,11 @@ class Page[Item](ApiModel):
     items: list[Item]
     """The items on this page, in the list's order."""
     total: int
-    """How many items the whole list has."""
+    """The number of items in the whole list."""
     limit: int
-    """The `limit` the request asked for."""
+    """The `limit` that the server applied to the request."""
     offset: int
-    """The `offset` the request asked for."""
+    """The `offset` that the server applied to the request."""
 
 
 def paginate[Item](items: Sequence[Item], params: PageParams) -> Page[Item]:

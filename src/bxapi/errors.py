@@ -86,15 +86,15 @@ MAX_FIELD_ERRORS = 20
 """The most entries the `errors` member of a `validation_error` lists."""
 
 VALIDATION_ERROR = (
-    "`validation_error`: The request doesn't match the operation's schema. A required field is missing, a value has "
-    "the wrong type or is out of range, or the body isn't valid JSON. `errors` lists the first 20 problems, and the "
-    "`loc` of each is the path to the value. Fix the request before you send it again."
+    "`validation_error`: The request doesn't match the operation's schema: a required field is missing, a value has "
+    "the wrong type or is out of range, or the body isn't valid JSON. `errors` lists the first 20 problems, and each "
+    "entry's `loc` is the path to the invalid value. Fix the request before you send it again."
 )
 """The OpenAPI entry for 422 `validation_error`, which every route under `/v1` can return."""
 
 INTERNAL_ERROR = (
-    "`internal_error`: The server failed because of a bug. The response says nothing about the cause, and the server "
-    "logs it. Report the request to the server's operator."
+    "`internal_error`: The server failed because of a bug. The response doesn't reveal the cause, which the server "
+    "logs. Report the `request_id` to the server operator."
 )
 """The OpenAPI entry for 500 `internal_error`, which every route under `/v1` can return."""
 
@@ -136,29 +136,29 @@ class FieldError(BaseModel):
     model_config = ConfigDict(use_attribute_docstrings=True)
 
     loc: list[str | int]
-    """Where the error is: `body`, `query`, `path`, or `header`, followed by the field names
-    and list positions that lead to the value. The server cuts each name to 128 characters."""
+    """The location of the error: `body`, `query`, `path`, or `header`, followed by the field names
+    and list positions that lead to the value. The server truncates each name to 128 characters."""
     msg: str
     """What's wrong with the value, at most 128 characters."""
     type: str
-    """pydantic's name for the kind of error, like `missing` or `extra_forbidden`."""
+    """pydantic's name for the kind of error, such as `missing` or `extra_forbidden`."""
 
 
 class Problem(BaseModel):
     """The body of an error response.
 
     Every problem document has `type`, `title`, `status`, `detail`, `code`, and `request_id`. The
-    server leaves out the other members, except the ones that the document's code adds:
+    server omits every other field unless the document's code adds it:
 
     - `validation_error` adds `errors` and `error_count`.
     - `not_found` adds `resource` and `id`.
-    - `revision_conflict` adds `revision`.
+    - `revision_conflict` and `session_busy` add `revision`.
     - `referee_command` adds `command_type`.
     - `character_invalid` adds `rejections` when osrlib reports them. Otherwise it adds `field`
       and `id`, and `index` when `field` is a list.
     - `storage_full` adds `used_bytes` and `max_bytes`.
 
-    A later release can add members, so ignore any member you don't know.
+    A later release might add fields, so ignore any field you don't recognize.
     """
 
     model_config = ConfigDict(extra="allow", use_attribute_docstrings=True)
@@ -166,44 +166,44 @@ class Problem(BaseModel):
     type: str = "about:blank"
     """Always `"about:blank"`. Read `code` to identify the error."""
     title: str
-    """The standard phrase for the HTTP status, like `"Not Found"`."""
+    """The standard phrase for the HTTP status, such as `"Not Found"`."""
     status: int
     """The HTTP status code, repeated from the response."""
     detail: str
-    """A short description of what went wrong, written for a person, at most 1,000 characters."""
+    """A short description of what went wrong, written for a person, at most 1,000 characters long."""
     code: str
-    """A fixed snake_case name for the error, like `"not_found"`. It doesn't change between
+    """A fixed snake_case name for the error, such as `"not_found"`. It doesn't change between
     releases, so a client can branch on it."""
     request_id: str | SkipJsonSchema[None] = left_out_when_none()
-    """The id of the request, which the `X-Request-Id` response header has too. The server logs
-    it with the request. Include it when you report the error to whoever runs the server."""
+    """The ID of the request, which also appears in the `X-Request-Id` response header. The server
+    logs it with the request. Include it when you report the error to the server operator."""
     errors: list[FieldError] | SkipJsonSchema[None] = left_out_when_none()
-    """`validation_error` only: the first 20 parts of the request that failed validation."""
+    """`validation_error` only: The first 20 parts of the request that failed validation."""
     error_count: int | SkipJsonSchema[None] = left_out_when_none()
-    """`validation_error` only: how many parts of the request failed validation, including any
-    that `errors` leaves out."""
+    """`validation_error` only: The number of parts of the request that failed validation,
+    including any that `errors` omits."""
     resource: str | SkipJsonSchema[None] = left_out_when_none()
-    """`not_found` only: the kind of resource the request asked for, like `"session"`."""
+    """`not_found` only: The kind of resource the request asked for, such as `"session"`."""
     id: str | SkipJsonSchema[None] = left_out_when_none()
-    """For `not_found`, the id in the request, or its first 128 characters followed by `...`.
-    For `character_invalid`, the value of the entry that's wrong, like an item id."""
+    """For `not_found`, the ID in the request, or its first 128 characters followed by `...`.
+    For `character_invalid`, the value of the invalid entry, such as an item ID."""
     revision: int | SkipJsonSchema[None] = left_out_when_none()
-    """`revision_conflict` only: the session's current revision."""
+    """`revision_conflict` and `session_busy` only: The session's current revision."""
     command_type: str | SkipJsonSchema[None] = left_out_when_none()
-    """`referee_command` only: the `command_type` of the referee command a player sent."""
+    """`referee_command` only: The `command_type` of the referee command that a player key sent."""
     field: str | SkipJsonSchema[None] = left_out_when_none()
-    """`character_invalid` only, when osrlib reports no rejections: the request field that's
-    wrong, like `"equip_item_ids"`."""
+    """`character_invalid` only, when osrlib reports no rejections: The invalid request field,
+    such as `"equip_item_ids"`."""
     index: int | SkipJsonSchema[None] = left_out_when_none()
-    """`character_invalid` only, when `field` is a list: the position of the entry that's
-    wrong, counted from 0."""
+    """`character_invalid` only, when `field` is a list: The position of the invalid entry,
+    counted from 0."""
     used_bytes: int | SkipJsonSchema[None] = left_out_when_none()
-    """`storage_full` only: the bytes of documents the server stores for your client."""
+    """`storage_full` only: The number of bytes of documents the server stores for your client."""
     max_bytes: int | SkipJsonSchema[None] = left_out_when_none()
-    """`storage_full` only: the most bytes the server stores for one client."""
+    """`storage_full` only: The maximum number of bytes the server stores for one client."""
     rejections: list[Rejection] | SkipJsonSchema[None] = left_out_when_none()
     """`character_invalid` only, and only when osrlib reports them: osrlib's reasons for
-    refusing the character, each a `code` and `params`."""
+    rejecting the character, each with a `code` and `params`."""
 
     @field_validator("detail")
     @classmethod

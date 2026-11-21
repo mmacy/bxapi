@@ -74,27 +74,27 @@ else:
     AnyEventModel = AnyEvent
 
 SessionId = Annotated[
-    str, Path(description="The session's id, which starts with `ses_`. `POST /v1/sessions` returns it.")
+    str, Path(description="The session's ID, which starts with `ses_`. `POST /v1/sessions` returns it.")
 ]
 
-_NOT_FOUND = "`not_found`: Your client has no session with this id. `GET /v1/sessions` lists your sessions."
+_NOT_FOUND = "`not_found`: Your client has no session with this ID. `GET /v1/sessions` lists your sessions."
 _BUSY = (
-    "`session_busy`: The request waited more than 5 seconds for a command running on the session, and did nothing. "
-    "`revision` is the session's revision. Send the request again."
+    "`session_busy`: The request waited more than 5 seconds for a command that was running on the session, then timed "
+    "out without reading the session. `revision` is the session's current revision. Send the request again."
 )
 _UNREADABLE = (
     "`session_unreadable`: The server's osrlib can't load the session's stored state, for example because a server "
-    "with another osrlib release wrote it. Report the session's id to the server's operator."
+    "running a different osrlib release wrote it. Report the session's ID to the server operator."
 )
 _REFEREE_EVENTS = (
-    "`referee_required`: A player passed `visibility=referee`. Leave `visibility` out to get the events the players "
-    "may see."
+    "`referee_required`: The request used a player key and passed `visibility=referee`. Omit `visibility` to get the "
+    "events that the players may see."
 )
 VisibilityQuery = Annotated[
     Visibility,
     Query(
-        description="Which events to return. With `player`, the response has the events the players may see. With "
-        "`referee`, it has every event, and only a referee may pass `referee`."
+        description="Which events to return. `player` returns the events that the players may see. `referee` returns "
+        "every event and requires a referee key."
     ),
 ]
 
@@ -103,14 +103,14 @@ VisibilityQuery = Annotated[
 
 
 class Clock(ApiModel):
-    """How much game time has passed since the game began. A session restored from a save continues the save's clock."""
+    """The game time elapsed since the game began. A session restored from a save continues the save's clock."""
 
     rounds: int
-    """The time in rounds of 10 seconds. `turns` and `days` are the same time in whole turns and whole days."""
+    """The elapsed time in rounds of 10 seconds. `turns` and `days` express the same time in whole turns and days."""
     turns: int
-    """The time in whole turns of 10 minutes."""
+    """The elapsed time in whole turns of 10 minutes."""
     days: int
-    """The time in whole days."""
+    """The elapsed time in whole days."""
 
     @classmethod
     def from_rounds(cls, rounds: int) -> Clock:
@@ -120,28 +120,27 @@ class Clock(ApiModel):
 
 
 class SessionInfo(ApiModel):
-    """A session's name, adventure, mode, revision, clock, versions, and times: what a list or a menu shows."""
+    """A session's summary for a list or menu: its name, adventure, mode, revision, clock, versions, and timestamps."""
 
     id: str
-    """The session's id, which starts with `ses_`."""
+    """The session's ID, which starts with `ses_`."""
     name: str
     """The session's name. It defaults to the adventure's name, and `PATCH /v1/sessions/{session_id}` changes it."""
     adventure_id: str | None
-    """The id of the session's adventure, or `null` for a session restored from an imported save.
+    """The ID of the session's adventure, or `null` for a session restored from an imported save.
 
-    A session restored from a save has the save's `adventure_id`, which is `null` for an imported save. The adventure
-    may have been deleted since the session started. Neither a deleted adventure nor a `null` id changes play,
-    because the session uses the copy of the adventure in its save document.
+    A session restored from a save takes the save's `adventure_id`, which is `null` for an imported save. The
+    adventure might have been deleted since the session started. Neither a deleted adventure nor a `null` ID affects
+    play, because the session uses the copy of the adventure in its save document.
     """
     adventure_name: str
     """The name of the session's adventure."""
     mode: SessionMode
     """The session's mode after its last accepted command."""
     ended: bool
-    """Whether the session is over, which it is in the modes `game_over` and `victory`."""
+    """Whether the session is over. A session is over in the `game_over` and `victory` modes."""
     revision: int
-    """How many of the session's command requests osrlib has accepted. A new session, and a restored one, start at
-    0."""
+    """The number of commands the session has accepted. A new session and a restored session both start at 0."""
     clock: Clock
     """The game time after the last accepted command."""
     schema_version: int
@@ -151,27 +150,28 @@ class SessionInfo(ApiModel):
     created_at: str
     """When the session was created."""
     updated_at: str
-    """The time of the session's last accepted command, or `created_at` before the first one. Renaming the session
-    doesn't change it."""
+    """The time of the session's last accepted command, or `created_at` if the session hasn't accepted one. Renaming
+    the session doesn't change it."""
 
 
 class SaveInfo(ApiModel):
-    """A save's info, without its save document.
+    """A save's info, which excludes the save document.
 
-    The save document is osrlib's record of the whole game at that moment.
+    The save document is osrlib's record of the whole game at the moment of the save.
     """
 
     id: str
-    """The save's id, which starts with `sav_`."""
+    """The save's ID, which starts with `sav_`."""
     session_id: str | None
-    """The session the save was made from, which may have been deleted since. `null` for an imported save."""
+    """The ID of the session the save was made from, or `null` for an imported save. The session might have been
+    deleted since."""
     adventure_id: str | None
-    """The id of the adventure the save's session played, which may have been deleted since. `null` for an
-    imported save, and for a save of a session restored from an imported save."""
+    """The ID of the adventure that the save's session played. The adventure might have been deleted since. It's
+    `null` for an imported save, and for a save of a session restored from an imported save."""
     adventure_name: str
     """The name of the adventure in the save."""
     label: str | None
-    """The label the player gave the save, or `null` if it has none."""
+    """The label the player gave the save, or `null` if the save has no label."""
     mode: SessionMode
     """The session's mode when the save was made."""
     clock: Clock
@@ -181,29 +181,29 @@ class SaveInfo(ApiModel):
 
 
 class CreateSessionRequest(RequestModel):
-    """The adventure to play, the party to play it with, and the optional choices for a new session.
+    """The adventure to play, the party that plays it, and the optional settings for a new session.
 
-    Send `character_ids` or `party_document`, and not both.
+    Send either `character_ids` or `party_document`, but not both.
     """
 
     adventure_id: str = Field(min_length=1, max_length=128)
-    """The id of the adventure to play: a built-in adventure, like `builtin-barrow`, or one you uploaded."""
+    """The ID of the adventure to play: a built-in adventure, such as `builtin-barrow`, or one you uploaded."""
     character_ids: list[str] | None = Field(default=None, max_length=MAX_PARTY_SIZE)
-    """The ids of stored characters, in marching order: the first one walks in front. The session uses copies,
-    so play doesn't change the stored characters. osrlib requires at least one member, and this server allows at
-    most 20. You can name a character twice to play two copies of it, and the session gives each copy a different
-    id."""
+    """The IDs of stored characters, in marching order, so the first character walks in front. The session plays
+    copies, so play doesn't change the stored characters. osrlib requires at least one member, and this server allows
+    at most 20. You can list a character twice to play two copies of it, and the session gives each copy a different
+    ID."""
     party_document: JsonObject | None = None
-    """Referee only. A party document from osrlib's `party_to_document`, in place of stored characters. It has at
-    most 20 characters."""
+    """Referee only. A party document from osrlib's `party_to_document`, in place of stored characters. It contains
+    at most 20 characters."""
     name: NameText | None = Field(default=None, min_length=1, max_length=NAME_MAX_LENGTH)
-    """A name for the session, with no control character like a tab or a newline. Defaults to the adventure's
+    """A name for the session, with no control characters such as a tab or a newline. Defaults to the adventure's
     name."""
     ruleset: Ruleset | None = None
-    """osrlib's optional rules, as `Ruleset` fields. For each field you leave out, the session uses the rule as
-    written. With no `ruleset`, the session uses every rule as written."""
+    """osrlib's optional rules, as `Ruleset` fields. The session uses the rule as written for each field you omit,
+    and uses every rule as written when you omit `ruleset`."""
     seed: Seed | None = None
-    """Referee only. The session's master seed. The server draws one when you leave it out. It returns the seed only
+    """Referee only. The session's master seed. The server generates one when you omit it, and returns the seed only
     inside a save document, which only a referee can read."""
 
     @model_validator(mode="after")
@@ -217,50 +217,51 @@ class RenameSessionRequest(RequestModel):
     """The session's new name."""
 
     name: NameText = Field(min_length=1, max_length=NAME_MAX_LENGTH)
-    """The new name, with no control character like a tab or a newline."""
+    """The new name, with no control characters such as a tab or a newline."""
 
 
 class CreateSaveRequest(RequestModel):
     """An optional label for a new save."""
 
     label: NameText | None = Field(default=None, min_length=1, max_length=NAME_MAX_LENGTH)
-    """A label to show in a list of saves, with no control character like a tab or a newline. A save without one
-    has the label `null`."""
+    """A label to show in a list of saves, with no control characters such as a tab or a newline. A save without a
+    label has `label` set to `null`."""
 
 
 class CommandChoice(ApiModel):
     """A command that's legal in the session's current mode."""
 
     command_type: str
-    """The `command_type` to send, like `"move_party"`."""
+    """The `command_type` to send, such as `"move_party"`."""
     kind: CommandKind
-    """`play` for a command a player may send, and `referee` for one only a referee may send."""
+    """`play` for a command that a player may send, or `referee` for a command that only a referee may send."""
 
 
 class SessionCommands(ApiModel):
-    """The commands that are legal in a session now, for the caller's role."""
+    """The commands that are currently legal in a session for the caller's role."""
 
     mode: SessionMode
     """The session's mode."""
     revision: int
-    """The session's revision. Pass it as `expected_revision` to send a command only if the session has accepted no
-    command since you read this list."""
+    """The session's revision. Pass it as `expected_revision` so that the server runs your command only if the
+    session has accepted no other command since you read this list."""
     commands: list[CommandChoice]
-    """Each command that's legal in the mode and that the caller may send, in osrlib's order. A player gets only
-    `play` commands. osrlib can still refuse a legal command, for a reason it checks when you send the command."""
+    """Each command that's legal in the mode and that the caller may send, in osrlib's order. A player key sees only
+    `play` commands. osrlib can still reject a legal command for a reason it checks only when you send the command."""
 
 
 class CommandOutcome(ApiModel):
-    """What happened when you sent the command. A refused command is an outcome, not an error."""
+    """The result of a command. A rejected command is an outcome, not an error."""
 
     accepted: bool
-    """Whether osrlib accepted the command. When osrlib refused it, nothing in the game changed."""
+    """Whether osrlib accepted the command. A rejected command changes nothing in the game."""
     rejections: list[Rejection]
-    """Why osrlib refused the command: each a `code` and its `params`. Empty when osrlib accepted the command."""
+    """The reasons osrlib rejected the command, each with a `code` and its `params`. Empty when osrlib accepted the
+    command."""
     events: list[AnyEventModel]
-    """The events the command caused, in order, as osrlib serializes them: the command's events, then the events
-    of what the adventure's triggers and quests did in response. With player visibility, the list leaves out the
-    events only the referee may see."""
+    """The events the command caused, in order, as osrlib serializes them: first the command's own events, then the
+    events from the adventure's triggers and quests that responded to it. With player visibility, the list omits the
+    events that only the referee may see."""
     messages: list[str]
     """One line of English for each event in `events`, in the same order, from osrlib's `format_message`."""
     mode: SessionMode
@@ -270,8 +271,8 @@ class CommandOutcome(ApiModel):
     revision: int
     """The session's revision after the command."""
     view: PlayerView | SkipJsonSchema[None] = left_out_when_none()
-    """osrlib's `PlayerView` of the session after the command: what `GET /v1/sessions/{session_id}/view` returns
-    at this `revision`. The response has it only when the request has `include=view`."""
+    """osrlib's `PlayerView` of the session after the command, which is what `GET /v1/sessions/{session_id}/view`
+    returns at this `revision`. The response includes it only when the request has `include=view`."""
 
 
 class EventPage(ApiModel):
@@ -279,15 +280,15 @@ class EventPage(ApiModel):
 
     events: list[AnyEventModel | JsonObject]
     """The events that follow the first `after` events of this visibility, in the order they happened, as osrlib
-    serializes them. An event that this server's osrlib has no class for, from a save a newer osrlib wrote, comes
-    back as it was stored."""
+    serializes them. When this server's osrlib has no class for an event, which can happen with a save that a newer
+    osrlib wrote, the server returns the event as stored."""
     messages: list[str]
     """One line of English for each event in `events`, in the same order, from osrlib's `format_message`. For an
     event that osrlib has no class for, the line is the event's `code`."""
     next_after: int
-    """The `after` to pass to read the events that come after this page."""
+    """The `after` value to pass to read the events that follow this page."""
     total: int
-    """How many events of this visibility the log has."""
+    """The number of events of this visibility in the log."""
 
 
 def session_info(row: SessionRow) -> SessionInfo:
@@ -400,28 +401,28 @@ def _party(db: Database, principal: Principal, body: CreateSessionRequest) -> Pa
     "",
     status_code=201,
     summary="Start a session",
-    response_description="The new session's info, in the mode `town` at revision 0.",
+    response_description="The new session's info, in `town` mode at revision 0.",
     responses=problem_responses(
         {
             403: [
-                "`referee_required`: A player sent `seed` or `party_document`. Leave them out and send "
-                "`character_ids`, or use a key with the referee role."
+                "`referee_required`: The request used a player key and sent `seed` or `party_document`. Omit both "
+                "and send `character_ids`, or use a referee key."
             ],
             404: [
-                "`not_found`: Your client has no adventure or no character with an id in the request. `resource` is "
-                "`adventure` or `character`, and `id` is the id. `GET /v1/adventures` and `GET /v1/characters` list "
-                "the ids."
+                "`not_found`: Your client has no adventure or character with an ID in the request. `resource` is "
+                "`adventure` or `character`, and `id` is the missing ID. `GET /v1/adventures` and "
+                "`GET /v1/characters` list the valid IDs."
             ],
             422: [
                 VALIDATION_ERROR
-                + " A request with both `character_ids` and `party_document`, or with neither, gets this code, and "
-                "so does a request with more than 20 `character_ids`.",
-                "`party_invalid`: osrlib refuses the party, like an empty `character_ids`, or a `party_document` has "
-                "more than 20 characters or two members with the same id.",
+                + " The server also returns this code for a request with both `character_ids` and `party_document`, "
+                "a request with neither, and a request with more than 20 `character_ids`.",
+                "`party_invalid`: osrlib rejects the party, for example because `character_ids` is empty, or a "
+                "`party_document` has more than 20 characters or two members with the same ID. Change the party.",
                 "`content_invalid`: The `party_document` isn't a valid party document, or the server's osrlib "
-                "refuses a stored adventure that an earlier osrlib release accepted. If the party document is the "
-                "cause, send a valid one. If the adventure is, upload a fixed adventure document, and start the "
-                "session with the new adventure's id.",
+                "rejects a stored adventure that an earlier osrlib release accepted. For an invalid party document, "
+                "send a valid one. For a rejected adventure, upload a corrected adventure document and start the "
+                "session with the new adventure's ID.",
             ],
         }
     ),
@@ -430,17 +431,19 @@ def _party(db: Database, principal: Principal, body: CreateSessionRequest) -> Pa
 def create_session(request: Request, principal: CurrentPrincipal, body: CreateSessionRequest) -> SessionInfo:
     """Start a game of an adventure with a party. The session starts in town, at revision 0.
 
-    Take `adventure_id` from `GET /v1/adventures`, and the party's ids from `POST /v1/characters`. Keep the session's
-    `id`, then call `GET /v1/sessions/{session_id}/commands` for the commands that are legal in town and
+    Take `adventure_id` from `GET /v1/adventures` and the party's character IDs from `POST /v1/characters`. Keep the
+    session's `id`, then call `GET /v1/sessions/{session_id}/commands` for the commands that are legal in town and
     `GET /v1/sessions/{session_id}/view` to draw the screen.
 
-    Choose the party with `character_ids`, the stored characters in marching order. The session plays copies, so
-    play never changes the stored characters. A referee can send a `party_document` instead, and can choose the
-    `seed`, the integer osrlib draws every random number from. The server draws a seed when the request has none.
-    Only a save document contains the seed, and only a referee can read one.
+    Choose the party with `character_ids`, which lists the stored characters in marching order. The session plays
+    copies, so play never changes the stored characters. A referee can send a `party_document` instead, and can
+    choose the `seed`, the integer that determines every random number osrlib generates for the session. The server
+    generates a seed when the request has none. Only a save document contains the seed, and only a referee can read
+    a save document.
 
-    A party document is an object with `kind` set to `party`, `schema_version` and `engine_version`, and a `payload`
-    whose `characters` is a list of osrlib `Character` models, like the `character` of a stored character.
+    A party document is an object with `kind` set to `party`, a `schema_version`, an `engine_version`, and a
+    `payload` whose `characters` is a list of osrlib `Character` models, such as the `character` of a stored
+    character.
     """
     seed = referee_seed(body.seed, principal)
     if body.party_document is not None and not principal.is_referee:
@@ -471,8 +474,9 @@ def list_sessions(
 ) -> Page[SessionInfo]:
     """List your client's sessions, newest first.
 
-    Use it for a menu of games to continue. Pass `mode` to list only the sessions in one mode, like `victory` for the
-    games that ended in a win. The list reads the stored info, so it doesn't wait for a command running on a session.
+    Use it to build a menu of games to continue. Pass `mode` to list only the sessions in one mode, such as `victory`
+    for the games that ended in a win. The list reads the stored info, so it doesn't wait for a command that's
+    running on a session.
     """
     rows = _db(request).list_sessions(
         principal.client, limit=page.limit, offset=page.offset, mode=None if mode is None else mode.value
@@ -487,11 +491,11 @@ def list_sessions(
     responses=problem_responses({404: [_NOT_FOUND]}),
 )
 def get_session(request: Request, principal: CurrentPrincipal, session_id: SessionId) -> SessionInfo:
-    """Return a session's info, like its mode, revision, clock, and versions.
+    """Return a session's info, such as its mode, revision, clock, and versions.
 
-    The info is what a menu shows, and it doesn't wait for a command running on the session. Compare `revision` with
-    the revision you last saw to find out whether another request changed the game. For what the players can see,
-    use `GET /v1/sessions/{session_id}/view`.
+    The info is what a menu shows, and reading it doesn't wait for a command that's running on the session. Compare
+    `revision` with the revision you last saw to find out whether another request changed the game. For what the
+    players can see, use `GET /v1/sessions/{session_id}/view`.
     """
     row = _db(request).get_session(principal.client, session_id)
     if row is None:
@@ -508,7 +512,7 @@ def get_session(request: Request, principal: CurrentPrincipal, session_id: Sessi
 def rename_session(
     request: Request, principal: CurrentPrincipal, session_id: SessionId, body: RenameSessionRequest
 ) -> SessionInfo:
-    """Change a session's name. The game doesn't change, so `revision` and `updated_at` stay as they were."""
+    """Change a session's name. Renaming doesn't change the game, so `revision` and `updated_at` keep their values."""
     db = _db(request)
     row = (
         db.get_session(principal.client, session_id)
@@ -528,9 +532,9 @@ def rename_session(
     responses=problem_responses({404: [_NOT_FOUND]}),
 )
 def delete_session(request: Request, principal: CurrentPrincipal, session_id: SessionId) -> Response:
-    """Delete a session. The saves made from it stay, and you can still restore them.
+    """Delete a session. The saves made from it remain, and you can still restore them.
 
-    The saves keep the deleted session's id in `session_id`, so `GET /v1/saves?session_id=` still finds them.
+    The saves keep the deleted session's ID in `session_id`, so `GET /v1/saves?session_id=` still finds them.
     """
     if not _db(request).delete_session(principal.client, session_id):
         raise not_found("session", session_id)
@@ -548,12 +552,12 @@ def list_session_commands(request: Request, principal: CurrentPrincipal, session
     """Return the session's mode and revision, and the commands that are legal in that mode for your role.
 
     Use it to build the menu of actions after each command. Read `GET /v1/rules/commands/{command_type}` for a
-    command's fields, then send the command to `POST /v1/sessions/{session_id}/commands`. A player gets only `play`
-    commands, and a referee gets the `referee` commands too.
+    command's fields, then send the command to `POST /v1/sessions/{session_id}/commands`. A player key sees only
+    `play` commands, whereas a referee key also sees the `referee` commands.
 
-    A command on the list can still be refused, for a reason osrlib checks only when you send it, like a wall in the
-    way of `move_party`. Pass `revision` as `expected_revision` to send a command only if no other command was
-    accepted since you read the list.
+    osrlib can still reject a listed command for a reason it checks only when you send the command, such as a wall
+    that blocks `move_party`. Pass `revision` as `expected_revision` so that the server runs your command only if the
+    session has accepted no other command since you read the list.
     """
     row = _db(request).get_session(principal.client, session_id)
     if row is None:
@@ -571,28 +575,30 @@ def list_session_commands(request: Request, principal: CurrentPrincipal, session
 @router.post(
     "/{session_id}/commands",
     summary="Send a command to a session",
-    response_description="The command's outcome. A command osrlib refused has `accepted` set to `false`.",
+    response_description="The command's outcome. A command that osrlib rejected has `accepted` set to `false`.",
     responses=problem_responses(
         {
             403: [
-                "`referee_command`: A player sent a referee command. `command_type` is the command's type. "
-                "`GET /v1/sessions/{session_id}/commands` lists the commands your role may send. The server checks "
-                "the body against the command's schema first, so a referee command that doesn't fit it gets 422 "
-                "`validation_error` instead.",
-                "`referee_required`: A player passed `visibility=referee` or sent a command with a `source`. Leave "
-                "them out.",
+                "`referee_command`: The request used a player key and sent a referee command. `command_type` is the "
+                "command's type. `GET /v1/sessions/{session_id}/commands` lists the commands your role may send. "
+                "The server validates the body against the command's schema first, so a referee command that fails "
+                "validation returns `422 validation_error` instead.",
+                "`referee_required`: The request used a player key and passed `visibility=referee` or set a "
+                "command's `source`. Omit both.",
             ],
             404: [_NOT_FOUND],
             409: [
-                "`revision_conflict`: You passed `expected_revision`, and the session is at another revision, which "
-                "`revision` states. The server ran nothing. Read the view, then decide whether to send the command.",
+                "`revision_conflict`: You passed `expected_revision`, but the session is at a different revision, "
+                "which `revision` reports. The server ran nothing. Read the view, then decide whether to send the "
+                "command.",
                 "`session_busy`: The command waited more than 5 seconds for the request ahead of it, or another "
                 "server process wrote the session after this request read it. The command had no effect, and "
-                "`revision` is the session's revision. If you passed `expected_revision`, read the session first, "
-                "and send the command again only if the revision is the one you expected. Otherwise send it again.",
+                "`revision` is the session's current revision. If you passed `expected_revision`, read the session "
+                "first, and send the command again only if the revision is the one you expected. Otherwise, send "
+                "the command again.",
             ],
             422: [
-                VALIDATION_ERROR + " An unknown or missing `command_type` gets this code too.",
+                VALIDATION_ERROR + " The server also returns this code for an unknown or missing `command_type`.",
             ],
             500: [
                 INTERNAL_ERROR,
@@ -610,39 +616,42 @@ def send_command(
         int | None,
         Query(
             ge=0,
-            description="Execute the command only if the session has this revision. Pass it when you might send "
-            "the same request twice, like a retry after a timeout.",
+            description="Run the command only if the session is at this revision. Pass it when you might send the "
+            "same request twice, such as a retry after a timeout.",
         ),
     ] = None,
     visibility: VisibilityQuery = Visibility.PLAYER,
     include: Annotated[
         Literal["view"] | None,
         Query(
-            description="Pass `view` to get the player view after the command, as the response's `view`. It "
-            "replaces the `GET /v1/sessions/{session_id}/view` that a client sends after each command. The server "
-            "builds the view before any other request can change the session, so it's the view at the response's "
-            "`revision`.",
+            description="Pass `view` to get the player view after the command as the response's `view`. It replaces "
+            "the `GET /v1/sessions/{session_id}/view` request that a client would otherwise send after each command. "
+            "The server builds the view before any other request can change the session, so it's the view at the "
+            "response's `revision`.",
         ),
     ] = None,
 ) -> CommandOutcome:
-    """Execute one osrlib command, like `{"command_type": "move_party", "direction": "north"}`, and return the outcome.
+    """Run one osrlib command, such as `{"command_type": "move_party", "direction": "north"}`, and return its outcome.
 
-    The body is one of osrlib's commands, chosen by `command_type`. `GET /v1/sessions/{session_id}/commands` lists
-    the ones that are legal now, and `GET /v1/rules/commands/{command_type}` has each one's fields. osrlib ignores a
-    field that the command doesn't define. After the response, show the player `messages`, and draw the screen from
-    the player view. Pass `include=view` to get the view in the same response, or read it with
-    `GET /v1/sessions/{session_id}/view`.
+    The body is one of osrlib's commands, selected by `command_type`. `GET /v1/sessions/{session_id}/commands` lists
+    the commands that are legal now, and `GET /v1/rules/commands/{command_type}` describes each command's fields.
+    osrlib ignores any field that the command doesn't define.
 
-    When osrlib refuses the command, the response is a 200 with `accepted` set to `false` and osrlib's
-    `rejections`, and the session doesn't change. Show the player why, from each rejection's `code` and `params`.
-    When osrlib accepts it, the server stores the new state before it responds, and the revision goes up by 1.
-    `events` has what the command caused, then what the adventure's triggers and quests did in response.
+    When osrlib accepts the command, the server stores the new state before it responds, and the session's revision
+    increases by 1. `events` lists what the command caused, followed by what the adventure's triggers and quests did
+    in response. Show the player `messages`, and draw the screen from the player view. To get the view in the same
+    response, pass `include=view`. Otherwise, read it with `GET /v1/sessions/{session_id}/view`.
 
-    A player gets the events the players may see. A referee who passes `visibility=referee` gets every event.
+    When osrlib rejects the command, the response is still a `200`, with `accepted` set to `false` and osrlib's
+    `rejections`, and the session doesn't change. Use each rejection's `code` and `params` to show the player why
+    the command failed.
 
-    If the response doesn't arrive, because the connection or the server failed, the server may have applied the
-    command. To retry safely, pass the revision you last saw as `expected_revision`. A retry of a command the server
-    already applied then gets 409 `revision_conflict` instead of running again.
+    A player key receives the events that the players may see. A referee key that passes `visibility=referee`
+    receives every event.
+
+    If the response doesn't arrive because the connection or the server failed, the server might have applied the
+    command. To retry safely, pass the revision you last saw as `expected_revision`. If the server already applied
+    the command, the retry returns `409 revision_conflict` instead of running the command again.
     """
     _require_visibility(visibility, principal)
     command_type = command.command_type
@@ -677,35 +686,35 @@ def send_command(
     responses=problem_responses({404: [_NOT_FOUND], 409: [_BUSY], 500: [INTERNAL_ERROR, _UNREADABLE]}),
 )
 def get_player_view(request: Request, principal: CurrentPrincipal, session_id: SessionId) -> PlayerView:
-    """Return osrlib's `PlayerView` of the session: what the players may see now.
+    """Return osrlib's `PlayerView` of the session, which is everything the players may see now.
 
-    Draw the screen from it after each command. It has the party, the mapped part of the dungeon, the encounter or
-    battle in progress, the journal, the active quests, and the town's prices for healing. It never has unexplored
-    map, monster hit points, or the referee's rolls. The server builds the view while no command runs on the
-    session, so it shows the session between two commands.
+    Draw the screen from it after each command. It includes the party, the explored part of the dungeon, the
+    encounter or battle in progress, the journal, the active quests, and the town's healing prices. It never includes
+    unexplored map, monster hit points, or the referee's rolls. The server builds the view while no command is
+    running on the session, so the view shows the session between two commands.
 
-    These fields are the ones a screen usually needs:
+    A screen usually needs these fields:
 
-    - `mode`: the session's mode, which decides the commands that are legal.
-    - `location`: in town, `kind` is `town`. In a dungeon, it has `dungeon_id`, `level_number`, the party's
-      `position` as `[x, y]`, and `facing`.
-    - `party`: each member's character sheet, in marching order: `id`, conditions, inventory, hit points, and every
-      other number on a B/X character sheet, like `scores`, `armour_class`, `thac0`, `saves`, and `thief_skills`. A
-      command that acts on one member takes this `id`, like `character_id` in `equip_item`. The numbers count every
-      item the member wears, identified or not, because those are the numbers the monsters roll against. So a
-      player can infer an unidentified item's bonus or curse from them, while `inventory` keeps the item's name
-      masked, like `"a shield with a faint aura"`.
-    - `explored`: for each dungeon level the party has visited, the `cells` it has seen and the `edges` between
-      them. An edge's key is `x,y:side`, like `0,0:north`.
-    - `encounter`: the encounter in progress, or `null`. Each of its `groups` has an `id` to put in a battle
+    - `mode`: The session's mode, which determines which commands are legal.
+    - `location`: The party's location. In town, `kind` is `town`. In a dungeon, it has `dungeon_id`,
+      `level_number`, the party's `position` as `[x, y]`, and `facing`.
+    - `party`: Each member's character sheet, in marching order: `id`, conditions, inventory, hit points, and every
+      other number on a B/X character sheet, such as `scores`, `armour_class`, `thac0`, `saves`, and `thief_skills`.
+      A command that acts on one member takes this `id`, such as `character_id` in `equip_item`. The numbers count
+      every item the member wears, identified or not, because the monsters roll against those numbers. A player can
+      therefore infer an unidentified item's bonus or curse from them, even though `inventory` keeps the item's name
+      masked, such as `"a shield with a faint aura"`.
+    - `explored`: For each dungeon level the party has visited, the `cells` it has seen and the `edges` between
+      them. An edge's key is `x,y:side`, such as `0,0:north`.
+    - `encounter`: The encounter in progress, or `null`. Each of its `groups` has an `id` to put in a battle
       declaration's `target_group_id`. Show a group's `label` or `label_plural`, and read its `family_id` and
-      `categories` to tell what kind of creature it is. The view doesn't say which group a monster id in a message
-      belongs to. Only the referee view lists each group's `monster_ids`. The rules reference has no lookup by
-      `family_id`. To find the built-in forms of a family, pass the `family_id` as `q` to `GET /v1/rules/monsters`,
-      which also matches other ids and names that contain it, and check each result's `family_id` in
+      `categories` to tell what kind of creature it is. The view doesn't say which group a monster ID in a message
+      belongs to, because only the referee view lists each group's `monster_ids`. The rules reference has no lookup
+      by `family_id`. To find a family's built-in forms, pass the `family_id` as `q` to `GET /v1/rules/monsters`,
+      which also matches other IDs and names that contain it, and check each result's `family_id` in
       `GET /v1/rules/monsters/{monster_id}`.
-    - `journal` and `quests`: what the players have learned, and the quests they know about.
-    - `town_healing_prices`: what the town's temple charges, in gold pieces, for each service that
+    - `journal` and `quests`: What the players have learned, and the quests they know about.
+    - `town_healing_prices`: The price in gold pieces that the town's temple charges for each service that
       `purchase_healing` buys.
     """
     return _sessions(request).read(principal.client, session_id, build_player_view)
@@ -718,7 +727,7 @@ def get_player_view(request: Request, principal: CurrentPrincipal, session_id: S
     responses=problem_responses(
         {
             403: [
-                "`referee_required`: Only a referee may read the referee view. A player reads "
+                "`referee_required`: Only a referee key may read the referee view. With a player key, read "
                 "`GET /v1/sessions/{session_id}/view`."
             ],
             404: [_NOT_FOUND],
@@ -730,9 +739,9 @@ def get_player_view(request: Request, principal: CurrentPrincipal, session_id: S
 def get_referee_view(request: Request, principal: RefereePrincipal, session_id: SessionId) -> RefereeView:
     """Return osrlib's `RefereeView` of the session: the whole state except the master seed and the dice streams.
 
-    Only a referee may read it. Use it for a referee's screen, or to decide which referee command to send. It has the
-    whole adventure, every monster with its hit points, the flags the triggers set, and the logs of every command and
-    event. To save the whole state, use `POST /v1/sessions/{session_id}/saves` instead.
+    Only a referee may read it. Use it for a referee's screen, or to decide which referee command to send. It
+    includes the whole adventure, every monster with its hit points, the flags that the triggers set, and the logs of
+    every command and event. To save the whole state, use `POST /v1/sessions/{session_id}/saves` instead.
     """
     return _sessions(request).read(principal.client, session_id, build_referee_view)
 
@@ -750,19 +759,20 @@ def list_events(
     principal: CurrentPrincipal,
     session_id: SessionId,
     after: Annotated[
-        int, Query(ge=0, description="How many events of this visibility you've already read. Start at 0.")
+        int, Query(ge=0, description="The number of events of this visibility that you've already read. Start at 0.")
     ] = 0,
-    limit: Annotated[int, Query(ge=1, le=500, description="The largest number of events to return.")] = 100,
+    limit: Annotated[int, Query(ge=1, le=500, description="The maximum number of events to return.")] = 100,
     visibility: VisibilityQuery = Visibility.PLAYER,
 ) -> EventPage:
     """Return a page of the events the session has logged since it started, oldest first.
 
-    `after` counts the events of the requested visibility that you've read, so pass the `next_after` of the last
-    page to read what's new. A client that reconnects reads from its last `next_after` to catch up. You've read every
-    event when `next_after` equals `total`.
+    `after` counts the events of the requested visibility that you've already read, so pass the `next_after` of the
+    last page to read what's new. A client that reconnects reads from its last `next_after` to catch up. You've read
+    every event when `next_after` equals `total`.
 
-    Each command's response already has the events it caused, so a client that reads every response doesn't need the
-    log. The log has the events from the session's start, including the ones from before a restore.
+    Each command's response already includes the events the command caused, so a client that reads every response
+    doesn't need the log. The log contains every event since the session started, including the events from before a
+    restore.
     """
     _require_visibility(visibility, principal)
 
@@ -795,9 +805,8 @@ def save_session(
     """Store a copy of the session as it is after its last accepted command, and return the save's info.
 
     The body is optional. Send a `label` to show in a list of saves. Saving doesn't change the session or its
-    revision, and it doesn't wait for a command running on the session. Restore the save with
-    `POST /v1/saves/{save_id}/restore` to start a new session from this moment. A session can have any number of
-    saves.
+    revision, and it doesn't wait for a command that's running on the session. To start a new session from this
+    moment, restore the save with `POST /v1/saves/{save_id}/restore`. A session can have any number of saves.
     """
     db = _db(request)
     row = db.get_session_with_document(principal.client, session_id)

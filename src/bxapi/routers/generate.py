@@ -41,15 +41,15 @@ class TreasureRequest(RequestModel):
     """The treasure type to roll, the tier of magic items, and an optional seed."""
 
     treasure_type: str = Field(min_length=1, max_length=8, examples=["A"])
-    """The letter of a treasure type, from `A` to `V`. Letters are upper case."""
+    """The letter of a treasure type, from `A` to `V`. Letters are uppercase."""
     tier: Literal["basic", "expert"]
     """The column of the magic item table to roll on.
 
-    Use `basic` for a party whose highest level is 1 to 3, and `expert` from level 4.
+    Use `basic` for a party whose highest level is 1 to 3, and `expert` for a party whose highest level is 4 or more.
     """
     seed: Seed | None = None
-    """The seed to roll with. To get the same treasure again, send the same body with the `seed` of an earlier
-    response. When you leave it out, the server draws a seed and returns it."""
+    """The seed to roll with. To get the same treasure again, send the same body with the `seed` from an earlier
+    response. When you omit it, the server generates a seed and returns it."""
 
 
 class TreasureResponse(ApiModel):
@@ -66,10 +66,10 @@ class NpcPartyRequest(RequestModel):
     kind: Literal["basic", "expert"]
     """`basic` for a party of levels 1 to 3, or `expert` for a higher-level party."""
     count: int = Field(ge=1, le=100)
-    """How many adventurers the party has."""
+    """The number of adventurers in the party."""
     seed: Seed | None = None
-    """The seed to roll with. To get the same party again, send the same body with the `seed` of an earlier
-    response. When you leave it out, the server draws a seed and returns it."""
+    """The seed to roll with. To get the same party again, send the same body with the `seed` from an earlier
+    response. When you omit it, the server generates a seed and returns it."""
 
 
 class NpcPartyResponse(ApiModel):
@@ -86,8 +86,8 @@ class RoomRequest(RequestModel):
     level_number: int = Field(ge=1)
     """The dungeon level the room is on, counting from 1 at the top."""
     seed: Seed | None = None
-    """The seed to roll with. To get the same room again, send the same body with the `seed` of an earlier
-    response. When you leave it out, the server draws a seed and returns it."""
+    """The seed to roll with. To get the same room again, send the same body with the `seed` from an earlier
+    response. When you omit it, the server generates a seed and returns it."""
 
 
 class RoomResponse(ApiModel):
@@ -102,12 +102,12 @@ class MonstersRequest(RequestModel):
     """The monster to spawn, how many, and an optional seed."""
 
     monster_id: str = Field(min_length=1, max_length=128, examples=["goblin"])
-    """The id of a monster, from `GET /v1/rules/monsters`, like `goblin`."""
+    """The ID of a monster from `GET /v1/rules/monsters`, such as `goblin`."""
     count: int = Field(default=1, ge=1, le=100)
-    """How many monsters to spawn."""
+    """The number of monsters to spawn."""
     seed: Seed | None = None
-    """The seed to roll with. To get the same monsters again, send the same body with the `seed` of an earlier
-    response. When you leave it out, the server draws a seed and returns it."""
+    """The seed to roll with. To get the same monsters again, send the same body with the `seed` from an earlier
+    response. When you omit it, the server generates a seed and returns it."""
 
 
 class MonstersResponse(ApiModel):
@@ -115,7 +115,7 @@ class MonstersResponse(ApiModel):
 
     seed: Seed
     monsters: list[osr_monsters.MonsterInstance]
-    """The monsters, in spawn order. Each has its template, an id, and separately rolled hit points."""
+    """The monsters, in spawn order. Each has its template, an ID, and separately rolled hit points."""
 
 
 @router.post(
@@ -126,7 +126,7 @@ class MonstersResponse(ApiModel):
         {
             422: [
                 VALIDATION_ERROR,
-                "`content_invalid`: osrlib has no treasure type with that letter. Send an upper-case letter from "
+                "`content_invalid`: osrlib has no treasure type with that letter. Send an uppercase letter from "
                 "`A` to `V`.",
             ]
         }
@@ -136,11 +136,14 @@ def generate_treasure(body: TreasureRequest) -> TreasureResponse:
     """Roll the contents of one treasure type: coins, gems, jewellery, and magic items.
 
     osrlib's `generate_treasure` function does the rolling, in the order the entries appear in the treasure table.
-    `GET /v1/rules/tables/treasure` lists the treasure types and the chance of each entry. In the response, `coins`
-    has the number of each coin (`pp`, `gp`, `ep`, `sp`, and `cp`). Each entry of `valuables` is a gem or a piece of
-    jewellery with its `value_gp`. Each entry of `magic_items` has the `template_id` to pass to
-    `GET /v1/rules/magic-items/{item_id}`. Send the same body with the returned seed to get the same treasure again,
-    or leave `seed` out to get a new random seed.
+    `GET /v1/rules/tables/treasure` lists the treasure types and the chance of each entry. The response describes the
+    treasure in three fields:
+
+    - `coins`: The number of each coin (`pp`, `gp`, `ep`, `sp`, and `cp`).
+    - `valuables`: The gems and pieces of jewellery, each with its `value_gp`.
+    - `magic_items`: The magic items, each with the `template_id` to pass to `GET /v1/rules/magic-items/{item_id}`.
+
+    Send the same body with the returned seed to get the same treasure again, or omit `seed` to get a new random seed.
     """
     seed = seed_or_draw(body.seed)
     try:
@@ -166,8 +169,8 @@ def generate_npc_party(body: NpcPartyRequest) -> NpcPartyResponse:
     """Generate a party of NPC adventurers with classes, levels, ability scores, gear, spells, and treasure.
 
     osrlib's `generate_npc_party` function does the rolling. Each entry of `members` is an osrlib `Character`, in the
-    format of the `character` of a stored character. Send the same body with the returned seed to get the same party
-    again, or leave `seed` out to get a new random seed.
+    same format as the `character` of a stored character. Send the same body with the returned seed to get the same
+    party again, or omit `seed` to get a new random seed.
 
     The members are for a referee to use as rivals or hirelings outside a game. To put an NPC party in a session, a
     referee sends the `spawn_npc_party` command.
@@ -192,14 +195,14 @@ def generate_npc_party(body: NpcPartyRequest) -> NpcPartyResponse:
 def generate_room(body: RoomRequest) -> RoomResponse:
     """Roll what a dungeon room contains, using the B/X stocking tables.
 
-    osrlib's `stock_area` function does the rolling. It rolls whether the room is empty, a trap, special, or has a
-    monster, and `contents` is the result. It then rolls whether the room has treasure. For a monster room, it also
-    rolls on the encounter table for the level, and `encounter` lists the monsters by `template_id`, the id that
+    osrlib's `stock_area` function does the rolling. It first rolls the room's `contents`: `empty`, `monster`,
+    `special`, or `trap`. It then rolls whether the room has treasure. For a monster room, it also rolls on the
+    encounter table for the level, and `encounter` lists the monsters by `template_id`, the ID that
     `GET /v1/rules/monsters/{monster_id}` takes.
 
     The result is content for an adventure author to place in an adventure document, not a game in progress. Send the
-    same body with the returned seed to get the same room again, or leave `seed` out to get a new random seed. To
-    stock several rooms, send one request for each room.
+    same body with the returned seed to get the same room again, or omit `seed` to get a new random seed. To stock
+    several rooms, send one request for each room.
     """
     seed = seed_or_draw(body.seed)
     streams = RngStreams(master_seed=seed)
@@ -215,7 +218,7 @@ def generate_room(body: RoomRequest) -> RoomResponse:
         {
             422: [
                 VALIDATION_ERROR,
-                "`content_invalid`: osrlib has no monster with that id. Find the id with `GET /v1/rules/monsters`.",
+                "`content_invalid`: osrlib has no monster with that ID. Find the ID with `GET /v1/rules/monsters`.",
             ]
         }
     ),
@@ -223,11 +226,10 @@ def generate_room(body: RoomRequest) -> RoomResponse:
 def generate_monsters(body: MonstersRequest) -> MonstersResponse:
     """Spawn one or more monsters from a template, each with separately rolled hit points.
 
-    osrlib's `spawn_monster` function does the rolling, once for each monster, in spawn order. The monsters get the
-    ids `monster-0001`, `monster-0002`, and so on. Each monster has the whole template, the one
-    `GET /v1/rules/monsters/{monster_id}` returns, in `template`, and its rolled hit points in `max_hp` and
-    `current_hp`. Send the same body with the returned seed to get the same hit points again, or leave `seed` out to
-    get a new random seed.
+    osrlib's `spawn_monster` function does the rolling, once for each monster, in spawn order. The monsters get the IDs
+    `monster-0001`, `monster-0002`, and so on. Each monster has the whole template in `template`, the same one that
+    `GET /v1/rules/monsters/{monster_id}` returns, and its rolled hit points in `max_hp` and `current_hp`. Send the same
+    body with the returned seed to get the same hit points again, or omit `seed` to get a new random seed.
 
     The monsters don't belong to a game. To add monsters to a session, a referee sends the `spawn_monsters` command.
     """

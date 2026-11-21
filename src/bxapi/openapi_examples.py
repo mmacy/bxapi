@@ -128,21 +128,21 @@ def shared_problems() -> tuple[SharedProblem, ...]:
         shared(
             "unauthorized",
             "Send no API key",
-            "The response to a request under `/v1` with no API key, or with a key the server doesn't have.",
+            "The response to a request under `/v1` with no API key, or with a key the server doesn't recognize.",
             unauthorized(),
         ),
         shared(
             "misdirected_request",
-            "Call a server that asks for no key by another host name",
-            "The response to a request under `/v1` whose `Host` header isn't `localhost`, `127.0.0.1`, or `[::1]`, "
-            "from a server that asks for no API key.",
+            "Call an anonymous-mode server by another host name",
+            "The response from a server in anonymous mode to a request under `/v1` whose `Host` header isn't "
+            "`localhost`, `127.0.0.1`, or `[::1]`.",
             misdirected_request(),
         ),
         shared(
             "rate_limited",
             "Send requests faster than the limit",
-            f"The response to a request from a client that sent more than {per_minute} requests in a minute, the "
-            "server's default limit.",
+            f"The response to a request from a client that exceeded {per_minute} requests per minute, the server's "
+            "default limit.",
             rate_limited(per_minute, 1),
         ),
         shared(
@@ -173,7 +173,7 @@ def shared_problems() -> tuple[SharedProblem, ...]:
         ),
         shared(
             "validation_error",
-            "Leave out a required field",
+            "Omit a required field",
             "The response to `POST /v1/dice/roll` with the body `{}`. Each entry in `errors` is one part of the "
             "request that failed validation, and `loc` is the path to it.",
             validation_error([missing]),
@@ -188,13 +188,13 @@ def shared_problems() -> tuple[SharedProblem, ...]:
         shared(
             "idempotency_key_interrupted",
             "Retry a request the server didn't finish",
-            "The response to a request with an `Idempotency-Key` whose first request the server failed or stopped "
-            "in the middle of.",
+            "The response to a retry with an `Idempotency-Key` after the server failed or stopped while it handled "
+            "the first request with that key.",
             key_interrupted(),
         ),
         shared(
             "idempotency_key_reused",
-            "Send a key again with another request",
+            "Reuse a key with a different request",
             "The response to a request with an `Idempotency-Key` that your client already sent with a different body.",
             key_reused(),
         ),
@@ -208,8 +208,8 @@ def shared_problems() -> tuple[SharedProblem, ...]:
         shared(
             "internal_error",
             "Hit a bug in the server",
-            "The response to a request that raises an exception the server doesn't expect. Every such request gets "
-            "the same document.",
+            "The response to a request that raises an exception the server doesn't expect. Every such request "
+            "returns the same problem document.",
             internal_error(),
         ),
         shared(
@@ -227,7 +227,7 @@ def shared_problems() -> tuple[SharedProblem, ...]:
         ),
         shared(
             "storage_full",
-            "Store more than the server allows one client",
+            "Exceed the storage limit for one client",
             f"The response to a request that would store a document, from a client for which the server already "
             f"stores {max_client_bytes} bytes or more, the server's default limit.",
             storage_full(max_client_bytes + 20_480, max_client_bytes),

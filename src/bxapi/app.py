@@ -64,133 +64,145 @@ COMPRESSION_MINIMUM_BYTES = 1024
 _log = logging.getLogger("bxapi")
 
 _DESCRIPTION = """
-bxapi runs games of the 1981 B/X (Basic/Expert) fantasy adventure game over HTTP.
-[osrlib](https://github.com/mmacy/osrlib-python), a Python library, applies every rule. bxapi
-adds API keys, storage, and an error format. A client application draws the screen and reads the
-player's input. bxapi rolls the dice, applies the rules, stores the game, and returns what
-happened.
+bxapi runs games of B/X (Basic/Expert), the fantasy adventure game published in 1981, over HTTP.
+[osrlib](https://github.com/mmacy/osrlib-python), a Python library, applies every rule, and bxapi
+adds API keys, storage, and a standard error format. Your client application draws the screen and
+reads the player's input, while bxapi rolls the dice, applies the rules, stores the game, and
+returns what happened.
 
 ## Play a game
 
-1. `GET /v1/meta` checks your API key and returns your client name and role.
-2. `POST /v1/ability-rolls` rolls six ability scores and lists the classes they qualify for.
-3. `POST /v1/characters` creates a character from the roll and the player's choices. Keep the
-   character's `id`.
-4. `GET /v1/adventures` lists the adventures you can play. Every server has `builtin-barrow`.
-5. `POST /v1/sessions` starts a game of an adventure with a party of stored characters. Keep the
-   session's `id`.
-6. `GET /v1/sessions/{session_id}/commands` lists the commands that are legal now.
-7. `POST /v1/sessions/{session_id}/commands` sends one command and returns what happened.
-8. `GET /v1/sessions/{session_id}/view` returns what the players can see. Draw the screen from it.
-   To get the view in step 7's response instead, pass `include=view` there.
+A game client calls these operations, in this order:
 
-Repeat steps 6 to 8 until `ended` is `true` in a command's response.
+1. `GET /v1/meta` verifies your API key and returns your client name and role.
+2. `POST /v1/ability-rolls` rolls six ability scores and lists the classes they qualify for.
+3. `POST /v1/characters` creates a character from the roll and the player's choices. Save the
+   character's `id`.
+4. `GET /v1/adventures` lists the adventures you can play. Every server includes
+   `builtin-barrow`.
+5. `POST /v1/sessions` starts a game of an adventure with a party of stored characters. Save the
+   session's `id`.
+6. `GET /v1/sessions/{session_id}/commands` lists the commands that are currently legal.
+7. `POST /v1/sessions/{session_id}/commands` sends one command and returns its outcome.
+8. `GET /v1/sessions/{session_id}/view` returns what the players can see, which your client
+   renders. To receive the view in step 7's response instead, pass `include=view` on that request.
+
+Repeat steps 6 through 8 until a command's response has `ended` set to `true`.
 
 ## Authentication
 
 Send an API key as a bearer token in the `Authorization` header: `Authorization: Bearer <key>`.
-Whoever runs the server sets its keys in the `BXAPI_API_KEYS` setting, and gives each key a client
-name and a role. Every path under `/v1` needs a key. `GET /health`, `/docs`, `/redoc`, and
-`/openapi.json` don't. A request with no key, or with a key the server doesn't have, gets 401
-`unauthorized`.
+The server operator configures the keys in the `BXAPI_API_KEYS` setting and assigns each key a
+client name and a role. Every path under `/v1` requires a key. The only paths that need no key are
+`GET /health`, `/docs`, `/redoc`, and `/openapi.json`. The server returns `401 unauthorized` for a
+request with no key or with a key it doesn't recognize.
 
-A server started with no keys and with `BXAPI_ALLOW_ANONYMOUS=true` asks for no key. It treats
-every caller as a referee of the client `local`, and `GET /v1/meta` returns `auth_enabled` set to
-`false`. Such a server answers a request under `/v1` only when the request's `Host` header is
-`localhost`, `127.0.0.1`, or `[::1]`, with or without a port. A request with another host gets 421
-`misdirected_request`.
+A server started with no keys and with `BXAPI_ALLOW_ANONYMOUS=true` runs in anonymous mode and
+doesn't require an API key. It treats every caller as a referee for the client `local`, and
+`GET /v1/meta` returns `auth_enabled` set to `false`. An anonymous-mode server answers a request
+under `/v1` only when the request's `Host` header is `localhost`, `127.0.0.1`, or `[::1]`, with or
+without a port. It returns `421 misdirected_request` for any other host.
 
-A key has one of two roles:
+Each key has one of two roles:
 
-- `player`: everything a game needs. In a session, a player sees only what the players may see.
-- `referee`: everything a player can do, and also the referee view, referee events, referee
-  commands, seeds, imports, and full adventure and save documents.
+- `player`: Grants everything a game client needs. In a session, a player key sees only what the
+  players may see.
+- `referee`: Grants everything a player key can do, plus the referee view, referee events,
+  referee commands, seeds, imports, and full adventure and save documents.
 
-A player's request for something only a referee may do gets 403 `referee_required`, or 403
-`referee_command` for a referee command.
+The server returns `403 referee_required` when a player key requests something only a referee may
+do, or `403 referee_command` when a player key sends a referee command.
 
 A key identifies a client application, not a person. Every key of one client reads and changes
-the same characters, adventures, sessions, and saves, and a client can't read another client's.
-A request for another client's resource gets the same 404 `not_found` as an id that doesn't
-exist.
+the same characters, adventures, sessions, and saves, and no client can read another client's
+data. A request for another client's resource receives the same `404 not_found` as a request for
+an ID that doesn't exist.
 
 ## Conventions
 
-- **Ids.** A stored resource's id is a prefix and 22 random characters: `rol_` for an ability
-  roll, `chr_` for a character, `adv_` for an adventure, `ses_` for a session, and `sav_` for a
-  save. The id of an adventure that comes with the server starts with `builtin-`.
-- **Timestamps.** UTC, in RFC 3339 format with whole seconds, like `2026-11-20T22:01:05Z`.
+- **IDs.** A stored resource's ID is a prefix followed by 22 random characters: `rol_` for an
+  ability roll, `chr_` for a character, `adv_` for an adventure, `ses_` for a session, and `sav_`
+  for a save. The ID of a built-in adventure starts with `builtin-`.
+- **Timestamps.** Timestamps are UTC in RFC 3339 format with whole seconds, such as
+  `2026-11-20T22:01:05Z`.
 - **Lists.** A list operation takes `limit` (1 to 200, default 50) and `offset` (default 0), and
   returns `items`, `total`, `limit`, and `offset`. To read the next page, add `limit` to `offset`.
-  You have read the whole list when `offset` plus `limit` is `total` or more. The server lists
+  You've read the whole list when `offset` plus `limit` is `total` or more. The server lists
   stored resources newest first.
 - **Documents.** A *document* is osrlib's JSON format for an adventure, a character, a party, or a
-  save. It's an object with the keys `kind`, `schema_version`, `engine_version`, and `payload`.
-  The server reads a document whose `schema_version` is at most the `schema_version` that
+  save: an object with the keys `kind`, `schema_version`, `engine_version`, and `payload`. The
+  server reads a document whose `schema_version` is no higher than the `schema_version` that
   `GET /v1/meta` returns.
-- **Seeds.** osrlib draws every random number from one integer, the *seed*. The operations under
-  `/v1/dice` and `/v1/generate` take an optional `seed` from any caller and return the seed they
+- **Seeds.** osrlib derives every random number from one integer, the *seed*. The operations under
+  `/v1/dice` and `/v1/generate` accept an optional `seed` from any caller and return the seed they
   used. The same request with the same seed returns the same result on the same osrlib version.
   For ability rolls, characters, and sessions, only a referee may choose a seed, and the server
   never returns it to a player.
-- **Unknown fields.** A request body with a field the operation doesn't define gets 422
-  `validation_error`. A command and a document are osrlib's models, and osrlib ignores a field it
-  doesn't define.
-- **osrlib's descriptions.** The descriptions of osrlib's models, like the commands and the player
-  view, were written for osrlib's Python API. Read `None` as JSON `null`, and a tuple as an array.
-  Where a description says that a model raises `ValueError` or `ValidationError`, the server refuses
-  the request: a command or another request body gets 422 `validation_error`, and an uploaded or
-  imported document, like an adventure, gets 422 `content_invalid`.
+- **Unknown fields.** The server returns `422 validation_error` for a request body with a field
+  the operation doesn't define. Commands and documents are the exception: they're osrlib models,
+  and osrlib ignores a field it doesn't define.
+- **osrlib's descriptions.** The descriptions of osrlib's models, such as the commands and the
+  player view, were written for osrlib's Python API. Read `None` as JSON `null`, and a tuple as an
+  array. Where a description says that a model raises `ValueError` or `ValidationError`, the
+  server rejects the request. It returns `422 validation_error` for a command or another request
+  body, and `422 content_invalid` for an uploaded or imported document, such as an adventure.
 - **JSON bodies.** Send a request body as JSON with the header `Content-Type: application/json`.
-  A body with another content type, or with none, gets 415 `unsupported_media_type`. The server
-  refuses a body with `NaN`, `Infinity`, a number too large for a 64-bit float, a string with half
-  of a UTF-16 surrogate pair, or arrays and objects nested more than 100 levels deep, with 400
-  `bad_request`.
-- **Body size.** A body is at most 65,536 bytes. On the operations that take an osrlib document,
-  the limit is the server's `BXAPI_MAX_BODY_BYTES` setting instead, which is 8,388,608 bytes by
-  default: `POST /v1/adventures`, `POST /v1/adventures/validate`, `POST /v1/characters/import`,
-  `POST /v1/saves/import`, and `POST /v1/sessions`. A larger body gets 413 `content_too_large`.
-- **Compression.** Send `Accept-Encoding: gzip`, and the server compresses every response of
-  1,024 bytes or more. Most HTTP clients send the header and decompress the response for you.
-- **Conditional requests.** Every 200 response to a `GET` has an `ETag` header, a short name for
-  the response's content. To check whether a response you have is still current, send its `ETag`
-  in `If-None-Match`. The server answers 304 with no body while the content is the same, and
-  200 with the new content when it has changed. Use it to poll a session's info or view.
+  The server returns `415 unsupported_media_type` for a body with another content type or with
+  none. It returns `400 bad_request` for a body that contains `NaN`, `Infinity`, a number too
+  large for a 64-bit float, a string with half of a UTF-16 surrogate pair, or arrays and objects
+  nested more than 100 levels deep.
+- **Body size.** A body is at most 65,536 bytes, except on the five operations that accept an
+  osrlib document: `POST /v1/adventures`, `POST /v1/adventures/validate`,
+  `POST /v1/characters/import`, `POST /v1/saves/import`, and `POST /v1/sessions`. The limit for
+  those five is the server's `BXAPI_MAX_BODY_BYTES` setting, which defaults to 8,388,608 bytes.
+  The server returns `413 content_too_large` for a larger body.
+- **Compression.** The server compresses every response of 1,024 bytes or more with gzip when the
+  request has the header `Accept-Encoding: gzip`. Most HTTP clients send the header and decompress
+  the response for you.
+- **Conditional requests.** Every `200` response to a `GET` has an `ETag` header, an identifier
+  for the response's content. To check whether a response you hold is still current, send its
+  `ETag` in `If-None-Match`. The server returns `304` with no body while the content is unchanged,
+  and `200` with the new content after it changes. Use conditional requests to poll a session's
+  info or view.
 - **HEAD.** Every `GET` operation also answers `HEAD`, with the same status and headers and no
   body.
-- **Idempotency keys.** To send a `POST` again without running it twice, put a value you chose,
-  like a UUID, in the `Idempotency-Key` header of the first request and of every retry. The
-  server runs the first request and stores a 2xx response for 24 hours. A retry with the same
-  key gets the stored response, with the header `Idempotent-Replayed: true`. A request that fails
-  with a problem other than 500 `internal_error` changed nothing, and the server forgets its key,
-  so the same key runs the request again. A key is 1 to 255 printable ASCII characters with no
-  spaces, and it belongs to your client.
-- **Request ids.** Every response has an `X-Request-Id` header, like
-  `req_Zk3uY0mWq1x8Jr5cTt2aLw`, and the server logs the id with the request. To choose the id,
-  send `X-Request-Id` with 1 to 128 letters, digits, and the characters `.`, `_`, `~`, and `-`.
-  The server replaces any other value with an id it draws.
-- **Storage.** The server counts the bytes of the documents it stores for your client: characters,
-  ability rolls, adventures, sessions, saves, and the responses it stores for idempotency keys.
-  `GET /v1/meta` returns the count and the limit, which the server's `BXAPI_MAX_CLIENT_BYTES`
-  setting sets and which is 1,073,741,824 bytes by default. When the count reaches the limit, each
-  request that would store more gets 507 `storage_full`, until you delete something.
-- **Rate limits.** Each client may send as many requests a minute as the server's
-  `BXAPI_RATE_LIMIT_PER_MINUTE` setting allows, which is 600 by default. You can send that many at
-  once, and you regain them at a steady rate. A request over the limit gets 429 `rate_limited`,
-  with the seconds to wait in the `Retry-After` header.
+- **Idempotency keys.** To retry a `POST` without running it twice, put a value you choose, such
+  as a UUID, in the `Idempotency-Key` header of the first request and of every retry. The server
+  runs the first request and stores a `2xx` response for 24 hours. A retry with the same key
+  receives the stored response, with the header `Idempotent-Replayed: true`. A request that fails
+  with any problem other than `500 internal_error` changed nothing, so the server discards its
+  key, and the same key runs the request again. A key is 1 to 255 printable ASCII characters with
+  no spaces, and it's scoped to your client.
+- **Request IDs.** Every response has an `X-Request-Id` header, such as
+  `req_Zk3uY0mWq1x8Jr5cTt2aLw`, and the server logs the ID with the request. To choose the ID
+  yourself, send `X-Request-Id` with 1 to 128 letters, digits, and the characters `.`, `_`, `~`,
+  and `-`. The server replaces any other value with an ID it generates.
+- **Storage.** The server counts the bytes of the documents it stores for your client:
+  characters, ability rolls, adventures, sessions, saves, and the responses it stores for
+  idempotency keys. `GET /v1/meta` returns the count and the limit. The limit is configured by the
+  server's `BXAPI_MAX_CLIENT_BYTES` setting and defaults to 1,073,741,824 bytes. After the count
+  reaches the limit, each request that would store more receives `507 storage_full` until you
+  delete something.
+- **Rate limits.** Each client may send as many requests per minute as the server's
+  `BXAPI_RATE_LIMIT_PER_MINUTE` setting allows, which defaults to 600. You can send that many at
+  once, and the allowance refills at a steady rate. A request that exceeds the limit receives
+  `429 rate_limited`, with the number of seconds to wait in the `Retry-After` header.
 
-## Refused commands
+## Rejected commands
 
 A command that the rules don't allow isn't an error. `POST /v1/sessions/{session_id}/commands`
-returns 200 with `accepted` set to `false` and osrlib's `rejections`, and the game doesn't change.
-An HTTP error status means that the request itself failed.
+returns `200` with `accepted` set to `false` and osrlib's `rejections`, and the game doesn't
+change. An HTTP error status means that the request itself failed.
 
 ## Errors
 
 Every error response is a problem document (RFC 9457) with the media type
 `application/problem+json`. Branch on `code`, which doesn't change between releases. `detail` is a
-sentence for a person, at most 1,000 characters. Some codes add members, which the `Problem`
-schema lists. Each operation's responses list the codes it returns, with what to do about each.
+sentence written for a person, at most 1,000 characters long. Some codes add fields, which the
+`Problem` schema lists. Each operation's responses list the codes it returns and what to do about
+each one.
+
+The following problem document reports a request for a session that doesn't exist:
 
 ```json
 {
@@ -205,24 +217,25 @@ schema lists. Each operation's responses list the codes it returns, with what to
 }
 ```
 
-`request_id` is the id in the response's `X-Request-Id` header.
+`request_id` matches the ID in the response's `X-Request-Id` header.
 
-Five codes can succeed when you send the same request again: 409 `session_busy`, 409
-`idempotency_key_in_progress`, 429 `rate_limited`, and 503 `database_busy` after the seconds in
-their `Retry-After` headers, and 408 `request_timeout`. For any other code, change the request first. When no
-response arrives at all, send the same `POST` again with the same `Idempotency-Key`. For a 500,
-report the `request_id` to whoever runs the server.
+Five codes can succeed when you send the same request again. Three of them state how many seconds
+to wait in a `Retry-After` header: `409 idempotency_key_in_progress`, `429 rate_limited`, and
+`503 database_busy`. The other two are `409 session_busy` and `408 request_timeout`. Change the
+request before you resend it for any other code. If no response arrives at all, send the same
+`POST` again with the same `Idempotency-Key`. Report the `request_id` of a `500` to the server
+operator.
 """
 
 _TAGS = [
     {
         "name": "meta",
         "description": """
-The server's health check, and the versions and identity a client checks when it starts.
+The server's health check, plus the versions and identity that a client verifies when it starts.
 
-- `GET /health` returns `{"status": "ok"}` and needs no key. Point a load balancer's health check
-  at it.
-- `GET /v1/meta` returns the versions of bxapi and osrlib, whether the server asks for a key, and
+- `GET /health` returns `{"status": "ok"}` and requires no key. Point a load balancer's health
+  check at it.
+- `GET /v1/meta` returns the versions of bxapi and osrlib, whether the server requires a key, and
   the client and role of your key.
 """,
     },
@@ -235,77 +248,86 @@ a bestiary, or a command menu.
 
 Each list operation returns a page of summaries, and each get operation returns osrlib's full
 model for one entry. Pass an entry's `id` from a list to the get operation of the same kind. On a
-list, `q` keeps the entries whose id or name contains the text, ignoring case. Every successful
+list, `q` keeps the entries whose ID or name contains the text, ignoring case. Every successful
 response has the header `Cache-Control: private, max-age=3600`, because the content changes only
-when the server's osrlib does. Every role can read every entry, including the ones a referee keeps
-from the players, like what a cursed item does.
+when the server's osrlib version changes. Every role can read every entry, including the ones a
+referee keeps from the players, such as what a cursed item does.
 
-- `GET /v1/rules/classes` and `GET /v1/rules/classes/{class_id}`: the character classes. Pass an
+The rules reference covers these kinds of content:
+
+- `GET /v1/rules/classes` and `GET /v1/rules/classes/{class_id}`: The character classes. Pass an
   `id` as `class_id` to `POST /v1/characters`.
-- `GET /v1/rules/equipment` and `GET /v1/rules/equipment/{item_id}`: the weapons, armour, gear,
+- `GET /v1/rules/equipment` and `GET /v1/rules/equipment/{item_id}`: The weapons, armour, gear,
   and ammunition a character can buy. Pass an `id` as `item_id` in `purchases`.
-- `GET /v1/rules/spells` and `GET /v1/rules/spells/{spell_id}`: the spells. Pass an `id` in
+- `GET /v1/rules/spells` and `GET /v1/rules/spells/{spell_id}`: The spells. Pass an `id` in
   `starting_spell_ids` for a magic-user or an elf.
-- `GET /v1/rules/languages`: the languages. Pass the `id` of a language whose `choosable` is
-  `true` in `extra_languages`, for a character with a high Intelligence.
-- `GET /v1/rules/monsters` and `GET /v1/rules/monsters/{monster_id}`: the monsters, with their
+- `GET /v1/rules/languages`: The languages. For a character with a high Intelligence, pass the
+  `id` of a language whose `choosable` is `true` in `extra_languages`.
+- `GET /v1/rules/monsters` and `GET /v1/rules/monsters/{monster_id}`: The monsters, with their
   statistics.
-- `GET /v1/rules/magic-items` and `GET /v1/rules/magic-items/{item_id}`: the magic items.
-- `GET /v1/rules/tables` and `GET /v1/rules/tables/{name}`: the printed tables for abilities,
+- `GET /v1/rules/magic-items` and `GET /v1/rules/magic-items/{item_id}`: The magic items.
+- `GET /v1/rules/tables` and `GET /v1/rules/tables/{name}`: The printed tables for abilities,
   combat, encounters, and treasure.
-- `GET /v1/rules/commands` and `GET /v1/rules/commands/{command_type}`: every command a session
+- `GET /v1/rules/commands` and `GET /v1/rules/commands/{command_type}`: Every command a session
   accepts, with the JSON Schema of its body.
-- `GET /v1/rules/license`: the Open Game License that covers the content.
+- `GET /v1/rules/license`: The Open Game License that covers the content.
 """,
     },
     {
         "name": "dice",
         "description": """
-Roll a dice expression, like `3d6` or `2d6+1x10`, outside a game. The response has every die and
-every total. Use it for a dice roller, or for a roll that a session's rules don't make for you.
+Roll a dice expression, such as `3d6` or `2d6+1x10`, outside a game. The response has every die
+and every total. Use it for a dice roller, or for a roll that a session's rules don't make for
+you.
 
-- `POST /v1/dice/roll`: an expression, how many times to roll it, and an optional seed. Returns
-  the results and the seed.
+- `POST /v1/dice/roll` takes an expression, the number of times to roll it, and an optional seed.
+  It returns the results and the seed.
 """,
     },
     {
         "name": "generate",
         "description": """
 Roll characters, treasure, NPC parties, stocked rooms, and monsters from the B/X tables, outside
-a game. The server stores nothing. Use them for a referee's tools, or to prepare an adventure.
+a game. The server stores nothing. Use the generators to build tools for a referee or to prepare
+an adventure.
 
 Each operation takes an optional `seed` and returns the seed it used. Send the same body with that
-seed to get the same result again, on the same osrlib version.
+seed to get the same result again on the same osrlib version.
 
-- `POST /v1/generate/character`: the choices for a first-level character. Returns the character
-  and every die rolled for it. To store a character for play, use `POST /v1/characters` instead.
-- `POST /v1/generate/treasure`: a treasure type, like `A`. Returns the coins, gems, jewellery,
-  and magic items.
-- `POST /v1/generate/npc-party`: `basic` or `expert`, and a party size. Returns NPC adventurers
-  with gear and treasure.
-- `POST /v1/generate/room`: a dungeon level. Returns what a room on that level contains.
-- `POST /v1/generate/monsters`: a monster id and a count. Returns the monsters with rolled hit
-  points.
+Each generator takes a few inputs and returns what osrlib rolled:
+
+- `POST /v1/generate/character`: Takes the choices for a first-level character. Returns the
+  character and every die rolled for it. To store a character for play, use `POST /v1/characters`
+  instead.
+- `POST /v1/generate/treasure`: Takes a treasure type, such as `A`. Returns the coins, gems,
+  jewellery, and magic items.
+- `POST /v1/generate/npc-party`: Takes `basic` or `expert`, and a party size. Returns NPC
+  adventurers with gear and treasure.
+- `POST /v1/generate/room`: Takes a dungeon level. Returns what a room on that level contains.
+- `POST /v1/generate/monsters`: Takes a monster ID and a count. Returns the monsters with rolled
+  hit points.
 """,
     },
     {
         "name": "characters",
         "description": """
-A stored character is a first-level character that the server rolled and stored, so that you can
+A stored character is a first-level character that the server rolled and stored so that you can
 start sessions with it. A session plays a copy, so play never changes the stored character, and
 one character can start any number of sessions.
 
 B/X players roll ability scores before they choose a class. An *ability roll* is six scores that
 the server rolls and stores before the player chooses. The server rolls them from a *seed*, the
-integer that osrlib draws every random number from, and stores the seed with the roll. The
+integer from which osrlib derives every random number, and stores the seed with the roll. The
 character created from a roll gets its hit points and gold from the same seed, so a retry after
-osrlib refuses a choice gets the same rolls.
+osrlib rejects a choice produces the same rolls.
+
+To create a character and play it, call these operations in order:
 
 1. `POST /v1/ability-rolls` rolls the scores. Show the player `scores` and `eligible_class_ids`.
 2. `POST /v1/characters` creates the character from the roll's `id` and the player's choices.
 3. `POST /v1/sessions` starts a game with the character's `id` in `character_ids`.
 
-`GET /v1/characters` lists the stored characters, `GET /v1/characters/{character_id}` reads one,
+`GET /v1/characters` lists the stored characters, `GET /v1/characters/{character_id}` returns one,
 and `DELETE /v1/characters/{character_id}` deletes one. A referee can store a character from
 another server with `POST /v1/characters/import`. To roll a character without storing it, use
 `POST /v1/generate/character`.
@@ -315,23 +337,25 @@ another server with `POST /v1/characters/import`. To roll a character without st
         "name": "adventures",
         "description": """
 An adventure is the content a session plays: a town, one or more dungeons, and the triggers and
-quests that run in them. Every server has the adventure `builtin-barrow`, so you can start a game
-without uploading anything.
+quests that run in them. Every server includes the adventure `builtin-barrow`, so you can start a
+game without uploading anything.
 
-An *adventure document* is osrlib's JSON format for an adventure. osr-forge, which converts
-adventure module PDFs, and osr-editor, a local application for writing adventures, both write
-adventure documents. They're separate projects by osrlib's author. *Adventure info* is what a
-player may know before play: the title, the description, the town, and the names of the dungeons.
+An *adventure document* is osrlib's JSON format for an adventure. Two separate projects by
+osrlib's author write adventure documents: osr-forge, which converts adventure module PDFs, and
+osr-editor, a local application for writing adventures. *Adventure info* is what a player may know
+before play: the title, the description, the town, and the names of the dungeons.
 
-1. `GET /v1/adventures` lists the adventures that come with the server, then your uploads.
+To upload an adventure and play it, call these operations in order:
+
+1. `GET /v1/adventures` lists the built-in adventures, then your uploads.
 2. `POST /v1/adventures/validate` checks a document and stores nothing.
 3. `POST /v1/adventures` checks a document and stores it.
 4. `POST /v1/sessions` starts a game of an adventure by its `id`.
 
 `GET /v1/adventures/{adventure_id}` returns one adventure's info.
-`GET /v1/adventures/{adventure_id}/document` returns the whole document, for a referee only.
-`DELETE /v1/adventures/{adventure_id}` deletes an upload. A session has a copy of its adventure,
-so deleting the adventure doesn't change a session.
+`GET /v1/adventures/{adventure_id}/document` returns the whole document, to a referee only.
+`DELETE /v1/adventures/{adventure_id}` deletes an upload. Each session has its own copy of its
+adventure, so deleting the adventure doesn't change a session.
 """,
     },
     {
@@ -340,47 +364,53 @@ so deleting the adventure doesn't change a session.
 A session is one game in progress: a party playing an adventure. The party starts in town, and
 the game ends in the mode `game_over` or `victory`.
 
-- A *command* is one action, like `{"command_type": "move_party", "direction": "east"}`. osrlib
-  accepts it or refuses it.
+Five terms describe a session:
+
+- A *command* is one action, such as `{"command_type": "move_party", "direction": "east"}`. osrlib
+  accepts it or rejects it.
 - A *mode* is where the party is in play: `town`, `exploring`, `encounter`, `battle`,
-  `game_over`, or `victory`. The mode decides which commands are legal.
-- An *event* is one thing that happened. Each event is visible to the players, or to the referee
-  only.
+  `game_over`, or `victory`. The mode determines which commands are legal.
+- An *event* is one thing that happened. Each event is visible either to the players or to the
+  referee only.
 - The *revision* counts the commands that osrlib has accepted in the session. It starts at 0.
-- The *player view* is what the players can see now. A client draws the screen from it.
+- The *player view* is what the players can currently see. A client draws the screen from it.
+
+To play a session, call these operations in order:
 
 1. `POST /v1/sessions` starts a game and returns the session's info, at revision 0.
-2. `GET /v1/sessions/{session_id}/commands` lists the commands that are legal now.
-   `GET /v1/rules/commands/{command_type}` has the fields of each one.
+2. `GET /v1/sessions/{session_id}/commands` lists the commands that are currently legal.
+   `GET /v1/rules/commands/{command_type}` describes the fields of each one.
 3. `POST /v1/sessions/{session_id}/commands` sends one command and returns the outcome: whether
    osrlib accepted it, the events, one line of text for each event, and the new mode and
    revision.
-4. `GET /v1/sessions/{session_id}/view` returns the player view. Draw the screen from it. With
-   `include=view`, step 3's response has the view, and you can leave this step out.
-5. Repeat steps 2 to 4 until `ended` is `true`.
+4. `GET /v1/sessions/{session_id}/view` returns the player view, which your client renders. With
+   `include=view`, step 3's response includes the view, and you can skip this step.
+5. Repeat steps 2 through 4 until `ended` is `true`.
 
-`GET /v1/sessions/{session_id}/events` reads the event log, to catch up after a reconnect.
-`POST /v1/sessions/{session_id}/saves` saves the game, and `POST /v1/saves/{save_id}/restore`
-starts a new session from a save. `GET /v1/sessions` lists the sessions,
-`GET /v1/sessions/{session_id}` reads one session's info, `PATCH /v1/sessions/{session_id}`
-renames one, and `DELETE /v1/sessions/{session_id}` deletes one. A referee can read the whole
-state with `GET /v1/sessions/{session_id}/referee-view`.
+`GET /v1/sessions/{session_id}/events` returns the event log, so a client can catch up after it
+reconnects. `POST /v1/sessions/{session_id}/saves` saves the game, and
+`POST /v1/saves/{save_id}/restore` starts a new session from a save. `GET /v1/sessions` lists the
+sessions, `GET /v1/sessions/{session_id}` returns one session's info,
+`PATCH /v1/sessions/{session_id}` renames one, and `DELETE /v1/sessions/{session_id}` deletes one.
+A referee can read the whole state with `GET /v1/sessions/{session_id}/referee-view`.
 
 The server runs one command, view, or read of the event log at a time on each session. A request
-that waits more than 5 seconds for its turn gets 409 `session_busy`. To send a command safely more
-than once, like a retry after a timeout, pass `expected_revision`.
+that waits more than 5 seconds for its turn receives `409 session_busy`. To send a command safely
+more than once, such as a retry after a timeout, pass `expected_revision`.
 """,
     },
     {
         "name": "saves",
         "description": """
 A save is a copy of a session at one moment. Restoring a save starts a new session from that
-moment, and leaves the save and the original session as they were. The save's *save document* is
-osrlib's JSON record of the whole game. It includes the session's seed and the state only a
-referee may see, so only a referee can read or import one.
+moment, and leaves the save and the original session unchanged. A *save document* is osrlib's JSON
+record of the whole game. It includes the session's seed and the state only a referee may see, so
+only a referee can read or import one.
+
+To save a session and restore it, call these operations in order:
 
 1. `POST /v1/sessions/{session_id}/saves` saves a session and returns the save's info.
-2. `GET /v1/saves` lists the saves, and `GET /v1/saves/{save_id}` reads one save's info.
+2. `GET /v1/saves` lists the saves, and `GET /v1/saves/{save_id}` returns one save's info.
 3. `POST /v1/saves/{save_id}/restore` starts a new session from a save.
 
 `PATCH /v1/saves/{save_id}` changes a save's label, and `DELETE /v1/saves/{save_id}` deletes a
@@ -399,63 +429,66 @@ _NO_KEYS = (
 _SHARED_ERRORS = problem_responses(
     {
         401: [
-            "`unauthorized`: The request has no API key, or a key the server doesn't have. Send "
-            "`Authorization: Bearer <key>` with a key from whoever runs the server. The same request gets the same "
-            "error."
+            "`unauthorized`: The request has no API key, or it has a key the server doesn't recognize. Send "
+            "`Authorization: Bearer <key>` with a key from the server operator. Resending the same request returns "
+            "the same error."
         ],
         421: [
-            "`misdirected_request`: The server asks for no API key, and the request's `Host` header isn't "
-            "`localhost`, `127.0.0.1`, or `[::1]`. Call the server by one of those names, or ask whoever runs it to "
-            "set API keys. A server with API keys never returns this code."
+            "`misdirected_request`: The server runs in anonymous mode, which requires no API key, and the request's "
+            "`Host` header isn't `localhost`, `127.0.0.1`, or `[::1]`. Call the server by one of those names, or ask "
+            "the server operator to configure API keys. A server with API keys never returns this code."
         ],
         422: [VALIDATION_ERROR],
         429: [
-            "`rate_limited`: Your client sent more requests in a minute than the server allows, which its "
-            "`BXAPI_RATE_LIMIT_PER_MINUTE` setting sets and which is 600 by default. Wait the seconds that the "
-            "`Retry-After` header states, and send the request again. Requests with no valid API key share one "
-            "limit, and get this code in place of 401 `unauthorized` when they pass it."
+            "`rate_limited`: Your client sent more requests per minute than the server allows. The limit is "
+            "configured by the server's `BXAPI_RATE_LIMIT_PER_MINUTE` setting and defaults to 600. Wait the number "
+            "of seconds in the `Retry-After` header, then send the request again. Requests with no valid API key "
+            "share one limit, and the server returns this code instead of `401 unauthorized` when they exceed it."
         ],
         500: [INTERNAL_ERROR],
         503: [
             "`database_busy`: Another process held the database's write lock for more than 5 seconds. Wait the one "
-            "second that the `Retry-After` header states, and send the request again."
+            "second that the `Retry-After` header states, then send the request again."
         ],
     }
 )
 _SHARED_ERRORS[401]["headers"] = {
-    "WWW-Authenticate": {"description": "`Bearer`, the scheme the server accepts.", "schema": {"type": "string"}}
+    "WWW-Authenticate": {
+        "description": "`Bearer`, the authentication scheme the server accepts.",
+        "schema": {"type": "string"},
+    }
 }
 _SHARED_ERRORS[429]["headers"] = {
     "Retry-After": {
-        "description": "The seconds to wait before you send the request again, at least `1`.",
+        "description": "The number of seconds to wait before you send the request again, at least `1`.",
         "schema": {"type": "integer"},
     }
 }
 _SHARED_ERRORS[503]["headers"] = {
     "Retry-After": {
-        "description": "The seconds to wait before you send the request again: `1`.",
+        "description": "The number of seconds to wait before you send the request again: `1`.",
         "schema": {"type": "integer"},
     }
 }
 
 _BODY_ERRORS = {
-    400: "- `bad_request`: The server can't decode the body as text, or the body has a value the server refuses: an "
-    "integer with more than 4,300 digits, `NaN`, `Infinity`, a number too large for a 64-bit float, a string with "
+    400: "- `bad_request`: The server can't decode the body as text, or the body contains a value the server rejects: "
+    "an integer with more than 4,300 digits, `NaN`, `Infinity`, a number too large for a 64-bit float, a string with "
     f"half of a UTF-16 surrogate pair, or arrays and objects nested more than {MAX_JSON_DEPTH} levels deep. `detail` "
-    "states which. Send the body as JSON in UTF-8, without those values.",
-    408: "- `request_timeout`: The whole body didn't arrive within the time the server waits, which its "
-    "`BXAPI_BODY_TIMEOUT_SECONDS` setting sets and which is 30 seconds by default. Send the request again.",
-    413: "- `content_too_large`: The body is larger than the server accepts for an operation that takes a document, "
-    "which its `BXAPI_MAX_BODY_BYTES` setting sets and which is 8,388,608 bytes by default. The same body gets the "
-    "same error.",
-    415: "- `unsupported_media_type`: The request has a body, and its `Content-Type` header doesn't say that the body "
-    "is JSON. Send the body as JSON with the header `Content-Type: application/json`.",
+    "states which. Send the body as UTF-8 JSON without those values.",
+    408: "- `request_timeout`: The whole body didn't arrive within the server's body timeout, which is configured by "
+    "its `BXAPI_BODY_TIMEOUT_SECONDS` setting and defaults to 30 seconds. Send the request again.",
+    413: "- `content_too_large`: The body exceeds the limit for an operation that accepts a document. The limit is "
+    "configured by the server's `BXAPI_MAX_BODY_BYTES` setting and defaults to 8,388,608 bytes. Resending the same "
+    "body returns the same error.",
+    415: "- `unsupported_media_type`: The request has a body, but its `Content-Type` header doesn't declare the body "
+    "as JSON. Send the body as JSON with the header `Content-Type: application/json`.",
 }
 
 _SMALL_BODY_TOO_LARGE = (
-    f"- `content_too_large`: The body is larger than {SMALL_BODY_BYTES:,} bytes, the most the server accepts for an "
-    "operation that takes no document, or larger than the server's `BXAPI_MAX_BODY_BYTES` setting when that's "
-    "smaller. The same body gets the same error."
+    f"- `content_too_large`: The body exceeds {SMALL_BODY_BYTES:,} bytes, the limit for an operation that accepts no "
+    "document, or it exceeds the server's `BXAPI_MAX_BODY_BYTES` setting when that setting is smaller. Resending the "
+    "same body returns the same error."
 )
 
 _JSON_BODY_METHODS = frozenset({"POST", "PUT", "PATCH"})
@@ -636,14 +669,14 @@ def _describe_problems(schema: dict[str, Any], small_body_operations: frozenset[
 _IDEMPOTENCY_ERRORS = {
     "409": [
         "`idempotency_key_in_progress`: The first request with this `Idempotency-Key` is still running. Wait the one "
-        "second that the `Retry-After` header states, and send the request again.",
+        "second that the `Retry-After` header states, then send the request again.",
         "`idempotency_key_interrupted`: The server failed or stopped while it handled the first request with this "
         "`Idempotency-Key`, and it has no record of whether that request took effect. Read the resource the request "
         "would have changed. If the request didn't take effect, send it again with a new key.",
     ],
     "422": [
-        "`idempotency_key_reused`: Your client already sent this `Idempotency-Key` with another request: a different "
-        "method, path, query, body, or role. Send each new request with a new key.",
+        "`idempotency_key_reused`: Your client already sent this `Idempotency-Key` with a different request: one "
+        "with a different method, path, query, body, or role. Send each new request with a new key.",
     ],
 }
 
@@ -653,16 +686,16 @@ def _describe_idempotency(schema: dict[str, Any]) -> None:
         "name": IDEMPOTENCY_KEY_HEADER,
         "in": "header",
         "required": False,
-        "description": "A value you choose, like a UUID, that identifies this request: 1 to 255 printable ASCII "
-        "characters with no spaces. Send the same key when you send the same request again, and the server returns "
-        "the first response without running the request twice. The server remembers a key for 24 hours.",
+        "description": "A value you choose, such as a UUID, that identifies this request: 1 to 255 printable ASCII "
+        "characters with no spaces. Send the same key when you retry the request, and the server returns the first "
+        "response without running the request twice. The server remembers a key for 24 hours.",
         "schema": {"type": "string", "minLength": 1, "maxLength": 255, "pattern": "^[!-~]+$"},
         "example": "0b6f7c1e-3f9a-4f0e-9f57-2d1c6e8a4b11",
     }
     # One definition of the response header, which every POST operation refers to.
     schema.setdefault("components", {}).setdefault("headers", {})[REPLAYED_HEADER] = {
         "description": "`true` when the response is the stored response to an earlier request with the same "
-        "`Idempotency-Key`. The server leaves the header out of the response to the first request.",
+        "`Idempotency-Key`. The server omits the header from the response to the first request.",
         "schema": {"type": "string", "enum": ["true"]},
     }
     replayed = {"$ref": f"#/components/headers/{REPLAYED_HEADER}"}
@@ -681,18 +714,18 @@ def _describe_idempotency(schema: dict[str, Any]) -> None:
             response["description"] = "\n".join(part for part in (response["description"], listed) if part)
         retry_after = responses["409"].setdefault("headers", {})
         retry_after["Retry-After"] = {
-            "description": "With `idempotency_key_in_progress`, the seconds to wait before you send the request "
-            "again: `1`.",
+            "description": "With `idempotency_key_in_progress`, the number of seconds to wait before you send the "
+            "request again: `1`.",
             "schema": {"type": "integer"},
         }
 
 
 _STORAGE_FULL = (
-    "- `storage_full`: The server stores as many bytes of documents for your client as it allows, which its "
-    "`BXAPI_MAX_CLIENT_BYTES` setting sets and which is 1,073,741,824 by default. `used_bytes` and `max_bytes` state "
-    "the count and the limit. The request stored nothing. Delete sessions, saves, adventures, or characters you no "
-    "longer need, and send the request again. An operation that stores nothing, like a dice roll, returns this code "
-    "only for a request with an `Idempotency-Key`, because the server stores the response."
+    "- `storage_full`: The documents the server stores for your client have reached its storage limit, which is "
+    "configured by the server's `BXAPI_MAX_CLIENT_BYTES` setting and defaults to 1,073,741,824 bytes. `used_bytes` "
+    "and `max_bytes` state the count and the limit. The request stored nothing. Delete sessions, saves, adventures, "
+    "or characters you no longer need, then send the request again. An operation that stores nothing, such as a dice "
+    "roll, returns this code only for a request with an `Idempotency-Key`, because the server stores the response."
 )
 
 
@@ -709,14 +742,14 @@ def _describe_conditional_gets(schema: dict[str, Any]) -> None:
         "name": "If-None-Match",
         "in": "header",
         "required": False,
-        "description": "The `ETag` of a response you have for this request. While the content is the same, the "
-        "server answers 304 with no body.",
+        "description": "The `ETag` of a response you hold for this request. While the content is unchanged, the "
+        "server returns `304` with no body.",
         "schema": {"type": "string"},
         "example": 'W/"5f0c1b6de0a94d7f8f3f0f5b7a1c2d3e"',
     }
     # One definition of the response header, which every GET operation refers to.
     schema.setdefault("components", {}).setdefault("headers", {})["ETag"] = {
-        "description": 'A short name for the response\'s content, like `W/"5f0c1b6de0a94d7f8f3f0f5b7a1c2d3e"`. '
+        "description": 'An identifier for the response\'s content, such as `W/"5f0c1b6de0a94d7f8f3f0f5b7a1c2d3e"`. '
         "Send it in `If-None-Match` to ask whether the content has changed.",
         "schema": {"type": "string"},
     }
@@ -738,9 +771,9 @@ def _describe_conditional_gets(schema: dict[str, Any]) -> None:
 def _describe_request_ids(schema: dict[str, Any]) -> None:
     # One header definition, which every response of every operation refers to.
     schema.setdefault("components", {}).setdefault("headers", {})[REQUEST_ID_HEADER] = {
-        "description": "The id of the request, like `req_Zk3uY0mWq1x8Jr5cTt2aLw`. The server logs it with the "
-        "request. It's the `X-Request-Id` the request sent, when that was 1 to 128 letters, digits, and the "
-        "characters `.`, `_`, `~`, and `-`. Otherwise the server draws it.",
+        "description": "The ID of the request, such as `req_Zk3uY0mWq1x8Jr5cTt2aLw`. The server logs it with the "
+        "request. The server uses the `X-Request-Id` that the request sent when that value is 1 to 128 letters, "
+        "digits, and the characters `.`, `_`, `~`, and `-`. Otherwise, the server generates the ID.",
         "schema": {"type": "string"},
     }
     reference = {"$ref": f"#/components/headers/{REQUEST_ID_HEADER}"}

@@ -74,47 +74,46 @@ class Purchase(RequestModel):
     """One item to buy with the starting gold."""
 
     item_id: str
-    """The id of an item from `GET /v1/rules/equipment`, like `sword`."""
+    """The ID of an item from `GET /v1/rules/equipment`, such as `sword`."""
     quantity: int = Field(default=1, ge=1, le=MAX_QUANTITY)
-    """How many lots to buy, from 1 to 10,000. A lot is the unit the item is sold in. osrlib sells
-    weapons and armour one at a time, and gear and ammunition in bundles, so one lot of torches is
-    six torches."""
+    """The number of lots to buy, from 1 to 10,000. A lot is the unit the item is sold in. osrlib sells weapons and
+    armour one at a time, and gear and ammunition in bundles, so one lot of torches is six torches."""
 
 
 class CharacterChoices(RequestModel):
     """The choices a player makes for a new first-level character."""
 
     name: NameText = Field(min_length=1, max_length=MAX_NAME_LENGTH)
-    """The character's name, 1 to 100 characters, with no control character like a tab or a newline."""
+    """The character's name, 1 to 100 characters, with no control characters such as a tab or a newline."""
     class_id: str
-    """A class id from `GET /v1/rules/classes`, like `fighter`."""
+    """A class ID from `GET /v1/rules/classes`, such as `fighter`."""
     alignment: Alignment
     """The character's alignment."""
     adjustment: AbilityAdjustment | None = None
-    """A trade of ability points, as osrlib's `AbilityAdjustment`. In `lowered`, each key is an
-    ability to take points from, and its value is the number of points to take. In `raised`, each
-    key is an ability to add points to, and its value is the number of points to add. The keys are
-    `str` (Strength), `int` (Intelligence), `wis` (Wisdom), `dex` (Dexterity), `con` (Constitution),
-    and `cha` (Charisma). osrlib checks the trade. If osrlib refuses it, the response is 422
-    `character_invalid` with osrlib's rejections. Leave the field out to keep the scores as rolled."""
+    """A trade of ability points, as osrlib's `AbilityAdjustment`. In `lowered`, each key is an ability to take
+    points from, and its value is the number of points to take. In `raised`, each key is an ability to add points to,
+    and its value is the number of points to add. The keys are `str` (Strength), `int` (Intelligence), `wis`
+    (Wisdom), `dex` (Dexterity), `con` (Constitution), and `cha` (Charisma). osrlib checks the trade. If osrlib
+    rejects it, the response is `422 character_invalid` with osrlib's rejections. Omit the field to keep the scores
+    as rolled."""
     starting_spell_ids: list[str] = []
-    """The ids of the spells for an arcane caster's first spell book, from `GET /v1/rules/spells`. A first-level
-    magic-user or elf needs exactly one first-level spell. Leave it empty for every other class."""
+    """The IDs of the spells for an arcane caster's first spell book, from `GET /v1/rules/spells`. A first-level
+    magic-user or elf needs exactly one first-level spell. Leave the list empty for every other class."""
     extra_languages: list[str] = []
-    """The ids of the extra languages the character learns, from `GET /v1/rules/languages`. A high Intelligence allows
-    extra languages."""
+    """The IDs of the extra languages the character learns, from `GET /v1/rules/languages`. A high Intelligence score
+    allows extra languages."""
     purchases: list[Purchase] = []
-    """Starting gear to buy, in order, with the starting gold. The server rolls the gold in this same request, so to
-    choose gear after you see the gold, leave `purchases` empty and send `purchase_equipment` and `equip_item` commands
-    to a session in `town` mode."""
+    """Starting gear to buy, in order, with the starting gold. The server rolls the gold in this same request. To let
+    the player choose gear after seeing the gold, leave `purchases` empty and send `purchase_equipment` and
+    `equip_item` commands to a session in `town` mode."""
     equip_item_ids: list[str] = []
-    """The ids of purchased items to wear or wield. The server equips them in order."""
+    """The IDs of purchased items to wear or wield. The server equips them in order."""
     hp_reroll_at_first_level: bool = False
     """Whether to use the optional rule that rerolls a first hit die that shows 1 or 2."""
 
 
 class CreationRolls(ApiModel):
-    """The dice osrlib rolled to create a character."""
+    """The dice that osrlib rolled to create a character."""
 
     ability_rolls: AbilityScoreRolls
     """The six ability scores as rolled, before any adjustment, with the three dice rolled for each."""
@@ -125,7 +124,7 @@ class CreationRolls(ApiModel):
 
 
 class DerivedValues(ApiModel):
-    """The values osrlib computes from a character and doesn't store in the character document."""
+    """The values that osrlib computes from a character but doesn't store in the character document."""
 
     thac0: int
     """The d20 roll the character needs to hit armour class 0."""
@@ -153,13 +152,12 @@ class DerivedValues(ApiModel):
     npc_reaction_modifier: int
     """The Charisma modifier to monster reaction rolls when the character speaks."""
     xp_modifier_pct: int
-    """The percentage the class adds to or takes from each experience award, from the prime
+    """The percentage that the class adds to or subtracts from each experience award, based on the prime
     requisites."""
     level_title: str | None
-    """The title of the character's class at its level, like `Veteran`, or `null` past the last
-    title."""
+    """The title of the character's class at its level, such as `Veteran`, or `null` past the last title."""
     alignment_tongue: str
-    """The id of the secret language of the character's alignment, like `alignment_lawful`."""
+    """The ID of the secret language of the character's alignment, such as `alignment_lawful`."""
     languages: list[str]
     """Every language the character speaks: the alignment tongue, the class's languages, and the
     extra languages."""
