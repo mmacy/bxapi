@@ -121,7 +121,7 @@ SESSION_INFO_KEYS = {
     "created_at",
     "updated_at",
 }
-SAVE_INFO_KEYS = {"id", "session_id", "adventure_name", "label", "mode", "clock", "created_at"}
+SAVE_INFO_KEYS = {"id", "session_id", "adventure_id", "adventure_name", "label", "mode", "clock", "created_at"}
 CHARACTER_KEYS = {"id", "name", "class_id", "level", "created_at", "character", "derived"}
 CHARACTER_SUMMARY_KEYS = {"id", "name", "class_id", "level", "max_hp", "created_at"}
 OUTCOME_KEYS = {"accepted", "rejections", "events", "messages", "mode", "ended", "revision"}
