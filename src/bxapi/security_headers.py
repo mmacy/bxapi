@@ -12,10 +12,10 @@ to every response:
   buttons over the interactive documentation at `/docs`.
 - `Referrer-Policy: no-referrer`. A link from the documentation pages to another site doesn't tell
   that site the server's address.
-- `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`, on every response except
-  an HTML page. A browser that shows the response as a page loads and runs nothing from it. The
-  documentation pages at `/docs` and `/redoc` are HTML that loads scripts, so they don't have this
-  header.
+- `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`, on every response that
+  sets no policy of its own. A browser that shows the response as a page loads and runs nothing
+  from it. The documentation pages at `/docs` and `/redoc` load scripts, so each sets a policy
+  that allows its own files, as [`bxapi.docs_pages`][bxapi.docs_pages] describes.
 """
 
 from starlette.datastructures import MutableHeaders
@@ -24,26 +24,26 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 __all__ = ["API_HEADERS", "CONTENT_SECURITY_POLICY", "PAGE_HEADERS", "SecurityHeadersMiddleware"]
 
 CONTENT_SECURITY_POLICY = "default-src 'none'; frame-ancestors 'none'"
-"""The `Content-Security-Policy` of every response that isn't an HTML page."""
+"""The `Content-Security-Policy` of every response that sets none of its own."""
 
 PAGE_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "no-referrer",
 }
-"""The headers of every response, including the HTML documentation pages."""
+"""The headers of every response, including the documentation pages."""
 
 API_HEADERS = PAGE_HEADERS | {"Content-Security-Policy": CONTENT_SECURITY_POLICY}
-"""The headers of every response that isn't an HTML page."""
+"""The headers of every response that sets no `Content-Security-Policy` of its own."""
 
 
 class SecurityHeadersMiddleware:
     """Add the browser security headers to every response.
 
-    A response whose `Content-Type` is `text/html` gets
-    [`PAGE_HEADERS`][bxapi.security_headers.PAGE_HEADERS], and any other response gets
-    [`API_HEADERS`][bxapi.security_headers.API_HEADERS]. The middleware replaces a header of the
-    same name that the application set.
+    Every response gets [`PAGE_HEADERS`][bxapi.security_headers.PAGE_HEADERS], which replace a
+    header of the same name that the application set. A response that sets no
+    `Content-Security-Policy` gets
+    [`CONTENT_SECURITY_POLICY`][bxapi.security_headers.CONTENT_SECURITY_POLICY].
 
     Args:
         app: The ASGI application to wrap.
@@ -59,7 +59,7 @@ class SecurityHeadersMiddleware:
         headers = client.get("/health").headers
         assert headers["X-Content-Type-Options"] == "nosniff"
         assert headers["Content-Security-Policy"] == "default-src 'none'; frame-ancestors 'none'"
-        assert "Content-Security-Policy" not in client.get("/docs").headers
+        assert "script-src" in client.get("/docs").headers["Content-Security-Policy"]
         ```
     """
 
@@ -75,8 +75,8 @@ class SecurityHeadersMiddleware:
         async def send_with_headers(message: Message) -> None:
             if message["type"] == "http.response.start":
                 headers = MutableHeaders(scope=message)
-                is_page = headers.get("content-type", "").partition(";")[0].strip().lower() == "text/html"
-                headers.update(PAGE_HEADERS if is_page else API_HEADERS)
+                headers.update(PAGE_HEADERS)
+                headers.setdefault("Content-Security-Policy", CONTENT_SECURITY_POLICY)
             await send(message)
 
         await self.app(scope, receive, send_with_headers)

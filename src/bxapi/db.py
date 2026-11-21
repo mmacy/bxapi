@@ -8,6 +8,10 @@ only that client's rows. A row that belongs to another client looks the same as 
 doesn't exist: a read returns `None`, and an update or a delete returns `False`.
 
 A JSON column goes in as a Python object and comes out as one. The database stores it as text.
+
+The database counts the bytes of every document it stores for each client, in the `client_usage`
+table, and a `Database` opened with a limit refuses to store more for a client that has reached
+it. [`StorageFull`][bxapi.db.StorageFull] describes the count and the check.
 """
 
 import json
@@ -40,6 +44,7 @@ __all__ = [
     "SaveRow",
     "SessionDocumentRow",
     "SessionRow",
+    "StorageFull",
     "fits_integer_column",
     "utc_now",
 ]
@@ -50,7 +55,7 @@ type JsonObject = dict[str, Any]
 BUSY_TIMEOUT_SECONDS = 5.0
 """How long a statement waits for another connection's write lock before it fails."""
 
-LAYOUT_VERSION = 2
+LAYOUT_VERSION = 3
 """The version of the table layout, which the server writes to the file's `PRAGMA user_version`.
 
 A server opens only a file with this version, or an empty file. The server has no migrations, so a
@@ -138,7 +143,43 @@ CREATE TABLE IF NOT EXISTS idempotency_keys (
     claimed_at INTEGER NOT NULL,
     PRIMARY KEY (client, key)
 ) STRICT, WITHOUT ROWID;
-CREATE INDEX IF NOT EXISTS idempotency_keys_by_age ON idempotency_keys (claimed_at);"""
+CREATE INDEX IF NOT EXISTS idempotency_keys_by_age ON idempotency_keys (claimed_at);
+CREATE TABLE IF NOT EXISTS client_usage (
+    client TEXT NOT NULL PRIMARY KEY,
+    bytes INTEGER NOT NULL
+) STRICT, WITHOUT ROWID;"""
+
+_COUNTED_COLUMNS: dict[str, tuple[str, ...]] = {
+    "ability_rolls": ("scores",),
+    "characters": ("document",),
+    "adventures": ("info", "document"),
+    "sessions": ("document",),
+    "saves": ("document",),
+    "idempotency_keys": ("body",),
+}
+"""The columns whose bytes count toward a client's usage, for each table."""
+
+
+def _byte_count(row: str, columns: tuple[str, ...]) -> str:
+    # A cast to BLOB makes `length` count bytes and not characters. A stored response is NULL until its request ends.
+    return " + ".join(f"coalesce(length(CAST({row}.{column} AS BLOB)), 0)" for column in columns)
+
+
+def _usage_triggers() -> list[str]:
+    """Return the statements that create the triggers that keep `client_usage` equal to what the tables store."""
+    statements = []
+    for table, columns in _COUNTED_COLUMNS.items():
+        new, old = _byte_count("NEW", columns), _byte_count("OLD", columns)
+        statements += [
+            f"CREATE TRIGGER {table}_usage_insert AFTER INSERT ON {table} BEGIN "
+            "INSERT OR IGNORE INTO client_usage (client, bytes) VALUES (NEW.client, 0); "
+            f"UPDATE client_usage SET bytes = bytes + {new} WHERE client = NEW.client; END",
+            f"CREATE TRIGGER {table}_usage_update AFTER UPDATE OF {', '.join(columns)} ON {table} BEGIN "
+            f"UPDATE client_usage SET bytes = bytes + {new} - ({old}) WHERE client = NEW.client; END",
+            f"CREATE TRIGGER {table}_usage_delete AFTER DELETE ON {table} BEGIN "
+            f"UPDATE client_usage SET bytes = bytes - ({old}) WHERE client = OLD.client; END",
+        ]
+    return statements
 
 
 class DatabaseOpenError(Exception):
@@ -148,6 +189,33 @@ class DatabaseOpenError(Exception):
     isn't a SQLite database, and when the file's table layout version isn't
     [`LAYOUT_VERSION`][bxapi.db.LAYOUT_VERSION]. The message states the path.
     """
+
+
+class StorageFull(Exception):
+    """A client has reached the limit on the bytes the server stores for it.
+
+    The database counts, for each client, the bytes of every document it stores: ability
+    scores, character documents, adventure documents and their info, session documents, save
+    documents, and the stored responses of idempotency keys. Triggers on those tables add to the
+    count in `client_usage` on an insert, change it on an update, and subtract from it on a
+    delete, in the transaction of the statement itself. So the count is right however a row
+    changes, in any process that shares the file.
+
+    A [`Database`][bxapi.db.Database] with a limit raises this exception from each method that
+    stores a document, when the client's count is already at the limit or over it. The method
+    then stores nothing. The check doesn't count the document the method is about to store, so
+    a client can pass the limit by the size of one document, and can't store anything more until
+    it deletes something.
+
+    Args:
+        used_bytes: The bytes the server stores for the client.
+        max_bytes: The limit.
+    """
+
+    def __init__(self, used_bytes: int, max_bytes: int) -> None:
+        super().__init__(f"the client has {used_bytes} bytes stored, and the limit is {max_bytes}")
+        self.used_bytes = used_bytes
+        self.max_bytes = max_bytes
 
 
 def _create_private_file(path: str) -> None:
@@ -422,6 +490,8 @@ class Database:
         path: The path of the database file, or `":memory:"`. The constructor creates the file
             if it doesn't exist, readable and writable only by its owner (mode 0600), and SQLite
             gives its `-wal` and `-shm` files the same mode.
+        max_client_bytes: The most bytes of documents to store for one client, as
+            [`StorageFull`][bxapi.db.StorageFull] describes. 0 means no limit.
 
     Raises:
         DatabaseOpenError: If the file can't be opened, isn't a SQLite database, or has another
@@ -441,8 +511,9 @@ class Database:
         ```
     """
 
-    def __init__(self, path: str) -> None:
+    def __init__(self, path: str, *, max_client_bytes: int = 0) -> None:
         self._lock = threading.Lock()
+        self._max_client_bytes = max_client_bytes
         try:
             if path != ":memory:":
                 _create_private_file(path)
@@ -490,7 +561,7 @@ class Database:
                     f"The database file {path!r} has table layout version {found}, and this server uses version "
                     f"{LAYOUT_VERSION}. Point BXAPI_DATABASE at a new file, or at a file this version of bxapi created."
                 )
-            for statement in _SCHEMA.split(";"):
+            for statement in [*_SCHEMA.split(";"), *_usage_triggers()]:
                 if statement.strip():
                     connection.execute(statement)
             connection.execute(f"PRAGMA user_version = {LAYOUT_VERSION}")
@@ -502,6 +573,38 @@ class Database:
         """Close the connection. Any later call on the database raises `sqlite3.ProgrammingError`."""
         with self._lock:
             self._connection.close()
+
+    # Usage
+
+    def get_usage(self, client: str) -> int:
+        """Return the bytes of documents the database stores for a client.
+
+        [`StorageFull`][bxapi.db.StorageFull] lists what the count includes.
+        """
+        with self._lock:
+            return self._usage(client)
+
+    def require_room(self, client: str) -> None:
+        """Check that a client is under the limit, before work that ends by storing a document.
+
+        Args:
+            client: The client to check.
+
+        Raises:
+            StorageFull: If the database has a limit and stores that many bytes or more for the
+                client.
+        """
+        with self._lock:
+            self._require_room(client)
+
+    def _usage(self, client: str) -> int:
+        row = self._connection.execute("SELECT bytes FROM client_usage WHERE client = ?", (client,)).fetchone()
+        return 0 if row is None else row["bytes"]
+
+    def _require_room(self, client: str) -> None:
+        # The caller holds the lock.
+        if self._max_client_bytes and (used := self._usage(client)) >= self._max_client_bytes:
+            raise StorageFull(used, self._max_client_bytes)
 
     # Ability rolls
 
@@ -577,6 +680,7 @@ class Database:
         row = _character_row(name=name, class_id=class_id, level=level, max_hp=max_hp, document=document)
         insert, params = _insert_statement("characters", client, _character_values(row))
         with self._write_transaction() as connection:
+            self._require_room(client)
             claimed = connection.execute(
                 "UPDATE ability_rolls SET used = 1 WHERE id = ? AND client = ? AND used = 0", (roll_id, client)
             )
@@ -792,11 +896,15 @@ class Database:
 
         Raises:
             KeyError: If the document has no `schema_version` or `engine_version` key.
+            StorageFull: If the client has reached the limit on its stored bytes. The method
+                writes nothing.
         """
         schema_version, engine_version = _envelope_versions(document)
-        return self._change(
+        sql = (
             "UPDATE sessions SET document = ?, mode = ?, clock_rounds = ?, revision = ?, schema_version = ?,"
-            " engine_version = ?, updated_at = ? WHERE id = ? AND client = ? AND revision = ?",
+            " engine_version = ?, updated_at = ? WHERE id = ? AND client = ? AND revision = ?"
+        )
+        params = (
             _dumps(document),
             mode,
             clock_rounds,
@@ -808,6 +916,9 @@ class Database:
             client,
             expected_revision,
         )
+        with self._lock:
+            self._require_room(client)
+            return self._connection.execute(sql, params).rowcount > 0
 
     def delete_session(self, client: str, session_id: str) -> bool:
         """Delete a session and leave its saves. Return `False` if the client has no session with that id."""
@@ -912,7 +1023,13 @@ class Database:
         Returns:
             `None` if the method claimed the key, so the caller runs the request. Otherwise the row of
             the earlier request with that key, and the method changes nothing.
+
+        Raises:
+            StorageFull: If the key is new and the client has reached the limit on its stored
+                bytes, which the stored response would add to. The method still deletes the
+                old keys, which frees the bytes of their responses.
         """
+        used = 0
         with self._write_transaction() as connection:
             connection.execute("DELETE FROM idempotency_keys WHERE claimed_at <= ?", (now - retention_seconds,))
             row = connection.execute(
@@ -921,11 +1038,15 @@ class Database:
             ).fetchone()
             if row is not None:
                 return IdempotencyRow(**dict(row))
-            connection.execute(
-                "INSERT INTO idempotency_keys (client, key, fingerprint, claimed_at) VALUES (?, ?, ?, ?)",
-                (client, key, fingerprint, now),
-            )
-        return None
+            used = self._usage(client)
+            if not self._max_client_bytes or used < self._max_client_bytes:
+                connection.execute(
+                    "INSERT INTO idempotency_keys (client, key, fingerprint, claimed_at) VALUES (?, ?, ?, ?)",
+                    (client, key, fingerprint, now),
+                )
+                return None
+        # Raised after the transaction commits, so the delete of the old keys stays.
+        raise StorageFull(used, self._max_client_bytes)
 
     def complete_idempotency_key(self, client: str, key: str, *, status: int, body: bytes | None) -> None:
         """Record the outcome of the request that claimed a key.
@@ -958,6 +1079,7 @@ class Database:
     def _insert(self, table: str, client: str, values: dict[str, Any]) -> None:
         sql, params = _insert_statement(table, client, values)
         with self._lock:
+            self._require_room(client)
             self._connection.execute(sql, params)
 
     def _one(self, sql: str, *params: object) -> sqlite3.Row | None:

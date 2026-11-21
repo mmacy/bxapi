@@ -16,7 +16,7 @@ from bxapi.db import Database, JsonObject, SaveRow, fits_integer_column
 from bxapi.errors import INTERNAL_ERROR, VALIDATION_ERROR, invalid, not_found, problem_responses
 from bxapi.idempotency import IdempotentRoute
 from bxapi.json_body import accepts_document
-from bxapi.models import RequestModel
+from bxapi.models import NameText, RequestModel, has_control_character
 from bxapi.pagination import Page, PageQuery
 from bxapi.routers.sessions import NAME_MAX_LENGTH, SaveInfo, SessionInfo, save_info, session_info
 from bxapi.session_manager import SessionManager, load_stored_save, validate_loaded_adventure
@@ -36,15 +36,16 @@ _NOT_FOUND = "`not_found`: Your client has no save with this id. `GET /v1/saves`
 class RelabelSaveRequest(RequestModel):
     """The save's new label."""
 
-    label: str | None = Field(min_length=1, max_length=NAME_MAX_LENGTH)
-    """The new label, or `null` to remove the label."""
+    label: NameText | None = Field(min_length=1, max_length=NAME_MAX_LENGTH)
+    """The new label, with no control character like a tab or a newline, or `null` to remove the label."""
 
 
 class RestoreSaveRequest(RequestModel):
     """An optional name for the session a restore starts."""
 
-    name: str | None = Field(default=None, min_length=1, max_length=NAME_MAX_LENGTH)
-    """A name for the new session. Defaults to the name of the adventure in the save."""
+    name: NameText | None = Field(default=None, min_length=1, max_length=NAME_MAX_LENGTH)
+    """A name for the new session, with no control character like a tab or a newline. Defaults to the name of the
+    adventure in the save."""
 
 
 def _db(request: Request) -> Database:
@@ -116,6 +117,8 @@ def import_save(
     validate_loaded_adventure(game)
     if not fits_integer_column(game.clock.rounds):
         raise invalid("content_invalid", "The save's game clock is larger than the server can store.")
+    if has_control_character(game.adventure.name):
+        raise invalid("content_invalid", "The name of the save's adventure has a control character.")
     row = _db(request).insert_save(
         principal.client,
         session_id=None,

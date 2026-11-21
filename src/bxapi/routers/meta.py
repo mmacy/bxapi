@@ -8,7 +8,7 @@ from bxapi.auth import CurrentPrincipal
 from bxapi.models import ApiModel
 from bxapi.settings import Role
 
-__all__ = ["Health", "Meta", "health_router", "router"]
+__all__ = ["Health", "Meta", "Storage", "health_router", "router"]
 
 health_router = APIRouter(tags=["meta"])
 router = APIRouter(tags=["meta"])
@@ -19,6 +19,21 @@ class Health(ApiModel):
 
     status: str = "ok"
     """Always `"ok"`."""
+
+
+class Storage(ApiModel):
+    """How many bytes of documents the server stores for a client, and the most it stores.
+
+    The count is the bytes of the client's characters, ability rolls, adventures, sessions, and
+    saves, and of the responses the server stores for its idempotency keys.
+    """
+
+    used_bytes: int
+    """The bytes the server stores for the client now. Deleting a session, a save, an adventure,
+    or a character lowers it."""
+    max_bytes: int | None
+    """The most bytes the server stores for one client, or `null` when the server has no limit.
+    When `used_bytes` reaches it, each request that would store more gets 507 `storage_full`."""
 
 
 class Meta(ApiModel):
@@ -38,6 +53,8 @@ class Meta(ApiModel):
     allows anonymous callers."""
     role: Role
     """The caller's role."""
+    storage: Storage
+    """How much the server stores for the caller's client, and the limit."""
 
 
 @health_router.get("/health", summary="Check that the server is up", response_description='`{"status": "ok"}`.')
@@ -62,6 +79,9 @@ def get_meta(request: Request, principal: CurrentPrincipal) -> Meta:
     operations only a referee may call. If the client keeps documents, like save documents, compare
     `schema_version` with the `schema_version` of each document. The server refuses a document with a higher one,
     with 409 `version_unsupported`.
+
+    `storage` states how many bytes of documents the server stores for your client, and the limit. Read it to
+    find out how close the client is to 507 `storage_full`, and to see what a delete freed.
     """
     return Meta(
         api_version=__version__,
@@ -70,4 +90,8 @@ def get_meta(request: Request, principal: CurrentPrincipal) -> Meta:
         auth_enabled=request.app.state.settings.auth_enabled,
         client=principal.client,
         role=principal.role,
+        storage=Storage(
+            used_bytes=request.app.state.db.get_usage(principal.client),
+            max_bytes=request.app.state.settings.max_client_bytes or None,
+        ),
     )

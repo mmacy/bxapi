@@ -201,6 +201,12 @@ def test_the_shared_examples_are_what_the_server_returns() -> None:
     anonymous = _FixedSettings(database=":memory:", allow_anonymous=True)
     with TestClient(create_app(anonymous), base_url="http://game.example") as client:
         sent["misdirected_request"] = client.get("/v1/meta", headers=request_id)
+    with TestClient(create_app(settings)) as client:
+        # The budget regains a request every tenth of a second, so the first refusal comes a few requests late.
+        for _ in range(2 * settings.rate_limit_per_minute):
+            sent["rate_limited"] = client.get("/v1/meta", headers=key)
+            if sent["rate_limited"].status_code == 429:
+                break
     for name, response in sent.items():
         assert response.json() == shared[name], name
 

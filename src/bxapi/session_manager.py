@@ -383,8 +383,13 @@ class SessionManager:
                 another server process wrote the session after this request read it and before
                 this request wrote it. With status 500 and the code `session_unreadable`, if
                 osrlib can't load the stored session.
+            StorageFull: If the client has reached the limit on its stored bytes. The method
+                executes nothing.
         """
         key = (client, session_id)
+        # An accepted command stores the session's document again, so a client at its storage limit gets
+        # the refusal before osrlib does any work.
+        self._db.require_room(client)
         with self._locked(key) as slot:
             loaded = self._current(key, slot)
             if expected_revision is not None and expected_revision != loaded.revision:

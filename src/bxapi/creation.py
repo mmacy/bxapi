@@ -44,7 +44,7 @@ from osrlib.data import load_ability_tables, load_classes, load_equipment, load_
 from pydantic import Field
 
 from bxapi.errors import ApiError, invalid
-from bxapi.models import ApiModel, RequestModel
+from bxapi.models import ApiModel, NameText, RequestModel
 
 __all__ = [
     "CharacterChoices",
@@ -84,8 +84,8 @@ class Purchase(RequestModel):
 class CharacterChoices(RequestModel):
     """The choices a player makes for a new first-level character."""
 
-    name: str = Field(min_length=1, max_length=MAX_NAME_LENGTH)
-    """The character's name, 1 to 100 characters."""
+    name: NameText = Field(min_length=1, max_length=MAX_NAME_LENGTH)
+    """The character's name, 1 to 100 characters, with no control character like a tab or a newline."""
     class_id: str
     """A class id from `GET /v1/rules/classes`, like `fighter`."""
     alignment: Alignment

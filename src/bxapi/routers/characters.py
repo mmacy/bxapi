@@ -23,7 +23,7 @@ from bxapi.db import AbilityRollRow, CharacterDocumentRow, Database, fits_intege
 from bxapi.errors import VALIDATION_ERROR, ApiError, conflict, invalid, not_found, problem_responses
 from bxapi.idempotency import IdempotentRoute
 from bxapi.json_body import accepts_document
-from bxapi.models import ApiModel, RequestModel
+from bxapi.models import ApiModel, RequestModel, has_control_character
 from bxapi.pagination import Page, PageQuery
 from bxapi.seeds import Seed, referee_seed, seed_or_draw
 
@@ -374,7 +374,8 @@ def import_character(
     `effect_id`, like `dead`, is accepted.
 
     A character whose `max_hp` is larger than 2^63 - 1, the largest integer the server's database
-    stores, gets 422 `content_invalid` too.
+    stores, gets 422 `content_invalid` too. So does a character whose `name` has a control
+    character, like a tab or a newline.
     """
     character = Character.from_document(document)
     if character.stat_modifiers or any(condition.effect_id is not None for condition in character.conditions):
@@ -385,6 +386,8 @@ def import_character(
         )
     if not fits_integer_column(character.max_hp):
         raise invalid("content_invalid", "The character's max_hp is larger than the server can store.")
+    if has_control_character(character.name):
+        raise invalid("content_invalid", "The character's name has a control character.")
     character.id = None
     return _store(_db(request), principal.client, character)
 

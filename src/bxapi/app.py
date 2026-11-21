@@ -34,6 +34,7 @@ from bxapi.adventures import builtin_adventures
 from bxapi.auth import AuthMiddleware, authenticate
 from bxapi.caching import ConditionalGetMiddleware, HeadMiddleware
 from bxapi.db import Database
+from bxapi.docs_pages import install_docs_pages
 from bxapi.errors import (
     INTERNAL_ERROR,
     PROBLEM_MEDIA_TYPE,
@@ -48,6 +49,7 @@ from bxapi.errors import (
 from bxapi.idempotency import IDEMPOTENCY_KEY_HEADER, REPLAYED_HEADER
 from bxapi.json_body import MAX_JSON_DEPTH, SMALL_BODY_BYTES, body_limit
 from bxapi.openapi_examples import add_examples
+from bxapi.rate_limit import RateLimiter
 from bxapi.request_ids import REQUEST_ID_HEADER, RequestIdMiddleware, request_id_of
 from bxapi.routers import V1_ROUTERS, meta
 from bxapi.security_headers import SecurityHeadersMiddleware
@@ -167,7 +169,15 @@ exist.
   `req_Zk3uY0mWq1x8Jr5cTt2aLw`, and the server logs the id with the request. To choose the id,
   send `X-Request-Id` with 1 to 128 letters, digits, and the characters `.`, `_`, `~`, and `-`.
   The server replaces any other value with an id it draws.
-- **Rate limits.** The server has none.
+- **Storage.** The server counts the bytes of the documents it stores for your client: characters,
+  ability rolls, adventures, sessions, saves, and the responses it stores for idempotency keys.
+  `GET /v1/meta` returns the count and the limit, which the server's `BXAPI_MAX_CLIENT_BYTES`
+  setting sets and which is 1,073,741,824 bytes by default. When the count reaches the limit, each
+  request that would store more gets 507 `storage_full`, until you delete something.
+- **Rate limits.** Each client may send as many requests a minute as the server's
+  `BXAPI_RATE_LIMIT_PER_MINUTE` setting allows, which is 600 by default. You can send that many at
+  once, and you regain them at a steady rate. A request over the limit gets 429 `rate_limited`,
+  with the seconds to wait in the `Retry-After` header.
 
 ## Refused commands
 
@@ -197,9 +207,9 @@ schema lists. Each operation's responses list the codes it returns, with what to
 
 `request_id` is the id in the response's `X-Request-Id` header.
 
-Four codes can succeed when you send the same request again: 409 `session_busy`, 409
-`idempotency_key_in_progress` and 503 `database_busy` after the one second in their `Retry-After`
-headers, and 408 `request_timeout`. For any other code, change the request first. When no
+Five codes can succeed when you send the same request again: 409 `session_busy`, 409
+`idempotency_key_in_progress`, 429 `rate_limited`, and 503 `database_busy` after the seconds in
+their `Retry-After` headers, and 408 `request_timeout`. For any other code, change the request first. When no
 response arrives at all, send the same `POST` again with the same `Idempotency-Key`. For a 500,
 report the `request_id` to whoever runs the server.
 """
@@ -399,6 +409,12 @@ _SHARED_ERRORS = problem_responses(
             "set API keys. A server with API keys never returns this code."
         ],
         422: [VALIDATION_ERROR],
+        429: [
+            "`rate_limited`: Your client sent more requests in a minute than the server allows, which its "
+            "`BXAPI_RATE_LIMIT_PER_MINUTE` setting sets and which is 600 by default. Wait the seconds that the "
+            "`Retry-After` header states, and send the request again. Requests with no valid API key share one "
+            "limit, and get this code in place of 401 `unauthorized` when they pass it."
+        ],
         500: [INTERNAL_ERROR],
         503: [
             "`database_busy`: Another process held the database's write lock for more than 5 seconds. Wait the one "
@@ -408,6 +424,12 @@ _SHARED_ERRORS = problem_responses(
 )
 _SHARED_ERRORS[401]["headers"] = {
     "WWW-Authenticate": {"description": "`Bearer`, the scheme the server accepts.", "schema": {"type": "string"}}
+}
+_SHARED_ERRORS[429]["headers"] = {
+    "Retry-After": {
+        "description": "The seconds to wait before you send the request again, at least `1`.",
+        "schema": {"type": "integer"},
+    }
 }
 _SHARED_ERRORS[503]["headers"] = {
     "Retry-After": {
@@ -437,6 +459,8 @@ _SMALL_BODY_TOO_LARGE = (
 )
 
 _JSON_BODY_METHODS = frozenset({"POST", "PUT", "PATCH"})
+
+_OPENAPI_URL = "/openapi.json"
 
 _SCHEMAS = "#/components/schemas/"
 _PROBLEM_REF = _SCHEMAS + "Problem"
@@ -663,6 +687,23 @@ def _describe_idempotency(schema: dict[str, Any]) -> None:
         }
 
 
+_STORAGE_FULL = (
+    "- `storage_full`: The server stores as many bytes of documents for your client as it allows, which its "
+    "`BXAPI_MAX_CLIENT_BYTES` setting sets and which is 1,073,741,824 by default. `used_bytes` and `max_bytes` state "
+    "the count and the limit. The request stored nothing. Delete sessions, saves, adventures, or characters you no "
+    "longer need, and send the request again. An operation that stores nothing, like a dice roll, returns this code "
+    "only for a request with an `Idempotency-Key`, because the server stores the response."
+)
+
+
+def _describe_storage(schema: dict[str, Any]) -> None:
+    # Every operation that stores a document is a POST, and any POST with an idempotency key stores its response.
+    for path_name, path in schema.get("paths", {}).items():
+        operation = path.get("post")
+        if operation is not None and path_name.startswith("/v1/"):
+            operation.setdefault("responses", {})["507"] = {"description": _STORAGE_FULL, "content": _problem_content()}
+
+
 def _describe_conditional_gets(schema: dict[str, Any]) -> None:
     if_none_match = {
         "name": "If-None-Match",
@@ -761,6 +802,7 @@ def _install_openapi(app: FastAPI) -> None:
             )
             _describe_problems(schema, small_body_operations)
             _describe_idempotency(schema)
+            _describe_storage(schema)
             _describe_conditional_gets(schema)
             _describe_request_ids(schema)
             _require_discriminators(schema)
@@ -831,15 +873,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         generate_unique_id_function=_operation_id,
         # A path with a trailing slash is a 404, not a redirect to a path that may not exist either.
         redirect_slashes=False,
-        docs_url="/docs" if settings.docs_enabled else None,
-        redoc_url="/redoc" if settings.docs_enabled else None,
-        openapi_url="/openapi.json" if settings.docs_enabled else None,
-        # The API has no OAuth2 flow, so the server doesn't serve the page that Swagger UI uses for one.
-        swagger_ui_oauth2_redirect_url=None,
+        # install_docs_pages adds the two documentation pages in place of FastAPI's.
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=_OPENAPI_URL if settings.docs_enabled else None,
     )
+    if settings.docs_enabled:
+        install_docs_pages(app, openapi_url=_OPENAPI_URL)
     _install_openapi(app)
     app.state.settings = settings
-    app.state.db = Database(settings.database)
+    app.state.db = Database(settings.database, max_client_bytes=settings.max_client_bytes)
     app.state.sessions = SessionManager(app.state.db, cache_size=settings.session_cache_size)
     install_error_handlers(app)
     # Each middleware added wraps the ones before it. A request gets its id first, and every
@@ -850,7 +893,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(
         BodyLimitMiddleware, max_bytes=settings.max_body_bytes, timeout_seconds=settings.body_timeout_seconds
     )
-    app.add_middleware(AuthMiddleware, settings=settings)
+    app.add_middleware(AuthMiddleware, settings=settings, limiter=RateLimiter(settings.rate_limit_per_minute))
     app.add_middleware(ConditionalGetMiddleware, vary="Accept-Encoding")
     if settings.cors_origins:
         app.add_middleware(

@@ -31,7 +31,7 @@ from bxapi.db import Database, JsonObject, SaveRow, SessionRow
 from bxapi.errors import INTERNAL_ERROR, VALIDATION_ERROR, ApiError, forbidden, invalid, not_found, problem_responses
 from bxapi.idempotency import IdempotentRoute
 from bxapi.json_body import accepts_document
-from bxapi.models import ApiModel, RequestModel, left_out_when_none
+from bxapi.models import ApiModel, NameText, RequestModel, left_out_when_none
 from bxapi.pagination import Page, PageQuery
 from bxapi.seeds import Seed, referee_seed
 from bxapi.session_manager import MAX_PARTY_SIZE, SessionManager
@@ -196,8 +196,9 @@ class CreateSessionRequest(RequestModel):
     party_document: JsonObject | None = None
     """Referee only. A party document from osrlib's `party_to_document`, in place of stored characters. It has at
     most 20 characters."""
-    name: str | None = Field(default=None, min_length=1, max_length=NAME_MAX_LENGTH)
-    """A name for the session. Defaults to the adventure's name."""
+    name: NameText | None = Field(default=None, min_length=1, max_length=NAME_MAX_LENGTH)
+    """A name for the session, with no control character like a tab or a newline. Defaults to the adventure's
+    name."""
     ruleset: Ruleset | None = None
     """osrlib's optional rules, as `Ruleset` fields. For each field you leave out, the session uses the rule as
     written. With no `ruleset`, the session uses every rule as written."""
@@ -215,15 +216,16 @@ class CreateSessionRequest(RequestModel):
 class RenameSessionRequest(RequestModel):
     """The session's new name."""
 
-    name: str = Field(min_length=1, max_length=NAME_MAX_LENGTH)
-    """The new name."""
+    name: NameText = Field(min_length=1, max_length=NAME_MAX_LENGTH)
+    """The new name, with no control character like a tab or a newline."""
 
 
 class CreateSaveRequest(RequestModel):
     """An optional label for a new save."""
 
-    label: str | None = Field(default=None, min_length=1, max_length=NAME_MAX_LENGTH)
-    """A label to show in a list of saves. A save without one has the label `null`."""
+    label: NameText | None = Field(default=None, min_length=1, max_length=NAME_MAX_LENGTH)
+    """A label to show in a list of saves, with no control character like a tab or a newline. A save without one
+    has the label `null`."""
 
 
 class CommandChoice(ApiModel):
