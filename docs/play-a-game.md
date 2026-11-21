@@ -534,6 +534,37 @@ curl -s "http://127.0.0.1:8640/v1/sessions/ses_Bq2lhAvBgBLVtCRWuWkVUQ/events?aft
 
 The `limit` can be up to 500. A page contains at most `limit` events, so keep asking while `next_after` is less than `total`.
 
+## Check for changes without downloading them again
+
+More than one device can play the same session, and each one needs to notice when another has sent a command. Every 200 response to a `GET` has an `ETag` header, a short name for the response's content. Read the view and note its `ETag`:
+
+```sh
+curl -si http://127.0.0.1:8640/v1/sessions/ses_Bq2lhAvBgBLVtCRWuWkVUQ/view -H "Authorization: Bearer $KEY"
+```
+
+```text
+HTTP/1.1 200 OK
+...
+etag: W/"730ae2329d30fc29ddae6f1272e917f2"
+cache-control: private, no-cache
+```
+
+To ask whether the view has changed, send the `ETag` in `If-None-Match`:
+
+```sh
+curl -si http://127.0.0.1:8640/v1/sessions/ses_Bq2lhAvBgBLVtCRWuWkVUQ/view -H "Authorization: Bearer $KEY" -H 'If-None-Match: W/"730ae2329d30fc29ddae6f1272e917f2"'
+```
+
+```text
+HTTP/1.1 304 Not Modified
+...
+etag: W/"730ae2329d30fc29ddae6f1272e917f2"
+```
+
+The status 304 means that the view you have is current, and the response has no body. After a command changes what the players see, the same request gets 200 with the new view and a new `ETag`. The same works for every `GET`, like the session's info and the event log. A browser's `fetch` sends `If-None-Match` for you, because the response has `Cache-Control: private, no-cache`.
+
+The server also compresses a response of 1,024 bytes or more for a client that sends `Accept-Encoding: gzip`. Most HTTP libraries send that header and decompress the response for you. With curl, add `--compressed`.
+
 ## Save and restore
 
 A *save* is a copy of a session at one moment. Save the session before the second round, with a label:

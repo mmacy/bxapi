@@ -111,7 +111,7 @@ curl -s "http://127.0.0.1:8640/v1/rules/monsters?limit=2&offset=2" -H "Authoriza
 
 Add `limit` to `offset` for the next page, and stop when the new offset is at or past `total`. Lists of your own data, like `GET /v1/characters`, page the same way, and the newest items come first.
 
-The rules content changes only when the server's rules engine does, so every successful response under `/v1/rules` has the header `Cache-Control: private, max-age=3600`, and your client can cache it for an hour.
+The rules content changes only when the server's rules engine does, so every successful response under `/v1/rules` has the header `Cache-Control: private, max-age=3600`, and your client can cache it for an hour. After the hour, send the response's `ETag` in `If-None-Match`, as [Play a game](play-a-game.md#check-for-changes-without-downloading-them-again) shows. The server answers 304 with no body while the content is the same, and your client keeps its copy for another hour.
 
 ### Look up one entry
 

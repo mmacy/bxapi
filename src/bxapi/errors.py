@@ -68,6 +68,7 @@ __all__ = [
     "problem_responses",
     "request_timeout",
     "shorten",
+    "unsupported_media_type",
     "validation_error",
 ]
 
@@ -397,6 +398,20 @@ def request_timeout(timeout_seconds: float) -> ApiError:
         408,
         "request_timeout",
         f"The request body didn't arrive within the {timeout_seconds:g} seconds this server waits.",
+    )
+
+
+def unsupported_media_type() -> ApiError:
+    """Build the 415 for a request body that the request doesn't declare as JSON.
+
+    Returns:
+        An [`ApiError`][bxapi.errors.ApiError] with the code `unsupported_media_type`.
+    """
+    return ApiError(
+        415,
+        "unsupported_media_type",
+        "The request has a body, and its Content-Type header doesn't say that the body is JSON. Send the body as "
+        "JSON with the header Content-Type: application/json.",
     )
 
 

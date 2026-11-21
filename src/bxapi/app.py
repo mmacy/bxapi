@@ -1,8 +1,8 @@
 """The application factory.
 
 [`create_app`][bxapi.app.create_app] builds the FastAPI application: the database, the error
-handlers, the API key check, the request body limits, the cross-origin headers, and every
-router. Serve it with the `bxapi` command, or point an ASGI server at the factory:
+handlers, the API key check, the request body limits, the cross-origin headers, compression,
+conditional requests, and every router. Serve it with the `bxapi` command, or point an ASGI server at the factory:
 
 ```sh
 uvicorn bxapi.app:create_app --factory --port 8640
@@ -19,17 +19,19 @@ from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import APIRouter, Depends, FastAPI
+from fastapi import APIRouter, Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.routing import APIRoute
 from starlette.datastructures import Headers
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.gzip import GZipMiddleware
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from bxapi import __version__
 from bxapi.adventures import builtin_adventures
 from bxapi.auth import AuthMiddleware, authenticate
+from bxapi.caching import ConditionalGetMiddleware, HeadMiddleware
 from bxapi.db import Database
 from bxapi.errors import (
     INTERNAL_ERROR,
@@ -40,6 +42,7 @@ from bxapi.errors import (
     problem_response,
     problem_responses,
     request_timeout,
+    unsupported_media_type,
 )
 from bxapi.openapi_examples import add_examples
 from bxapi.request_ids import REQUEST_ID_HEADER, RequestIdMiddleware, request_id_of
@@ -47,7 +50,10 @@ from bxapi.routers import V1_ROUTERS, meta
 from bxapi.session_manager import SessionManager
 from bxapi.settings import Settings, SettingsError
 
-__all__ = ["BodyLimitMiddleware", "create_app"]
+__all__ = ["COMPRESSION_MINIMUM_BYTES", "BodyLimitMiddleware", "create_app", "require_json_body"]
+
+COMPRESSION_MINIMUM_BYTES = 1024
+"""The smallest response body, in bytes, that the server compresses for a client that accepts gzip."""
 
 _log = logging.getLogger("bxapi")
 
@@ -126,6 +132,16 @@ exist.
   Where a description says that a model raises `ValueError` or `ValidationError`, the server refuses
   the request: a command or another request body gets 422 `validation_error`, and an uploaded or
   imported document, like an adventure, gets 422 `content_invalid`.
+- **JSON bodies.** Send a request body as JSON with the header `Content-Type: application/json`.
+  A body with another content type, or with none, gets 415 `unsupported_media_type`.
+- **Compression.** Send `Accept-Encoding: gzip`, and the server compresses every response of
+  1,024 bytes or more. Most HTTP clients send the header and decompress the response for you.
+- **Conditional requests.** Every 200 response to a `GET` has an `ETag` header, a short name for
+  the response's content. To check whether a response you have is still current, send its `ETag`
+  in `If-None-Match`. The server answers 304 with no body while the content is the same, and
+  200 with the new content when it has changed. Use it to poll a session's info or view.
+- **HEAD.** Every `GET` operation also answers `HEAD`, with the same status and headers and no
+  body.
 - **Request ids.** Every response has an `X-Request-Id` header, like
   `req_Zk3uY0mWq1x8Jr5cTt2aLw`, and the server logs the id with the request. To choose the id,
   send `X-Request-Id` with 1 to 128 letters, digits, and the characters `.`, `_`, `~`, and `-`.
@@ -379,7 +395,11 @@ _BODY_ERRORS = {
     "`BXAPI_BODY_TIMEOUT_SECONDS` setting sets and which is 30 seconds by default. Send the request again.",
     413: "- `content_too_large`: The body is larger than the server accepts, which its `BXAPI_MAX_BODY_BYTES` setting "
     "sets and which is 8,388,608 bytes by default. The same body gets the same error.",
+    415: "- `unsupported_media_type`: The request has a body, and its `Content-Type` header doesn't say that the body "
+    "is JSON. Send the body as JSON with the header `Content-Type: application/json`.",
 }
+
+_JSON_BODY_METHODS = frozenset({"POST", "PUT", "PATCH"})
 
 _SCHEMAS = "#/components/schemas/"
 _PROBLEM_REF = _SCHEMAS + "Problem"
@@ -449,6 +469,36 @@ class BodyLimitMiddleware:
             return message
 
         await self.app(scope, limited_receive, send)
+
+
+def require_json_body(request: Request) -> None:
+    """Refuse a request that has a body and doesn't declare the body as JSON.
+
+    FastAPI parses a body as JSON only when the `Content-Type` header says it's JSON. Without this
+    check, a request with another content type gets a 422 about the body's type, which doesn't
+    say that the header is the cause. [`create_app`][bxapi.app.create_app] makes the function a
+    dependency of every route under `/v1`.
+
+    The function accepts the media type `application/json` and any `application` type whose name
+    ends in `+json`, with or without parameters like `charset`. It accepts a request with no body,
+    whatever its content type, so a `POST` whose body is optional needs no header.
+
+    Args:
+        request: The request.
+
+    Raises:
+        ApiError: With status 415 and the code `unsupported_media_type`, if a `POST`, `PUT`, or
+            `PATCH` request has a body and its `Content-Type` isn't a JSON media type.
+    """
+    headers = request.headers
+    if request.method not in _JSON_BODY_METHODS:
+        return
+    if headers.get("content-length", "0").strip() == "0" and "transfer-encoding" not in headers:
+        return
+    media_type = headers.get("content-type", "").partition(";")[0].strip().lower()
+    kind, _, subtype = media_type.partition("/")
+    if kind != "application" or not (subtype == "json" or subtype.endswith("+json")):
+        raise unsupported_media_type()
 
 
 def _log_startup(settings: Settings) -> None:
@@ -521,6 +571,37 @@ def _describe_problems(schema: dict[str, Any]) -> None:
             del schemas[name]
 
 
+def _describe_conditional_gets(schema: dict[str, Any]) -> None:
+    if_none_match = {
+        "name": "If-None-Match",
+        "in": "header",
+        "required": False,
+        "description": "The `ETag` of a response you have for this request. While the content is the same, the "
+        "server answers 304 with no body.",
+        "schema": {"type": "string"},
+        "example": 'W/"5f0c1b6de0a94d7f8f3f0f5b7a1c2d3e"',
+    }
+    # One definition of the response header, which every GET operation refers to.
+    schema.setdefault("components", {}).setdefault("headers", {})["ETag"] = {
+        "description": 'A short name for the response\'s content, like `W/"5f0c1b6de0a94d7f8f3f0f5b7a1c2d3e"`. '
+        "Send it in `If-None-Match` to ask whether the content has changed.",
+        "schema": {"type": "string"},
+    }
+    etag = {"$ref": "#/components/headers/ETag"}
+    for path in schema.get("paths", {}).values():
+        operation = path.get("get")
+        if operation is None:
+            continue
+        operation.setdefault("parameters", []).append(dict(if_none_match))
+        responses = operation.setdefault("responses", {})
+        responses.setdefault("200", {}).setdefault("headers", {})["ETag"] = etag
+        responses["304"] = {
+            "description": "The response whose `ETag` you sent in `If-None-Match` is still current. The response "
+            "has no body.",
+            "headers": {"ETag": etag},
+        }
+
+
 def _describe_request_ids(schema: dict[str, Any]) -> None:
     # One header definition, which every response of every operation refers to.
     schema.setdefault("components", {}).setdefault("headers", {})[REQUEST_ID_HEADER] = {
@@ -581,6 +662,7 @@ def _install_openapi(app: FastAPI) -> None:
                 license_info=app.license_info,
             )
             _describe_problems(schema)
+            _describe_conditional_gets(schema)
             _describe_request_ids(schema)
             _require_discriminators(schema)
             add_examples(schema)
@@ -658,24 +740,30 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.db = Database(settings.database)
     app.state.sessions = SessionManager(app.state.db, cache_size=settings.session_cache_size)
     install_error_handlers(app)
-    # Each middleware added wraps the ones before it. A request gets its id first, then passes
-    # the CORS headers, then the API key check, then the body limits, so the server reads no body
-    # from a caller without a key.
+    # Each middleware added wraps the ones before it. A request gets its id first. A HEAD request
+    # becomes a GET, and the response loses its body last, after compression. Then the request
+    # passes the CORS headers, the conditional check, the API key check, and the body limits, so
+    # the server reads no body from a caller without a key.
     app.add_middleware(
         BodyLimitMiddleware, max_bytes=settings.max_body_bytes, timeout_seconds=settings.body_timeout_seconds
     )
     app.add_middleware(AuthMiddleware, settings=settings)
+    app.add_middleware(ConditionalGetMiddleware)
     if settings.cors_origins:
         app.add_middleware(
             CORSMiddleware,
             allow_origins=list(settings.cors_origins),
             allow_methods=["*"],
             allow_headers=["*"],
-            expose_headers=["WWW-Authenticate", "Retry-After", REQUEST_ID_HEADER],
+            expose_headers=["WWW-Authenticate", "Retry-After", "ETag", REQUEST_ID_HEADER],
         )
+    app.add_middleware(GZipMiddleware, minimum_size=COMPRESSION_MINIMUM_BYTES, compresslevel=6)
+    app.add_middleware(HeadMiddleware)
     app.add_middleware(RequestIdMiddleware)
     app.include_router(meta.health_router)
-    v1 = APIRouter(prefix="/v1", dependencies=[Depends(authenticate)], responses=_SHARED_ERRORS)
+    v1 = APIRouter(
+        prefix="/v1", dependencies=[Depends(authenticate), Depends(require_json_body)], responses=_SHARED_ERRORS
+    )
     for router in V1_ROUTERS:
         v1.include_router(router)
     app.include_router(v1)
