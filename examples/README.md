@@ -2,7 +2,9 @@
 
 [`play_barrow.py`](play_barrow.py) is a Python script that sends requests to a running bxapi server. It plays the adventure that comes with bxapi, `builtin-barrow`, up to the end of the first battle, the party's first fight with monsters. It uses only the Python standard library, so once you've set up bxapi as the [README](../README.md#get-it-running) shows, you have everything the script needs.
 
-The script creates a *party* of three characters: a fighter, a cleric, and a thief. It starts a *session*, one game in progress, of `builtin-barrow`, enters the dungeon, and sends commands until the first battle ends or it has sent 40 commands. It prints each command and each message that the server returns. Before every command, it reads the legal commands from `GET /v1/sessions/{session_id}/commands` and sends only a command from that list. It also reads the *player view*, everything the players may know about the game, to pick a direction to walk and an action for each party member in battle.
+The script creates a *party* of three characters: a fighter, a cleric, and a thief. It starts a *session*, one game in progress, of `builtin-barrow`, enters the dungeon, and sends commands until the first battle ends or it has sent 40 commands. It prints each command and each message that the server returns. Before every command, it reads the legal commands from `GET /v1/sessions/{session_id}/commands` and sends only a command from that list. It sends each command with `include=view`, so the response has the *player view*, everything the players may know about the game, which the script reads to pick a direction to walk and an action for each party member in battle.
+
+The script sends every `POST` with an `Idempotency-Key` header. When a connection fails, or the server answers with an error that the same request can succeed after, the script sends the request again with the same key, up to four times. The server runs the request once and returns the first response to a retry. When the script gives up, it prints the error's code, its detail, and the request's id, which whoever runs the server can find in the log.
 
 ## Run it
 

@@ -2,7 +2,9 @@
 
 The script creates a party of three, starts `builtin-barrow`, enters the dungeon, and sends
 commands until the first battle ends or it has sent `--max-commands` commands. It prints the
-messages of each response. It uses only the standard library.
+messages of each response. It sends each `POST` with an `Idempotency-Key`, so it can send a
+request again after a failed connection without the server running the request twice. It uses
+only the standard library.
 
     python examples/play_barrow.py http://127.0.0.1:8640 --api-key YOUR_KEY
 """
@@ -10,9 +12,15 @@ messages of each response. It uses only the standard library.
 import argparse
 import json
 import sys
+import time
 import urllib.error
 import urllib.request
+import uuid
 from typing import Any
+
+# How many times to send one request, and the problem codes that the same request can succeed after.
+ATTEMPTS = 4
+RETRYABLE = {"session_busy", "database_busy", "request_timeout", "idempotency_key_in_progress"}
 
 # The party starts on its first cell facing north, and the rules refuse a move into a wall.
 DIRECTIONS = ("north", "east", "south", "west")
@@ -35,16 +43,37 @@ class Api:
             self.headers["Authorization"] = f"Bearer {api_key}"
 
     def call(self, method: str, path: str, body: Any = None) -> Any:
-        """Send a request and return the decoded response, or exit with the problem's code and detail."""
+        """Send a request and return the decoded response, or exit with the problem's code and detail.
+
+        The method sends the request again, up to `ATTEMPTS` times, when the connection fails or the server
+        answers with a code in `RETRYABLE`.
+        """
         data = None if body is None else json.dumps(body).encode()
-        request = urllib.request.Request(self.base_url + path, data=data, headers=self.headers, method=method)
-        try:
-            with urllib.request.urlopen(request) as response:
-                return json.load(response)
-        except urllib.error.HTTPError as error:
-            # The body of an error response is a problem document with a `code`. A refused command isn't an error.
-            problem = json.load(error)
-            raise SystemExit(f"{method} {path} failed: {problem['code']}: {problem['detail']}") from None
+        headers = dict(self.headers)
+        if method == "POST":
+            # Every attempt has the same key, so the server runs the request once and returns the first
+            # response to a retry.
+            headers["Idempotency-Key"] = str(uuid.uuid4())
+        for attempt in range(1, ATTEMPTS + 1):
+            request = urllib.request.Request(self.base_url + path, data=data, headers=headers, method=method)
+            try:
+                with urllib.request.urlopen(request) as response:
+                    return json.load(response)
+            except urllib.error.HTTPError as error:
+                # The body of an error response is a problem document with a `code`. A refused command isn't an
+                # error. Report `request_id` to whoever runs the server, who can find the request in the log.
+                problem = json.load(error)
+                if problem["code"] not in RETRYABLE or attempt == ATTEMPTS:
+                    raise SystemExit(
+                        f"{method} {path} failed: {problem['code']}: {problem['detail']} "
+                        f"(request {problem['request_id']})"
+                    ) from None
+                time.sleep(float(error.headers.get("Retry-After", 1)))
+            except urllib.error.URLError as error:
+                if attempt == ATTEMPTS:
+                    raise SystemExit(f"{method} {path} failed: {error.reason}") from None
+                time.sleep(1)
+        raise AssertionError("unreachable")
 
 
 def create_party(api: Api) -> list[str]:
@@ -121,9 +150,9 @@ def play(api: Api, max_commands: int) -> None:
     print(f"Started {session['name']} as {session['id']}.")
     tried: set[tuple[Any, ...]] = set()
     in_battle = False
+    view = api.call("GET", f"{base}/view")
     for _ in range(max_commands):
         legal = api.call("GET", f"{base}/commands")
-        view = api.call("GET", f"{base}/view")
         command = choose_command(
             legal["mode"],
             {entry["command_type"] for entry in legal["commands"]},
@@ -134,8 +163,9 @@ def play(api: Api, max_commands: int) -> None:
         if command is None:
             print(f"No command to send in mode {legal['mode']}. Stopping.")
             return
-        # Pass the revision we read, so a repeated request can't run the command twice.
-        outcome = api.call("POST", f"{base}/commands?expected_revision={legal['revision']}", command)
+        # `include=view` returns the player view after the command in the same response.
+        outcome = api.call("POST", f"{base}/commands?include=view", command)
+        view = outcome["view"]
         print(f"> {command['command_type']}" + (f" {command['direction']}" if "direction" in command else ""))
         if not outcome["accepted"]:
             print("  refused:", ", ".join(rejection["code"] for rejection in outcome["rejections"]))
