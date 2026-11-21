@@ -1,10 +1,10 @@
 # Play a game
 
-Play one game of the built-in adventure with `curl`, from an ability roll to a saved battle. A game client sends the same requests.
+Play one game of the adventure that comes with the server, with `curl`, from rolling a character's ability scores to saving the game during a battle. A game client that you build sends the same requests. If you haven't set up bxapi yet, follow [Get it running](../README.md#get-it-running) in the README first.
 
 ## Start a server with a player key
 
-Start the server with one API key. The key's role is `player`, which is the role a game client uses. A player sees only what the players of a game may see.
+Start the server with one API key. The `client` is a name you choose for your application. The key's role is `player`, which is the role a game client uses. The server shows a player only what the players of a game may see.
 
 ```sh
 BXAPI_API_KEYS='[{"client": "my-game", "key": "player-key-0123456789", "role": "player"}]' uv run bxapi
@@ -16,7 +16,7 @@ In a second terminal, put the key in a shell variable. Every command below sends
 export KEY=player-key-0123456789
 ```
 
-The server returns compact JSON. The responses below are formatted and shortened with `...`. The server creates an id for each character, session, and save, so your ids differ from the ones shown. Replace each id in a command with the one your server returned. The dice are random, so the scores, hit points, and battle results differ for you too. The text says where that matters.
+The server returns compact JSON. We've formatted the responses below and shortened them with `...`. The server creates an id for each character, session, and save, so your ids differ from the ones shown. Replace each id in a command with the one your server returned. The dice are random, so the characters' scores, the *hit points* (the damage a character can take), and the battle results differ for you too. The text notes where your results can differ.
 
 To check the key, ask the server who you are:
 
@@ -37,7 +37,7 @@ curl -s http://127.0.0.1:8640/v1/meta -H "Authorization: Bearer $KEY"
 
 ## Roll ability scores
 
-In B/X, a player rolls six ability scores first and then picks a class the scores qualify for. An *ability roll* is that first step. The server rolls and stores the scores:
+In B/X, a player first rolls six *ability scores*, the numbers like strength and dexterity that the rules use for a character. Then the player picks a *class*, like fighter or thief, that the scores qualify for. An *ability roll* is that first step. The server rolls the scores and stores them:
 
 ```sh
 curl -s -X POST http://127.0.0.1:8640/v1/ability-rolls -H "Authorization: Bearer $KEY"
@@ -62,7 +62,7 @@ The server doesn't limit how many ability rolls you ask for. If your game wants 
 
 ## Create a character
 
-Create a fighter from the roll. A character's *purchases* are the starting gear it buys with its starting gold, and `equip_item_ids` says which purchased items it wears or wields. First, try to buy ten lots of plate mail, which costs more than the character has:
+Create a fighter from the roll. A character's *purchases* are the starting gear it buys with its starting gold, and `equip_item_ids` lists the purchased items it wears or wields. First, try to buy ten lots of plate mail, which costs more than the character has:
 
 ```sh
 curl -s -X POST http://127.0.0.1:8640/v1/characters -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"name": "Brenna", "class_id": "fighter", "alignment": "lawful", "ability_roll_id": "rol__zoeisiFGZ4tcVU2ozKMgA", "purchases": [{"item_id": "plate_mail", "quantity": 10}]}'
@@ -81,7 +81,7 @@ curl -s -X POST http://127.0.0.1:8640/v1/characters -H "Authorization: Bearer $K
 }
 ```
 
-The server refuses a choice that breaks a rule with status 422 and the code `character_invalid`. The `rejections` list comes from the rules engine: each has a `code` and `params` that your game can turn into a message for the player. The roll stays unused, so you can try again with the same `ability_roll_id`. Buy chainmail, a shield, and a sword, and equip all three:
+The server refuses a choice that breaks a rule with status 422 and the code `character_invalid`. Character creation is the one place where a broken rule is an error, because the server can't create the character. The `rejections` list comes from the *rules engine*, osrlib, which applies the B/X rules for the server. Each rejection has a `code` and `params` that your game can turn into a message for the player. The roll stays unused, so you can try again with the same `ability_roll_id`. Buy chainmail, a shield, and a sword, and equip all three:
 
 ```sh
 curl -s -X POST http://127.0.0.1:8640/v1/characters -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"name": "Brenna", "class_id": "fighter", "alignment": "lawful", "ability_roll_id": "rol__zoeisiFGZ4tcVU2ozKMgA", "purchases": [{"item_id": "chainmail"}, {"item_id": "shield"}, {"item_id": "sword"}], "equip_item_ids": ["chainmail", "shield", "sword"]}'
@@ -101,7 +101,7 @@ curl -s -X POST http://127.0.0.1:8640/v1/characters -H "Authorization: Bearer $K
 
 - `id` is the character's id. A session uses it to put the character in a party.
 - `character` is the character as the rules engine stores it: scores, hit points, inventory, and spells.
-- `derived` has the numbers the engine computes from the character, like the attack target number `thac0` and the armour class.
+- `derived` has the numbers the rules engine computes from the character, like `thac0` and the armour class. `thac0` ("to hit armour class 0") is the number the character must roll on a 20-sided die to hit armour class 0, and the *armour class* is how hard the character is to hit, where lower is better. `saves` has the character's *saving throws*, the 20-sided die rolls that resist dangers like poison and dragon breath (not saved games).
 
 If the starting gold doesn't cover the chainmail, the shield, and the sword, the server refuses with the same `insufficient_funds` rejection. Buy less and try again.
 
@@ -119,7 +119,7 @@ Each response has the same fields as Brenna's. The ids in the rest of this page 
 
 ## Start a session
 
-A *session* is one game in progress. Start one with the party's character ids and the id of an adventure. The order of `character_ids` is the party's *marching order*: the first character walks in front, and the characters at the front are the ones who can fight in melee. A session plays copies of the characters, so the stored characters don't change.
+A *session* is one game in progress. Start one with the ids of the characters in the *party*, the group that plays, and the id of an adventure. The order of `character_ids` is the party's *marching order*. The first character walks in front, and only the characters at the front can fight in *melee*, hand to hand. A session plays copies of the characters, so the stored characters don't change.
 
 ```sh
 curl -s -X POST http://127.0.0.1:8640/v1/sessions -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"adventure_id": "builtin-barrow", "character_ids": ["chr_XSWUBj-UjQauxKNeDtopIg", "chr_yqskEJZy5UoVvqCBN3Hbkw", "chr_5EZYSIgQNlMz7w7p1GwFlA"]}'
@@ -147,11 +147,11 @@ curl -s -X POST http://127.0.0.1:8640/v1/sessions -H "Authorization: Bearer $KEY
 - `revision` counts the commands the session has accepted. It starts at 0.
 - `clock` is the game time that has passed, in rounds of 10 seconds, turns of 10 minutes, and days.
 
-A session is limited to 20 characters.
+A session's party can have at most 20 characters.
 
 ## Read the legal commands
 
-You play by sending *commands*. The server tells you which commands are legal in the session's current mode:
+You play by sending *commands*, like a move or an attack. The server lists the commands that are legal in the session's current mode:
 
 ```sh
 curl -s http://127.0.0.1:8640/v1/sessions/ses_eqeMc3BaPn-ii_2kKiCJWw/commands -H "Authorization: Bearer $KEY"
@@ -173,11 +173,11 @@ curl -s http://127.0.0.1:8640/v1/sessions/ses_eqeMc3BaPn-ii_2kKiCJWw/commands -H
 }
 ```
 
-A player sees only commands with `kind` set to `play`. A command that's listed can still be refused, for a reason the rules check when you send it. To learn which fields a command takes, see [Rules reference and generators](reference-and-generators.md#read-a-commands-json-schema).
+A player sees only commands with `kind` set to `play`. The rules can still refuse a command that's listed, for a reason they check when you send it. To learn which fields a command takes, see [Rules reference and generators](reference-and-generators.md#read-a-commands-json-schema).
 
 ## Enter the dungeon
 
-Send a command as a JSON body with a `command_type` and the command's own fields. `enter_dungeon` takes the id of a dungeon. The built-in adventure has one, `barrow`:
+Send a command as a JSON body with a `command_type` and the fields that the command takes. `enter_dungeon` takes the id of a dungeon. The built-in adventure has one dungeon, `barrow`:
 
 ```sh
 curl -s -X POST http://127.0.0.1:8640/v1/sessions/ses_eqeMc3BaPn-ii_2kKiCJWw/commands -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"command_type": "enter_dungeon", "dungeon_id": "barrow"}'
@@ -204,13 +204,13 @@ curl -s -X POST http://127.0.0.1:8640/v1/sessions/ses_eqeMc3BaPn-ii_2kKiCJWw/com
 This is the *command outcome*, the response to every command:
 
 - `accepted` is `true` when the rules accepted the command.
-- `rejections` says why the rules refused it. It's empty here.
+- `rejections` lists why the rules refused it. It's empty here.
 - `events` lists what happened, as data your game can act on. Each event has a `code`, an `event_type`, and fields that depend on the type.
 - `messages` has one line of English for each event, in the same order. Show them to the player.
 - `mode` and `ended` are the session's mode and whether it's over after the command.
 - `revision` is the session's revision after the command. It went from 0 to 1.
 
-Messages and events identify characters and monsters by id, like `character-0001` and `monster-0001`. The server assigns each character in the party an id of the form `character-NNNN`, in marching order. The player view, described below, lists each party member's id and name.
+Messages and events identify characters and monsters by id, like `character-0001` and `monster-0001`. When a session starts, the rules engine gives each character in the party an id of the form `character-NNNN`, in marching order. The player view, described below, lists each party member's id and name.
 
 ## Move, and see a refused command
 
@@ -228,7 +228,7 @@ content-type: application/json
 {"accepted":false,"rejections":[{"code":"exploration.move.blocked","params":{"direction":"north"}}],"events":[],"messages":[],"mode":"exploring","ended":false,"revision":1}
 ```
 
-A wall blocks the way, so the rules refuse the command. The status is 200, because the request was valid and the server did what you asked: it asked the rules. A refused command has `accepted` set to `false`, a `rejections` list, and no events, and it changes nothing. The revision is still 1. An error status like 422 means your request itself was wrong. [Errors](errors.md) covers the difference.
+A wall blocks the way, so the rules refuse the command. The status is 200, because the request was valid and the server did what you asked: it passed the command to the rules engine. A refused command has `accepted` set to `false`, a `rejections` list, and no events, and it changes nothing. The revision is still 1. Outside character creation, an error status like 422 means your request itself was wrong. For more about the difference, see [Errors](errors.md).
 
 Move east instead:
 
@@ -250,7 +250,7 @@ curl -s -X POST http://127.0.0.1:8640/v1/sessions/ses_eqeMc3BaPn-ii_2kKiCJWw/com
 
 ## Walk into the first encounter
 
-Move east again. The next cell is the guard room, and the adventure keeps goblins there:
+Move east again. The next cell is the guard room, which has goblins in it:
 
 ```sh
 curl -s -X POST http://127.0.0.1:8640/v1/sessions/ses_eqeMc3BaPn-ii_2kKiCJWw/commands -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"command_type": "move_party", "direction": "east"}'
@@ -273,7 +273,7 @@ curl -s -X POST http://127.0.0.1:8640/v1/sessions/ses_eqeMc3BaPn-ii_2kKiCJWw/com
 }
 ```
 
-The session is now in the `encounter` mode. Whether anyone is surprised and what the goblins' bearing is depend on dice, so yours can differ. Ask for the legal commands again:
+The session is now in the `encounter` mode: the party has met monsters, and nobody has attacked yet. The dice decide whether anyone is surprised and what the goblins' *bearing* is (how they react to the party, which the player view lists as `stance`), so yours can differ. Ask for the legal commands again:
 
 ```sh
 curl -s http://127.0.0.1:8640/v1/sessions/ses_eqeMc3BaPn-ii_2kKiCJWw/commands -H "Authorization: Bearer $KEY"
@@ -299,7 +299,7 @@ The party can talk (`parley`), run (`evade`), or fight (`engage_battle`). Before
 
 ## Read the player view
 
-The *player view* is everything the players may know about the game now. Read it after each command to draw your screen:
+The *player view* is everything the players may know about the game now. Read it after each command to update what your game shows:
 
 ```sh
 curl -s http://127.0.0.1:8640/v1/sessions/ses_eqeMc3BaPn-ii_2kKiCJWw/view -H "Authorization: Bearer $KEY"
@@ -330,15 +330,15 @@ curl -s http://127.0.0.1:8640/v1/sessions/ses_eqeMc3BaPn-ii_2kKiCJWw/view -H "Au
 }
 ```
 
-The session is in the `encounter` mode and no battle has started, so `in_battle` is `false` and `member_distance_feet` is empty. The fields that matter for the battle:
+The session is in the `encounter` mode and no battle has started, so `in_battle` is `false` and `member_distance_feet` is empty. These fields are the ones you use in the battle:
 
 - `party` lists each member's `id`, `name`, hit points, `conditions` (like `dead`), and inventory. Use it to turn the ids in messages into names. The `character-0001` in a message is Brenna.
-- `location` and `explored` give the party's position and the cells it has seen. The view never has the parts of the map the party hasn't explored.
-- `encounter.groups` lists the groups of monsters. A group has an `id` to attack, a `label` that says what it is, a `count`, and its `distance_feet` from the party. The view doesn't list the individual monsters. A message about `monster-0001` doesn't say which group it belongs to, so use the group's label and count.
+- `location` and `explored` contain the party's position and the cells it has seen. The view doesn't include the parts of the map the party hasn't explored.
+- `encounter.groups` lists the groups of monsters. A group has an `id` to attack, a `label` with the kind of monster, a `count`, and its `distance_feet` from the party. The view doesn't list the individual monsters. A message about `monster-0001` doesn't say which group it belongs to, so use the group's label and count.
 - `encounter.declarers` lists the members who must choose an action this round.
 - `encounter.front_rank` lists the members who can fight in melee. The others can't attack monsters in melee.
 
-The view never has monster hit points or the referee's dice.
+The view doesn't include monster hit points or the dice rolls that only a *referee* sees. A referee is a caller whose key has the role that may see a game's hidden state, as [Run games as a referee](referee.md) describes.
 
 ## Start the battle
 
@@ -362,7 +362,7 @@ curl -s -X POST http://127.0.0.1:8640/v1/sessions/ses_eqeMc3BaPn-ii_2kKiCJWw/com
 
 ## Fight one battle round
 
-A battle runs in rounds. In each round, every member in `declarers` chooses an action, and the rules resolve all of them. Send `resolve_battle_round` with one declaration for each declarer. A declaration names a `character_id` and an `action`: `attack`, `cast`, `turn_undead`, `move`, `use_item`, or `hold`. An attack also names the `target_group_id`. The goblins are 20 feet away, so an attacker adds `"move": "close"` to walk up to them and attack in the same round.
+A battle runs in rounds. In each round, every member in `declarers` chooses an action, and the rules resolve all of them. Send `resolve_battle_round` with one declaration for each declarer. A declaration has a `character_id` and an `action`: `attack`, `cast`, `turn_undead`, `move`, `use_item`, or `hold`. An attack also has a `target_group_id`. The goblins are 20 feet away, so an attacker adds `"move": "close"` to walk up to them and attack in the same round.
 
 First, send what a client might try: all three characters attack.
 
@@ -384,7 +384,7 @@ curl -s -X POST http://127.0.0.1:8640/v1/sessions/ses_eqeMc3BaPn-ii_2kKiCJWw/com
 }
 ```
 
-Wren isn't in the `front_rank`, so the rules refuse the whole round, and nothing changed. Have Wren `hold` instead:
+Wren isn't in the `front_rank`, so the rules refuse the whole round, and nothing changes. Have Wren `hold` instead:
 
 ```sh
 curl -s -X POST http://127.0.0.1:8640/v1/sessions/ses_eqeMc3BaPn-ii_2kKiCJWw/commands -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"command_type": "resolve_battle_round", "declarations": [{"character_id": "character-0001", "action": "attack", "target_group_id": "group-0001", "move": "close"}, {"character_id": "character-0002", "action": "attack", "target_group_id": "group-0001", "move": "close"}, {"character_id": "character-0003", "action": "hold"}]}'
@@ -418,7 +418,7 @@ curl -s -X POST http://127.0.0.1:8640/v1/sessions/ses_eqeMc3BaPn-ii_2kKiCJWw/com
 }
 ```
 
-The dice decide every roll in the messages, so your round differs. The revision went from 4 to 5, and the battle goes on. Read the view again to see the party's hit points. In this game Brenna and Tomas each have 1 of 3 hit points left. A character at 0 hit points has the condition `dead`, and the next round's `declarers` leaves that character out.
+The dice in the messages are random, so your round differs. The revision went from 4 to 5, and the battle goes on. Read the view again to see the party's hit points. In the game on this page, Brenna and Tomas each have 1 of 3 hit points left. A character at 0 hit points has the condition `dead`, and the next round's `declarers` leaves that character out.
 
 ## Catch up on events
 
@@ -460,7 +460,7 @@ curl -s "http://127.0.0.1:8640/v1/sessions/ses_eqeMc3BaPn-ii_2kKiCJWw/events?aft
 }
 ```
 
-The `limit` can be up to 500. A page holds at most `limit` events, so keep asking while `next_after` is less than `total`.
+The `limit` can be up to 500. A page contains at most `limit` events, so keep asking while `next_after` is less than `total`.
 
 ## Save and restore
 
@@ -505,7 +505,7 @@ curl -s -X POST http://127.0.0.1:8640/v1/saves/sav_aJfDsAPQJJMycBUJySEXRA/restor
 }
 ```
 
-The new session is in the same mode, with the same party, and its revision starts again at 0. Its `adventure_id` is the save's. The id is `null` for a save that a referee imported, and it can be the id of an adventure that you deleted since. Neither changes play, because a session plays its own copy of the adventure.
+The new session is in the same mode, with the same party, and its revision starts again at 0. Its `adventure_id` is the save's. The `adventure_id` is `null` for a save that a referee imported, and it can be the id of an adventure that you deleted after you saved. Neither changes play, because each session has a copy of its adventure.
 
 ## Retry a command safely
 
@@ -548,14 +548,14 @@ content-type: application/problem+json
 {"type":"about:blank","title":"Conflict","status":409,"detail":"The session is at revision 1, not 0. Read the view and decide whether to send the command again.","code":"revision_conflict","revision":1}
 ```
 
-The session is at revision 1, so the server ran nothing. A `revision_conflict` after a retry tells your client that the first request was applied. Read the view to see the result. [Errors](errors.md#revision_conflict) covers what to do in other cases.
+The session is at revision 1, so the server ran nothing. When you get a `revision_conflict` after a retry and nobody else sends commands to the session, the server applied the first request. Read the view to see the result. For what to do in other cases, see [Errors](errors.md#revision_conflict).
 
-Every response to a command has the new `revision`, and `GET /v1/sessions/{session_id}/commands` has the current one, so your client always knows what to send.
+Every response to a command has the new `revision`, and `GET /v1/sessions/{session_id}/commands` has the current one, so your client has the revision to send with the next command.
 
 ## Next steps
 
 - [Errors](errors.md): every error code and what to do about it.
 - [Rules reference and generators](reference-and-generators.md): look up the classes, spells, and equipment your players choose from, and read the schema of each command.
 - [Authentication](authentication.md): run a server with API keys for your game.
-- [Example client](../examples/README.md): a Python script that plays this battle without a hard-coded script.
+- [Example client](../examples/README.md): a Python script that plays this battle and picks each command from the legal commands and the player view.
 - [Run games as a referee](referee.md): see hidden state, send referee commands, and choose seeds.
