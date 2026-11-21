@@ -35,10 +35,11 @@ from bxapi.errors import (
     INTERNAL_ERROR,
     PROBLEM_MEDIA_TYPE,
     VALIDATION_ERROR,
-    ApiError,
+    content_too_large,
     install_error_handlers,
     problem_response,
     problem_responses,
+    request_timeout,
 )
 from bxapi.openapi_examples import add_examples
 from bxapi.routers import V1_ROUTERS, meta
@@ -406,11 +407,11 @@ class BodyLimitMiddleware:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
-        too_large = f"The request body is larger than the {self.max_bytes} bytes this server accepts."
-        too_slow = f"The request body didn't arrive within the {self.timeout_seconds:g} seconds this server waits."
+        too_large = content_too_large(self.max_bytes)
+        too_slow = request_timeout(self.timeout_seconds)
         declared = Headers(scope=scope).get("content-length")
         if declared is not None and declared.isdigit() and int(declared) > self.max_bytes:
-            response = problem_response(ApiError(413, "content_too_large", too_large).problem())
+            response = problem_response(too_large.problem())
             await response(scope, receive, send)
             return
         received = 0
@@ -430,13 +431,13 @@ class BodyLimitMiddleware:
             except TimeoutError:
                 # FastAPI re-raises an HTTPException raised while it reads the body, and turns
                 # any other exception into a 400.
-                raise StarletteHTTPException(status_code=408, detail=too_slow) from None
+                raise StarletteHTTPException(status_code=too_slow.status, detail=too_slow.detail) from None
             if message["type"] != "http.request" or not message.get("more_body", False):
                 complete = True
             if message["type"] == "http.request":
                 received += len(message.get("body", b""))
                 if received > self.max_bytes:
-                    raise StarletteHTTPException(status_code=413, detail=too_large)
+                    raise StarletteHTTPException(status_code=too_large.status, detail=too_large.detail)
             return message
 
         await self.app(scope, limited_receive, send)

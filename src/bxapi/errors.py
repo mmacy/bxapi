@@ -51,13 +51,18 @@ __all__ = [
     "FieldError",
     "Problem",
     "conflict",
+    "content_too_large",
+    "database_busy",
     "forbidden",
     "install_error_handlers",
+    "internal_error",
     "invalid",
     "not_found",
     "problem_response",
     "problem_responses",
+    "request_timeout",
     "shorten",
+    "validation_error",
 ]
 
 PROBLEM_MEDIA_TYPE = "application/problem+json"
@@ -301,6 +306,91 @@ def invalid(code: str, detail: str, **extras: Any) -> ApiError:
     return ApiError(422, code, detail, **extras)
 
 
+def validation_error(entries: Sequence[Any]) -> ApiError:
+    """Build the 422 for a request that doesn't match the operation's schema.
+
+    Args:
+        entries: pydantic's errors for the request, as `RequestValidationError.errors()` lists
+            them. Each is a mapping with `type`, `loc`, and `msg`, and optionally `ctx`.
+
+    Returns:
+        An [`ApiError`][bxapi.errors.ApiError] with the code `validation_error`. Its `errors`
+        member lists the first 20 entries, and `error_count` states how many there are.
+
+    Examples:
+        ```python
+        from bxapi.errors import validation_error
+
+        entry = {"type": "missing", "loc": ("body", "expression"), "msg": "Field required"}
+        problem = validation_error([entry]).problem()
+        assert problem.errors is not None and problem.errors[0].loc == ["body", "expression"]
+        ```
+    """
+    return ApiError(
+        422,
+        "validation_error",
+        "The request failed validation. See `errors` for each field.",
+        errors=[_field_error(entry) for entry in entries[:MAX_FIELD_ERRORS]],
+        error_count=len(entries),
+    )
+
+
+def internal_error() -> ApiError:
+    """Build the 500 for an exception the server doesn't expect.
+
+    The detail says nothing about the cause, because an exception's message can contain anything.
+
+    Returns:
+        An [`ApiError`][bxapi.errors.ApiError] with the code `internal_error`.
+    """
+    return ApiError(500, "internal_error", "The server failed to handle the request.")
+
+
+def database_busy() -> ApiError:
+    """Build the 503 for a request that waited too long for the database's write lock.
+
+    Returns:
+        An [`ApiError`][bxapi.errors.ApiError] with the code `database_busy` and the header
+        `Retry-After: 1`.
+    """
+    return ApiError(
+        503,
+        "database_busy",
+        "Another process is writing to the database. Send the request again.",
+        headers={"Retry-After": "1"},
+    )
+
+
+def content_too_large(max_bytes: int) -> ApiError:
+    """Build the 413 for a request body over the server's size limit.
+
+    Args:
+        max_bytes: The largest body the server accepts, in bytes.
+
+    Returns:
+        An [`ApiError`][bxapi.errors.ApiError] with the code `content_too_large`.
+    """
+    return ApiError(
+        413, "content_too_large", f"The request body is larger than the {max_bytes} bytes this server accepts."
+    )
+
+
+def request_timeout(timeout_seconds: float) -> ApiError:
+    """Build the 408 for a request body that didn't arrive in time.
+
+    Args:
+        timeout_seconds: The most time the server waits for a body, in seconds.
+
+    Returns:
+        An [`ApiError`][bxapi.errors.ApiError] with the code `request_timeout`.
+    """
+    return ApiError(
+        408,
+        "request_timeout",
+        f"The request body didn't arrive within the {timeout_seconds:g} seconds this server waits.",
+    )
+
+
 def problem_response(problem: Problem, headers: dict[str, str] | None = None) -> JSONResponse:
     """Return the HTTP response for a problem document.
 
@@ -408,15 +498,7 @@ def install_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(RequestValidationError)
     def _request_validation_error(request: Request, error: RequestValidationError) -> JSONResponse:
-        entries = error.errors()
-        problem = ApiError(
-            422,
-            "validation_error",
-            "The request failed validation. See `errors` for each field.",
-            errors=[_field_error(entry) for entry in entries[:MAX_FIELD_ERRORS]],
-            error_count=len(entries),
-        ).problem()
-        return problem_response(problem)
+        return problem_response(validation_error(error.errors()).problem())
 
     @app.exception_handler(ContentValidationError)
     def _content_validation_error(request: Request, error: ContentValidationError) -> JSONResponse:
@@ -434,10 +516,8 @@ def install_error_handlers(app: FastAPI) -> None:
         code = getattr(error, "sqlite_errorcode", None)
         if code is None or code & 0xFF not in _BUSY_CODES:
             raise error
-        problem = ApiError(
-            503, "database_busy", "Another process is writing to the database. Send the request again."
-        ).problem()
-        return problem_response(problem, {"Retry-After": "1"})
+        busy = database_busy()
+        return problem_response(busy.problem(), busy.headers)
 
     @app.exception_handler(StarletteHTTPException)
     def _http_exception(request: Request, error: StarletteHTTPException) -> JSONResponse:
@@ -450,4 +530,4 @@ def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(Exception)
     def _unexpected(request: Request, error: Exception) -> JSONResponse:
         _log.exception("unhandled error on %s %s", request.method, request.url.path, exc_info=error)
-        return problem_response(ApiError(500, "internal_error", "The server failed to handle the request.").problem())
+        return problem_response(internal_error().problem())

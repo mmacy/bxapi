@@ -26,7 +26,7 @@ from fastapi.testclient import TestClient
 
 from bxapi.app import create_app
 from bxapi.openapi import _FixedSettings, build_openapi
-from bxapi.openapi_examples import EXAMPLES_FILE, load_examples, trim
+from bxapi.openapi_examples import EXAMPLES_FILE, error_codes, load_examples, shared_problems, trim
 from bxapi.settings import ApiKey, Role
 
 SEED = 4127730658136791
@@ -66,11 +66,15 @@ def _normalized(value: Any) -> Any:
     return json.loads(text)
 
 
-def _replay() -> Iterator[tuple[dict[str, Any], dict[str, Any]]]:
-    """Send every example request to a new server, and yield each example with what the server returned."""
+def _settings() -> _FixedSettings:
     # The settings ignore the `BXAPI_` environment variables, so a key in your shell can't change the examples.
     keys = tuple(ApiKey.model_validate({"client": "my-game", "key": key, "role": role}) for role, key in _KEYS.items())
-    settings = _FixedSettings(database=":memory:", api_keys=keys)
+    return _FixedSettings(database=":memory:", api_keys=keys)
+
+
+def _replay() -> Iterator[tuple[dict[str, Any], dict[str, Any]]]:
+    """Send every example request to a new server, and yield each example with what the server returned."""
+    settings = _settings()
     responses: dict[str, Any] = {}
     with mock.patch("bxapi.seeds.draw_seed", return_value=SEED), TestClient(create_app(settings)) as client:
         for exchange in load_examples():
@@ -139,6 +143,48 @@ def test_the_document_shows_each_example() -> None:
         if recorded["response"] is not None:
             media = next(iter(operation["responses"][str(recorded["status"])]["content"].values()))
             assert media["examples"][exchange["name"]]["value"] == recorded["response"]
+
+
+def test_every_listed_error_has_an_example() -> None:
+    missing = []
+    for path, item in build_openapi()["paths"].items():
+        for method, operation in item.items():
+            for status, response in operation["responses"].items():
+                if not status.startswith(("4", "5")):
+                    continue
+                media = next(iter(response["content"].values()))
+                shown = {example["value"]["code"] for example in media.get("examples", {}).values()}
+                missing += [
+                    f"{method.upper()} {path} {status} {code}" for code in error_codes(response) if code not in shown
+                ]
+    assert not missing, (
+        "add an exchange to src/bxapi/openapi_examples.json for each of these errors, or a shared example to "
+        f"shared_problems() if a request alone can't cause it: {missing}"
+    )
+
+
+def test_shared_example_names_differ_from_the_exchange_names() -> None:
+    shared = [example.name for example in shared_problems()]
+    assert len(shared) == len(set(shared))
+    assert not set(shared) & {exchange["name"] for exchange in load_examples()}
+
+
+def test_the_shared_examples_are_what_the_server_returns() -> None:
+    shared = {example.name: example.problem.model_dump(mode="json") for example in shared_problems()}
+    settings = _settings()
+    key = {"Authorization": f"Bearer {_KEYS[Role.REFEREE]}"}
+    json_body = {**key, "Content-Type": "application/json"}
+    with TestClient(create_app(settings)) as client:
+        sent = {
+            "unauthorized": client.get("/v1/meta"),
+            "validation_error": client.post("/v1/dice/roll", json={}, headers=key),
+            "bad_request": client.post("/v1/dice/roll", content=b'{"expression": "\xff1d6"}', headers=json_body),
+            "content_too_large": client.post(
+                "/v1/dice/roll", content=b" " * (settings.max_body_bytes + 1), headers=json_body
+            ),
+        }
+    for name, response in sent.items():
+        assert response.json() == shared[name], name
 
 
 def _record() -> None:

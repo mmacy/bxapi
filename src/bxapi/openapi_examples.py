@@ -6,6 +6,12 @@ of earlier exchanges, and the request and response that a server returned for it
 [`add_examples`][bxapi.openapi_examples.add_examples] copies the recorded requests and responses
 into the document.
 
+Some errors read the same on every operation, like 401 `unauthorized`, or can't be caused by a
+request alone, like 503 `database_busy`. [`shared_problems`][bxapi.openapi_examples.shared_problems]
+lists one example of each, built by the function the server calls to report the error.
+`add_examples` shows it on each operation that lists the error's code and has no recorded example
+of it.
+
 `tests/test_openapi_examples.py` sends every request to a new server and fails when a response
 differs from the recorded one, so an example can't go stale. To add or change an example, edit
 its template in the file and record the responses again:
@@ -16,11 +22,36 @@ uv run python -m tests.test_openapi_examples
 """
 
 import json
+import re
+from dataclasses import dataclass
 from functools import cache
 from importlib import resources
 from typing import Any
 
-__all__ = ["EXAMPLES_FILE", "add_examples", "load_examples", "trim", "trim_note"]
+from bxapi.auth import unauthorized
+from bxapi.db import BUSY_TIMEOUT_SECONDS
+from bxapi.errors import (
+    ApiError,
+    Problem,
+    content_too_large,
+    database_busy,
+    internal_error,
+    request_timeout,
+    validation_error,
+)
+from bxapi.session_manager import LOCK_TIMEOUT_SECONDS, session_busy, session_unreadable
+from bxapi.settings import Settings
+
+__all__ = [
+    "EXAMPLES_FILE",
+    "SharedProblem",
+    "add_examples",
+    "error_codes",
+    "load_examples",
+    "shared_problems",
+    "trim",
+    "trim_note",
+]
 
 EXAMPLES_FILE = "openapi_examples.json"
 """The name of the file in the `bxapi` package that lists the examples."""
@@ -35,6 +66,169 @@ def load_examples() -> tuple[dict[str, Any], ...]:
     """
     text = resources.files("bxapi").joinpath(EXAMPLES_FILE).read_text(encoding="utf-8")
     return tuple(json.loads(text))
+
+
+@dataclass(frozen=True)
+class SharedProblem:
+    """An example of an error response that the OpenAPI document shows on more than one operation."""
+
+    name: str
+    """The example's name in the document, like `unauthorized`."""
+    summary: str
+    """A short title for the example."""
+    description: str
+    """When the server sends the response, as Markdown."""
+    problem: Problem
+    """The problem document the server sends."""
+    operations: frozenset[str] = frozenset()
+    """The `operationId` of each operation to show the example on. When it's empty, the example
+    goes on every operation that lists its code, except an operation that another shared example
+    of the same code lists."""
+
+
+@cache
+def shared_problems() -> tuple[SharedProblem, ...]:
+    """Return the examples of the errors that the recorded exchanges don't cover.
+
+    Each example's problem document comes from the function that the server calls to build that
+    error, with the default settings where the detail states a limit.
+
+    Returns:
+        One example for each error code, except `session_unreadable`, which has one for a
+        session and one for a save.
+
+    Examples:
+        ```python
+        from bxapi.openapi_examples import shared_problems
+
+        names = [example.name for example in shared_problems()]
+        assert "unauthorized" in names
+        ```
+    """
+    max_bytes: int = Settings.model_fields["max_body_bytes"].default
+    timeout_seconds: float = Settings.model_fields["body_timeout_seconds"].default
+    missing = {"type": "missing", "loc": ("body", "expression"), "msg": "Field required"}
+
+    def shared(name: str, summary: str, description: str, error: ApiError, *operations: str) -> SharedProblem:
+        return SharedProblem(name, summary, description, error.problem(), frozenset(operations))
+
+    return (
+        shared(
+            "unauthorized",
+            "Send no API key",
+            "The response to a request under `/v1` with no API key, or with a key the server doesn't have.",
+            unauthorized(),
+        ),
+        shared(
+            "bad_request",
+            "Send a body that isn't UTF-8",
+            "The response to a request with a body the server can't decode. FastAPI writes the `detail`.",
+            # FastAPI raises this error itself, and the server's handler only converts it.
+            ApiError(400, "bad_request", "There was an error parsing the body"),
+        ),
+        shared(
+            "request_timeout",
+            "Send a body too slowly",
+            f"The response when a body takes more than {timeout_seconds:g} seconds to arrive, the server's default "
+            "limit.",
+            request_timeout(timeout_seconds),
+        ),
+        shared(
+            "content_too_large",
+            "Send a body that's too large",
+            f"The response to a body larger than {max_bytes} bytes, the server's default limit.",
+            content_too_large(max_bytes),
+        ),
+        shared(
+            "validation_error",
+            "Leave out a required field",
+            "The response to `POST /v1/dice/roll` with the body `{}`. Each entry in `errors` is one part of the "
+            "request that failed validation, and `loc` is the path to it.",
+            validation_error([missing]),
+        ),
+        shared(
+            "session_busy",
+            "Wait too long for the session",
+            f"The response when another request uses the session for more than {LOCK_TIMEOUT_SECONDS:g} seconds. "
+            "`revision` is the session's revision.",
+            session_busy(3, waited_seconds=LOCK_TIMEOUT_SECONDS),
+        ),
+        shared(
+            "internal_error",
+            "Hit a bug in the server",
+            "The response to a request that raises an exception the server doesn't expect. Every such request gets "
+            "the same document.",
+            internal_error(),
+        ),
+        shared(
+            "session_unreadable",
+            "Load a session osrlib can't read",
+            "The response when the server's osrlib can't load the session's stored state.",
+            session_unreadable("session"),
+        ),
+        shared(
+            "save_unreadable",
+            "Restore a save osrlib can't read",
+            "The response when the server's osrlib can't load the save's stored document.",
+            session_unreadable("save"),
+            "restore_save",
+        ),
+        shared(
+            "database_busy",
+            "Wait too long for the database",
+            f"The response when another process holds the database's write lock for more than "
+            f"{BUSY_TIMEOUT_SECONDS:g} seconds.",
+            database_busy(),
+        ),
+    )
+
+
+_LISTED_CODE = re.compile(r"^- `([a-z_]+)`", re.MULTILINE)
+
+
+def error_codes(response: dict[str, Any]) -> list[str]:
+    """Return the error codes that an error response in the OpenAPI document lists.
+
+    Args:
+        response: A response object from the document, with the description that
+            [`problem_responses`][bxapi.errors.problem_responses] writes.
+
+    Returns:
+        The codes, in the order the description lists them.
+
+    Examples:
+        ```python
+        from bxapi.errors import problem_responses
+        from bxapi.openapi_examples import error_codes
+
+        response = problem_responses({404: ["`not_found`: No session has that id."]})[404]
+        assert error_codes(response) == ["not_found"]
+        ```
+    """
+    return _LISTED_CODE.findall(response.get("description", ""))
+
+
+def _shared_example(code: str, operation_id: str) -> SharedProblem | None:
+    matches = [example for example in shared_problems() if example.problem.code == code]
+    specific = [example for example in matches if operation_id in example.operations]
+    general = [example for example in matches if not example.operations]
+    return next(iter(specific + general), None)
+
+
+def _add_shared_examples(operation_id: str, operation: dict[str, Any]) -> None:
+    for status, response in operation["responses"].items():
+        if not status.startswith(("4", "5")) or "content" not in response:
+            continue
+        media = next(iter(response["content"].values()))
+        shown = {example["value"].get("code") for example in media.get("examples", {}).values()}
+        for code in error_codes(response):
+            example = None if code in shown else _shared_example(code, operation_id)
+            if example is not None:
+                media.setdefault("examples", {})[example.name] = {
+                    "summary": example.summary,
+                    "description": example.description,
+                    "value": example.problem.model_dump(mode="json"),
+                }
 
 
 def _parent(document: Any, pointer: str) -> tuple[Any, str | int]:
@@ -99,11 +293,13 @@ def _request_line(recorded: dict[str, Any]) -> str:
 
 
 def add_examples(schema: dict[str, Any]) -> None:
-    """Add the recorded examples to an OpenAPI document.
+    """Add the recorded examples, and then the shared error examples, to an OpenAPI document.
 
     Each request body becomes an example of its operation's request body, and each response body
     an example of the response with its status. A request and its response have the same example
-    name, so a tool that pairs them can.
+    name, so a tool that pairs them can. Then each error code that an operation lists, and that no
+    recorded example of the operation shows, gets its example from
+    [`shared_problems`][bxapi.openapi_examples.shared_problems].
 
     Args:
         schema: The OpenAPI document, which the function changes.
@@ -142,3 +338,5 @@ def add_examples(schema: dict[str, Any]) -> None:
             "description": description,
             "value": recorded["response"],
         }
+    for operation_id, operation in operations.items():
+        _add_shared_examples(operation_id, operation)

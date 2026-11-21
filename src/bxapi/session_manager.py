@@ -53,6 +53,8 @@ __all__ = [
     "Executed",
     "SessionManager",
     "load_stored_save",
+    "session_busy",
+    "session_unreadable",
     "validate_loaded_adventure",
 ]
 
@@ -127,11 +129,55 @@ def validate_loaded_adventure(game: GameSession) -> None:
     validate_adventure(game.adventure, load_monsters(), load_equipment())
 
 
+def session_unreadable(resource: str) -> ApiError:
+    """Build the 500 for a stored session or save that osrlib can't load.
+
+    The detail contains nothing from osrlib's message, which can quote the stored state.
+
+    Args:
+        resource: What the server tried to load: `"session"` or `"save"`.
+
+    Returns:
+        An [`ApiError`][bxapi.errors.ApiError] with the code `session_unreadable`.
+    """
+    return ApiError(500, "session_unreadable", f"The server can't load this {resource}'s stored state.")
+
+
+def session_busy(revision: int, *, waited_seconds: float | None = None) -> ApiError:
+    """Build the 409 for a request that did nothing because another request had the session.
+
+    Args:
+        revision: The session's revision.
+        waited_seconds: How long the request waited for the session's lock before it gave up.
+            `None` means that another server process wrote the session after this request read it.
+
+    Returns:
+        An [`ApiError`][bxapi.errors.ApiError] with the code `session_busy` and the session's
+        `revision`.
+    """
+    if waited_seconds is None:
+        cause = (
+            "Another server process wrote the session after this request read it and before this request wrote it, "
+            "so the command had no effect."
+        )
+    else:
+        cause = (
+            f"Another request used the session for more than {waited_seconds:g} seconds, so this request did nothing."
+        )
+    return conflict(
+        "session_busy",
+        f"{cause} The session is at revision {revision}. If you sent expected_revision, read the session before you "
+        "decide what to do: when the revision has changed, the same request gets revision_conflict. If you didn't "
+        "send expected_revision, send the request again.",
+        revision=revision,
+    )
+
+
 def _unreadable(resource: str, resource_id: str, error: OsrlibError) -> ApiError:
     # osrlib's message can quote the stored document, which can contain what only the referee may see, so the
     # message goes to the log and never to the caller.
     _log.error("osrlib can't load the stored %s %s: %s", resource, resource_id, error)
-    return ApiError(500, "session_unreadable", f"The server can't load this {resource}'s stored state.")
+    return session_unreadable(resource)
 
 
 def load_stored_save(save_id: str, document: Mapping[str, object]) -> GameSession:
@@ -360,11 +406,7 @@ class SessionManager:
                 raise
             if not written:
                 self._drop(key, slot)
-                raise self._busy(
-                    key,
-                    "Another server process wrote the session after this request read it and before this request "
-                    "wrote it, so the command had no effect.",
-                )
+                raise self._busy(key)
             self._remember(key, slot, _Loaded(game, revision))
             return Executed(result=result, mode=game.mode, revision=revision)
 
@@ -423,11 +465,7 @@ class SessionManager:
             slot.users += 1
         try:
             if not slot.lock.acquire(timeout=self._lock_timeout):
-                raise self._busy(
-                    key,
-                    f"Another request used the session for more than {self._lock_timeout:g} seconds, so this "
-                    "request did nothing.",
-                )
+                raise self._busy(key, waited_seconds=self._lock_timeout)
             try:
                 yield slot
             finally:
@@ -438,19 +476,13 @@ class SessionManager:
                 if slot.users == 0 and slot.loaded is None:
                     del self._slots[key]
 
-    def _busy(self, key: _Key, cause: str) -> ApiError:
+    def _busy(self, key: _Key, *, waited_seconds: float | None = None) -> ApiError:
         """Return the 409 `session_busy` for a session, with its revision, or the 404 if it no longer exists."""
         client, session_id = key
         revision = self._db.get_session_revision(client, session_id)
         if revision is None:
             return not_found("session", session_id)
-        return conflict(
-            "session_busy",
-            f"{cause} The session is at revision {revision}. If you sent expected_revision, read the session "
-            "before you decide what to do: when the revision has changed, the same request gets "
-            "revision_conflict. If you didn't send expected_revision, send the request again.",
-            revision=revision,
-        )
+        return session_busy(revision, waited_seconds=waited_seconds)
 
     def _current(self, key: _Key, slot: _Slot) -> _Loaded:
         """Return the session as the database has it now. The caller holds the slot's lock."""

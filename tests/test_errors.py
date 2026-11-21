@@ -12,7 +12,17 @@ from pydantic import BaseModel, ConfigDict
 from starlette.types import Message, Receive, Scope
 
 from bxapi.app import create_app
-from bxapi.errors import PROBLEM_MEDIA_TYPE, conflict, forbidden, invalid, not_found
+from bxapi.errors import (
+    PROBLEM_MEDIA_TYPE,
+    conflict,
+    content_too_large,
+    database_busy,
+    forbidden,
+    internal_error,
+    invalid,
+    not_found,
+    request_timeout,
+)
 from bxapi.settings import Settings
 
 from .conftest import PLAYER_KEY, bearer
@@ -104,7 +114,9 @@ def test_extra_members_are_sent(api: TestClient) -> None:
 
 
 def test_unexpected_errors_hide_the_cause(api: TestClient) -> None:
-    assert "secret" not in api.get("/raise/bug").text
+    response = api.get("/raise/bug")
+    assert "secret" not in response.text
+    assert response.json() == internal_error().problem().model_dump(mode="json")
 
 
 def test_request_validation_lists_each_field(api: TestClient) -> None:
@@ -127,7 +139,7 @@ def test_declared_body_over_the_limit_is_413(settings: Settings, make_client: Ca
     response = client.post("/v1/meta", content=b"x" * 2048)
     assert response.status_code == 413
     assert response.headers["content-type"] == PROBLEM_MEDIA_TYPE
-    assert response.json()["code"] == "content_too_large"
+    assert response.json() == content_too_large(1024).problem().model_dump(mode="json")
 
 
 def test_streamed_body_over_the_limit_is_413(settings: Settings) -> None:
@@ -146,7 +158,7 @@ def test_streamed_body_over_the_limit_is_413(settings: Settings) -> None:
     with TestClient(app) as client:
         response = client.post("/echo", content=chunks(), headers={"Content-Type": "application/json"})
     assert response.status_code == 413
-    assert response.json()["code"] == "content_too_large"
+    assert response.json() == content_too_large(1024).problem().model_dump(mode="json")
 
 
 def test_cors_headers_only_for_configured_origins(settings: Settings, make_client: Callable[..., TestClient]) -> None:
@@ -228,7 +240,7 @@ def test_a_write_lock_held_by_another_process_is_503(
         holder.close()
     assert response.status_code == 503
     assert response.headers["retry-after"] == "1"
-    assert response.json()["code"] == "database_busy"
+    assert response.json() == database_busy().problem().model_dump(mode="json")
     assert client.post("/v1/ability-rolls").status_code == 201
 
 
@@ -280,7 +292,7 @@ def test_a_body_that_never_arrives_is_408(keyed_settings: Settings) -> None:
 
     status, problem = _call(app, scope, receive)
     assert status == 408
-    assert problem["code"] == "request_timeout"
+    assert problem == request_timeout(0.2).problem().model_dump(mode="json")
     app.state.db.close()
 
 

@@ -15,6 +15,7 @@ from osrlib.persistence import load_game, save_game
 from osrlib.versioning import SCHEMA_VERSION
 
 from bxapi.adventures import adventure_document
+from bxapi.session_manager import session_unreadable
 from bxapi.settings import Settings
 
 from .conftest import REFEREE_KEY
@@ -280,8 +281,7 @@ def test_a_stored_save_osrlib_cannot_load_is_unreadable_without_details(
         connection.execute("UPDATE saves SET document = ? WHERE id = ?", (json.dumps(document), created["id"]))
     with caplog.at_level(logging.ERROR, logger="bxapi"):
         response = referee.post(f"/v1/saves/{created['id']}/restore")
-    found = problem(response, 500, "session_unreadable")
-    assert found["detail"] == "The server can't load this save's stored state."
+    assert problem(response, 500, "session_unreadable") == session_unreadable("save").problem().model_dump(mode="json")
     assert "SECRET" not in response.text
     assert created["id"] in caplog.text and "SECRET-TRAP-AT-3,4" in caplog.text
     assert ok(referee.get("/v1/sessions"))["total"] == 1

@@ -41,6 +41,7 @@ __all__ = [
     "authenticate",
     "find_principal",
     "require_referee",
+    "unauthorized",
 ]
 
 LOCAL_CLIENT = "local"
@@ -116,7 +117,13 @@ def find_principal(settings: Settings, authorization: str | None) -> Principal |
     return None if match is None else Principal(client=match.client, role=match.role)
 
 
-def _unauthorized() -> ApiError:
+def unauthorized() -> ApiError:
+    """Build the 401 for a request with no API key, or a key the server doesn't have.
+
+    Returns:
+        An [`ApiError`][bxapi.errors.ApiError] with the code `unauthorized` and the header
+        `WWW-Authenticate: Bearer`.
+    """
     return ApiError(
         401,
         "unauthorized",
@@ -150,7 +157,7 @@ class AuthMiddleware:
             return
         principal = find_principal(self.settings, Headers(scope=scope).get("authorization"))
         if principal is None:
-            error = _unauthorized()
+            error = unauthorized()
             await problem_response(error.problem(), error.headers)(scope, receive, send)
             return
         scope.setdefault("state", {})["principal"] = principal
@@ -185,7 +192,7 @@ def authenticate(
     if principal is None:
         principal = find_principal(request.app.state.settings, request.headers.get("authorization"))
     if principal is None:
-        raise _unauthorized()
+        raise unauthorized()
     return principal
 
 
