@@ -63,23 +63,23 @@ curl -s -X POST http://127.0.0.1:8640/v1/characters -H "Content-Type: applicatio
 ```
 
 ```json
-{"id":"chr_4G7Svt3juOQTF4Ma8pgnTg","name":"Brenna","class_id":"fighter","level":1,"created_at":"2026-11-21T00:30:36Z","character":{...},"derived":{...}}
+{"id":"chr_YT8cPTCkC64HI8WyN-Vq6A","name":"Brenna","class_id":"fighter","level":1,"created_at":"2026-11-21T05:25:55Z","character":{...},"derived":{...}}
 ```
 
 Start a *session*, which is one game in progress. Its *party*, the group of characters that plays, is the character you created, and its adventure is `builtin-barrow`:
 
 ```sh
-curl -s -X POST http://127.0.0.1:8640/v1/sessions -H "Content-Type: application/json" -d '{"adventure_id": "builtin-barrow", "character_ids": ["chr_4G7Svt3juOQTF4Ma8pgnTg"]}'
+curl -s -X POST http://127.0.0.1:8640/v1/sessions -H "Content-Type: application/json" -d '{"adventure_id": "builtin-barrow", "character_ids": ["chr_YT8cPTCkC64HI8WyN-Vq6A"]}'
 ```
 
 ```json
-{"id":"ses_X_eqeZHjvu-Ls07tQxvJcA","name":"The Barrow of the Forgotten King","adventure_id":"builtin-barrow","adventure_name":"The Barrow of the Forgotten King","mode":"town","ended":false,"revision":0,...}
+{"id":"ses_BVmUCi5oRTQ0qSr1NadnJw","name":"The Barrow of the Forgotten King","adventure_id":"builtin-barrow","adventure_name":"The Barrow of the Forgotten King","mode":"town","ended":false,"revision":0,...}
 ```
 
 The session starts in town. Send it the command to enter the dungeon:
 
 ```sh
-curl -s -X POST http://127.0.0.1:8640/v1/sessions/ses_X_eqeZHjvu-Ls07tQxvJcA/commands -H "Content-Type: application/json" -d '{"command_type": "enter_dungeon", "dungeon_id": "barrow"}'
+curl -s -X POST http://127.0.0.1:8640/v1/sessions/ses_BVmUCi5oRTQ0qSr1NadnJw/commands -H "Content-Type: application/json" -d '{"command_type": "enter_dungeon", "dungeon_id": "barrow"}'
 ```
 
 ```json
@@ -89,7 +89,7 @@ curl -s -X POST http://127.0.0.1:8640/v1/sessions/ses_X_eqeZHjvu-Ls07tQxvJcA/com
 Move the party one cell east:
 
 ```sh
-curl -s -X POST http://127.0.0.1:8640/v1/sessions/ses_X_eqeZHjvu-Ls07tQxvJcA/commands -H "Content-Type: application/json" -d '{"command_type": "move_party", "direction": "east"}'
+curl -s -X POST http://127.0.0.1:8640/v1/sessions/ses_BVmUCi5oRTQ0qSr1NadnJw/commands -H "Content-Type: application/json" -d '{"command_type": "move_party", "direction": "east"}'
 ```
 
 ```json

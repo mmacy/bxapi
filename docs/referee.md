@@ -17,12 +17,12 @@ A referee can do everything a player can, so the walkthrough in [Play a game](pl
 A *session* is one game in progress. A session's *seed* is a number that determines every die the session rolls. When a request to start a session has no `seed`, the server picks a random one. The server doesn't return a session's seed in the session's responses, so a player can't predict a roll. Only a save's document, which only a referee can read, contains it. A referee can pass a `seed`, an integer from 0 to 9,007,199,254,740,991, when it starts a session. Start the session that the rest of this page uses with seed 7:
 
 ```sh
-curl -s -X POST http://127.0.0.1:8640/v1/sessions -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"adventure_id": "builtin-barrow", "character_ids": ["chr_XSWUBj-UjQauxKNeDtopIg", "chr_yqskEJZy5UoVvqCBN3Hbkw", "chr_5EZYSIgQNlMz7w7p1GwFlA"], "seed": 7}'
+curl -s -X POST http://127.0.0.1:8640/v1/sessions -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"adventure_id": "builtin-barrow", "character_ids": ["chr_PUtflt1xPCTJIwhqMcAIrA", "chr_kqRWmM-1d1lMQFy-4CFVnw", "chr_8l3D6o0BvEL_V99x7NUK1w"], "seed": 7}'
 ```
 
 ```json
 {
-  "id": "ses_0VOivRW_xUk35SOGrfDwDA",
+  "id": "ses_E_QSB7sk4KaykheFC1oSxw",
   "name": "The Barrow of the Forgotten King",
   "adventure_id": "builtin-barrow",
   "adventure_name": "The Barrow of the Forgotten King",
@@ -39,12 +39,12 @@ A referee can pass a `seed` to `POST /v1/ability-rolls` and `POST /v1/characters
 
 ## Send referee commands
 
-A referee can send *referee commands*, which change a game directly. `GET /v1/sessions/{session_id}/commands` lists both play and referee commands for a referee. A command's `kind` is `play` or `referee`. A `referee` command is legal in most modes, and a player who sends one gets 403 `referee_command`. The list starts with `grant_item`, `grant_coins`, `award_xp`, `set_flag`, `spawn_monsters`, and `spawn_npc_party`, and includes `place_party`, `advance_time`, `complete_quest`, and `end_encounter`.
+A referee can send *referee commands*, which change a game directly. `GET /v1/sessions/{session_id}/commands` lists both play and referee commands for a referee. A command's `kind` is `play` or `referee`, and a player who sends a `referee` command gets 403 `referee_command`. `GET /v1/rules/commands?kind=referee` lists every referee command with its `allowed_modes`. The list starts with `grant_item`, `grant_coins`, `award_xp`, `set_flag`, `spawn_monsters`, and `spawn_npc_party`, and includes `place_party`, `advance_time`, `complete_quest`, and `end_encounter`. Most of them are legal in every mode. The others, like `spawn_monsters`, `place_party`, and `end_encounter`, list fewer modes, and in any other mode the rules refuse them with `session.command.wrong_mode`.
 
 Put a rope in a character's pack in the session you just started. A command refers to a party member by the id from the player view (`GET /v1/sessions/{session_id}/view`), like `character-0001` for the first character in marching order:
 
 ```sh
-curl -s -X POST http://127.0.0.1:8640/v1/sessions/ses_0VOivRW_xUk35SOGrfDwDA/commands -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"command_type": "grant_item", "character_id": "character-0001", "item_id": "rope"}'
+curl -s -X POST http://127.0.0.1:8640/v1/sessions/ses_E_QSB7sk4KaykheFC1oSxw/commands -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"command_type": "grant_item", "character_id": "character-0001", "item_id": "rope"}'
 ```
 
 ```json
@@ -66,7 +66,7 @@ Some events are for the referee only, like the surprise and reaction rolls and t
 Enter the dungeon and move east once, as in [Play a game](play-a-game.md#enter-the-dungeon). Then move east again into the guard room of the built-in adventure, this time with `visibility=referee`:
 
 ```sh
-curl -s -X POST "http://127.0.0.1:8640/v1/sessions/ses_0VOivRW_xUk35SOGrfDwDA/commands?visibility=referee" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"command_type": "move_party", "direction": "east"}'
+curl -s -X POST "http://127.0.0.1:8640/v1/sessions/ses_E_QSB7sk4KaykheFC1oSxw/commands?visibility=referee" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"command_type": "move_party", "direction": "east"}'
 ```
 
 ```json
@@ -89,7 +89,7 @@ curl -s -X POST "http://127.0.0.1:8640/v1/sessions/ses_0VOivRW_xUk35SOGrfDwDA/co
     "Treasure generated at cache-0001 (C): 500 gp in coin, 3 valuable(s), 0 magic item(s).",
     "Surprise (monsters): rolled 4, surprised on 1-2 — not surprised.",
     "Surprise (party): rolled 4, surprised on 1-3 — not surprised.",
-    "Encounter: 2 × Goblin at 20'.",
+    "Encounter: 2 goblins at 20'.",
     "Reaction roll: 9+0 = 9 — indifferent.",
     "The monsters' bearing: indifferent."
   ],
@@ -106,7 +106,7 @@ curl -s -X POST "http://127.0.0.1:8640/v1/sessions/ses_0VOivRW_xUk35SOGrfDwDA/co
 `GET /v1/sessions/{session_id}/referee-view` returns the whole state of a game, except the session's seed (the *master seed*) and the state of its random number generators. A player who asks gets 403 `referee_required`.
 
 ```sh
-curl -s http://127.0.0.1:8640/v1/sessions/ses_0VOivRW_xUk35SOGrfDwDA/referee-view -H "Authorization: Bearer $KEY"
+curl -s http://127.0.0.1:8640/v1/sessions/ses_E_QSB7sk4KaykheFC1oSxw/referee-view -H "Authorization: Bearer $KEY"
 ```
 
 ```json
@@ -125,7 +125,7 @@ curl -s http://127.0.0.1:8640/v1/sessions/ses_0VOivRW_xUk35SOGrfDwDA/referee-vie
   "encounter": {
     "kind": "keyed",
     "area_ref": "barrow:1:guard_room",
-    "groups": [{"id": "group-0001", "label": "Goblin", "monster_ids": ["monster-0001", "monster-0002"], "distance_feet": 20, ...}],
+    "groups": [{"id": "group-0001", "label": "goblin", "label_plural": "goblins", "monster_ids": ["monster-0001", "monster-0002"], "distance_feet": 20, "fleeing": false, "fled": false, ...}],
     "stance": "indifferent",
     ...
   },
@@ -144,7 +144,7 @@ Compared with the player view, it has the monsters' hit points and ids, the whol
 End the encounter as if the party had talked its way past the goblins. `outcome` is `parley` or `departed`:
 
 ```sh
-curl -s -X POST http://127.0.0.1:8640/v1/sessions/ses_0VOivRW_xUk35SOGrfDwDA/commands -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"command_type": "end_encounter", "outcome": "parley"}'
+curl -s -X POST http://127.0.0.1:8640/v1/sessions/ses_E_QSB7sk4KaykheFC1oSxw/commands -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"command_type": "end_encounter", "outcome": "parley"}'
 ```
 
 ```json
@@ -168,7 +168,7 @@ Only a referee can set a command's `source` field. It records who or what issued
 The event log takes `visibility=referee` too, and `after` counts the events of the visibility you ask for. Here, a referee who has read 8 events asks for the rest:
 
 ```sh
-curl -s "http://127.0.0.1:8640/v1/sessions/ses_0VOivRW_xUk35SOGrfDwDA/events?visibility=referee&after=8" -H "Authorization: Bearer $KEY"
+curl -s "http://127.0.0.1:8640/v1/sessions/ses_E_QSB7sk4KaykheFC1oSxw/events?visibility=referee&after=8" -H "Authorization: Bearer $KEY"
 ```
 
 ```json
@@ -176,7 +176,7 @@ curl -s "http://127.0.0.1:8640/v1/sessions/ses_0VOivRW_xUk35SOGrfDwDA/events?vis
   "events": [...],
   "messages": [
     "Surprise (party): rolled 4, surprised on 1-3 — not surprised.",
-    "Encounter: 2 × Goblin at 20'.",
+    "Encounter: 2 goblins at 20'.",
     "Reaction roll: 9+0 = 9 — indifferent.",
     "The monsters' bearing: indifferent.",
     "The encounter ends (parley)."
@@ -197,7 +197,7 @@ A referee can start a session with a `party_document` in place of `character_ids
 To try the endpoint, build a document from a character you created. The two versions in the document are the ones that `GET /v1/meta` returns. This command uses `jq` to copy Brenna's character from `GET /v1/characters/{character_id}`, raise it to level 5 with 30 hit points, and save the result as `hero.json`:
 
 ```sh
-curl -s http://127.0.0.1:8640/v1/characters/chr_XSWUBj-UjQauxKNeDtopIg -H "Authorization: Bearer $KEY" | jq '{kind: "character", schema_version: 4, engine_version: "2.4.0", payload: (.character | .name = "Brenna the Bold" | .level = 5 | .max_hp = 30 | .current_hp = 30)}' > hero.json
+curl -s http://127.0.0.1:8640/v1/characters/chr_PUtflt1xPCTJIwhqMcAIrA -H "Authorization: Bearer $KEY" | jq '{kind: "character", schema_version: 4, engine_version: "2.5.0", payload: (.character | .name = "Brenna the Bold" | .level = 5 | .max_hp = 30 | .current_hp = 30)}' > hero.json
 ```
 
 Import the document:
@@ -208,11 +208,11 @@ curl -s -X POST http://127.0.0.1:8640/v1/characters/import -H "Authorization: Be
 
 ```json
 {
-  "id": "chr_7sB21cwDr97zAJ5dFpiQ4w",
+  "id": "chr_9YBr9e9yLj4j_wuaQ6w0Iw",
   "name": "Brenna the Bold",
   "class_id": "fighter",
   "level": 5,
-  "created_at": "2026-11-21T00:26:59Z",
+  "created_at": "2026-11-21T05:24:33Z",
   "character": {...},
   "derived": {...}
 }
@@ -225,7 +225,7 @@ The response is a stored character, like the one `POST /v1/characters` returns. 
 A save's *document* contains the whole game, including the master seed. Only a referee can read one. Export the save from [Play a game](play-a-game.md#save-and-restore), to keep a copy or to move it to another server:
 
 ```sh
-curl -s http://127.0.0.1:8640/v1/saves/sav_aJfDsAPQJJMycBUJySEXRA/document -H "Authorization: Bearer $KEY" -o save.json
+curl -s http://127.0.0.1:8640/v1/saves/sav_E6NKZNiBl4c2jL_rkyY8Bg/document -H "Authorization: Bearer $KEY" -o save.json
 ```
 
 ```sh
@@ -233,7 +233,7 @@ head -c 300 save.json
 ```
 
 ```text
-{"kind":"save","schema_version":4,"engine_version":"2.4.0","payload":{"master_seed":8490118134873150,"ruleset":{"hp_reroll_at_first_level":false,"encumbrance":"basic","variable_weapon_damage":true,"individual_initiative":false,"thac0_arithmetic":false,"weapon_reload":false,"hd5_counts_as_magical":fa
+{"kind":"save","schema_version":4,"engine_version":"2.5.0","payload":{"master_seed":3860435029322934,"ruleset":{"hp_reroll_at_first_level":false,"encumbrance":"basic","variable_weapon_damage":true,"individual_initiative":false,"thac0_arithmetic":false,"weapon_reload":false,"hd5_counts_as_magical":fa
 ```
 
 Import it, on this server or another one:
@@ -244,26 +244,26 @@ curl -s -X POST http://127.0.0.1:8640/v1/saves/import -H "Authorization: Bearer 
 
 ```json
 {
-  "id": "sav_6A6GS6DlA8U4T31M7YAQoA",
+  "id": "sav_mAJU7Pqpm2ScDYKejDK-Rw",
   "session_id": null,
   "adventure_id": null,
   "adventure_name": "The Barrow of the Forgotten King",
   "label": null,
   "mode": "battle",
   "clock": {"rounds": 121, "turns": 2, "days": 0},
-  "created_at": "2026-11-21T00:26:59Z"
+  "created_at": "2026-11-21T05:24:33Z"
 }
 ```
 
 An imported save has no `session_id`, `adventure_id`, or label. The server loads the document before it stores anything, so a document that the rules engine can't load gets 422 `content_invalid`, and one with a newer schema version gets 409 `version_unsupported`. Restore the imported save the way you restore any save:
 
 ```sh
-curl -s -X POST http://127.0.0.1:8640/v1/saves/sav_6A6GS6DlA8U4T31M7YAQoA/restore -H "Authorization: Bearer $KEY"
+curl -s -X POST http://127.0.0.1:8640/v1/saves/sav_mAJU7Pqpm2ScDYKejDK-Rw/restore -H "Authorization: Bearer $KEY"
 ```
 
 ```json
 {
-  "id": "ses_hrDLkmHRyi3IRaTNymkylg",
+  "id": "ses_XcI1kemu07lLvUu_-aBbHw",
   "name": "The Barrow of the Forgotten King",
   "adventure_id": null,
   "adventure_name": "The Barrow of the Forgotten King",
@@ -281,7 +281,7 @@ export KEY=player-key-0123456789
 ```
 
 ```sh
-curl -si http://127.0.0.1:8640/v1/saves/sav_aJfDsAPQJJMycBUJySEXRA/document -H "Authorization: Bearer $KEY"
+curl -si http://127.0.0.1:8640/v1/saves/sav_E6NKZNiBl4c2jL_rkyY8Bg/document -H "Authorization: Bearer $KEY"
 ```
 
 ```text

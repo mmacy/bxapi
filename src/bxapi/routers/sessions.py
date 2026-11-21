@@ -410,7 +410,9 @@ def _party(db: Database, principal: Principal, body: CreateSessionRequest) -> Pa
                 "so does a request with more than 20 `character_ids`.",
                 "`party_invalid`: osrlib refuses the party, like an empty `character_ids`, or a `party_document` has "
                 "more than 20 characters or two members with the same id.",
-                "`content_invalid`: The `party_document` isn't a valid party document.",
+                "`content_invalid`: The `party_document` isn't a valid party document, or the server's osrlib "
+                "refuses the stored adventure, which a server with an earlier osrlib release accepted. Upload a "
+                "fixed document.",
             ],
         }
     ),
@@ -653,21 +655,27 @@ def get_player_view(request: Request, principal: CurrentPrincipal, session_id: S
     """Return osrlib's `PlayerView` of the session: what the players may see now.
 
     Draw the screen from it after each command. It has the party, the mapped part of the dungeon, the encounter or
-    battle in progress, the journal, and the active quests. It never has unexplored map, monster hit points, or the
-    referee's rolls. The server builds the view while no command runs on the session, so it shows the session
-    between two commands.
+    battle in progress, the journal, the active quests, and the town's prices for healing. It never has unexplored
+    map, monster hit points, or the referee's rolls. The server builds the view while no command runs on the
+    session, so it shows the session between two commands.
 
     These fields are the ones a screen usually needs:
 
     - `mode`: the session's mode, which decides the commands that are legal.
     - `location`: in town, `kind` is `town`. In a dungeon, it has `dungeon_id`, `level_number`, the party's
       `position` as `[x, y]`, and `facing`.
-    - `party`: each member, in marching order, with `id`, hit points, conditions, and inventory. A command that acts
-      on one member takes this `id`, like `character_id` in `equip_item`.
+    - `party`: each member, in marching order, with `id`, hit points, conditions, inventory, and every other number
+      on a B/X character sheet, like `scores`, `armour_class`, `thac0`, `saves`, and `thief_skills`. A command that
+      acts on one member takes this `id`, like `character_id` in `equip_item`.
     - `explored`: for each dungeon level the party has visited, the `cells` it has seen and the `edges` between
       them. An edge's key is `x,y:side`, like `0,0:north`.
-    - `encounter`: the encounter in progress, or `null`.
+    - `encounter`: the encounter in progress, or `null`. Each of its `groups` has an `id` to put in a battle
+      declaration's `target_group_id`, a `label` and a `label_plural` to show, and `family_id` and `categories` to
+      tell what kind of creature the group is. The view doesn't say which group a monster id in a message belongs
+      to. Only the referee view lists each group's `monster_ids`.
     - `journal` and `quests`: what the players have learned, and the quests they know about.
+    - `town_healing_prices`: what the town's temple charges, in gold pieces, for each service that
+      `purchase_healing` buys.
     """
     return _sessions(request).read(principal.client, session_id, build_player_view)
 

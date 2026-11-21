@@ -49,7 +49,7 @@ curl -s http://127.0.0.1:8640/v1/meta -H "Authorization: Bearer $KEY"
 ```json
 {
   "api_version": "0.1.0",
-  "engine_version": "2.4.0",
+  "engine_version": "2.5.0",
   "schema_version": 4,
   "auth_enabled": true,
   "client": "my-game",
@@ -92,7 +92,7 @@ A key's role determines what the holder may do in a *session*, a game in progres
 A player who asks for something only a referee may do gets status 403 and the code `referee_required`. This request and the ones below use the id of a session that the player key of `my-game` started, as [Play a game](play-a-game.md#start-a-session) shows. Replace the id with one of yours:
 
 ```sh
-curl -si http://127.0.0.1:8640/v1/sessions/ses_eqeMc3BaPn-ii_2kKiCJWw/referee-view -H "Authorization: Bearer $KEY"
+curl -si http://127.0.0.1:8640/v1/sessions/ses_Bq2lhAvBgBLVtCRWuWkVUQ/referee-view -H "Authorization: Bearer $KEY"
 ```
 
 ```text
@@ -110,11 +110,11 @@ export KEY=referee-key-0123456789
 ```
 
 ```sh
-curl -s http://127.0.0.1:8640/v1/sessions/ses_eqeMc3BaPn-ii_2kKiCJWw/referee-view -H "Authorization: Bearer $KEY" | head -c 300
+curl -s http://127.0.0.1:8640/v1/sessions/ses_Bq2lhAvBgBLVtCRWuWkVUQ/referee-view -H "Authorization: Bearer $KEY" | head -c 300
 ```
 
 ```text
-{"ruleset":{"hp_reroll_at_first_level":false,"encumbrance":"basic","variable_weapon_damage":true,"individual_initiative":false,"thac0_arithmetic":false,"weapon_reload":false,"hd5_counts_as_magical":false,"magic_item_death_save":tr
+{"ruleset":{"hp_reroll_at_first_level":false,"encumbrance":"basic","variable_weapon_damage":true,"individual_initiative":false,"thac0_arithmetic":false,"weapon_reload":false,"hd5_counts_as_magical":false,"magic_item_death_save":true,"xp_award_timing":"on_return","deprivation_penalties":false,"aoe_fr
 ```
 
 Trying again doesn't fix a 403 either. Give your application a referee key only if it needs one. [Run games as a referee](referee.md) describes what the role adds. Give a referee key only to software that runs on a server you trust, like your game's backend. Don't put a referee key in a web page or an app that your players can read.
@@ -131,12 +131,12 @@ bxapi has no user accounts. A key identifies a client application, not a person.
 The referee key of `my-game`, still in `KEY`, can read the session that the player key of `my-game` created:
 
 ```sh
-curl -s http://127.0.0.1:8640/v1/sessions/ses_eqeMc3BaPn-ii_2kKiCJWw -H "Authorization: Bearer $KEY"
+curl -s http://127.0.0.1:8640/v1/sessions/ses_Bq2lhAvBgBLVtCRWuWkVUQ -H "Authorization: Bearer $KEY"
 ```
 
 ```json
 {
-  "id": "ses_eqeMc3BaPn-ii_2kKiCJWw",
+  "id": "ses_Bq2lhAvBgBLVtCRWuWkVUQ",
   "name": "The Barrow of the Forgotten King",
   "adventure_id": "builtin-barrow",
   "adventure_name": "The Barrow of the Forgotten King",
@@ -145,9 +145,9 @@ curl -s http://127.0.0.1:8640/v1/sessions/ses_eqeMc3BaPn-ii_2kKiCJWw -H "Authori
   "revision": 5,
   "clock": {"rounds": 121, "turns": 2, "days": 0},
   "schema_version": 4,
-  "engine_version": "2.4.0",
-  "created_at": "2026-11-21T00:26:38Z",
-  "updated_at": "2026-11-21T00:26:38Z"
+  "engine_version": "2.5.0",
+  "created_at": "2026-11-21T05:24:33Z",
+  "updated_at": "2026-11-21T05:24:33Z"
 }
 ```
 
@@ -158,7 +158,7 @@ export KEY=other-key-0123456789ab
 ```
 
 ```sh
-curl -si http://127.0.0.1:8640/v1/sessions/ses_eqeMc3BaPn-ii_2kKiCJWw -H "Authorization: Bearer $KEY"
+curl -si http://127.0.0.1:8640/v1/sessions/ses_Bq2lhAvBgBLVtCRWuWkVUQ -H "Authorization: Bearer $KEY"
 ```
 
 ```text
@@ -166,7 +166,7 @@ HTTP/1.1 404 Not Found
 ...
 content-type: application/problem+json
 
-{"type":"about:blank","title":"Not Found","status":404,"detail":"No session has the id 'ses_eqeMc3BaPn-ii_2kKiCJWw'.","code":"not_found","resource":"session","id":"ses_eqeMc3BaPn-ii_2kKiCJWw"}
+{"type":"about:blank","title":"Not Found","status":404,"detail":"No session has the id 'ses_Bq2lhAvBgBLVtCRWuWkVUQ'.","code":"not_found","resource":"session","id":"ses_Bq2lhAvBgBLVtCRWuWkVUQ"}
 ```
 
 ```sh
@@ -201,7 +201,7 @@ curl -s http://127.0.0.1:8640/v1/meta
 ```
 
 ```json
-{"api_version":"0.1.0","engine_version":"2.4.0","schema_version":4,"auth_enabled":false,"client":"local","role":"referee"}
+{"api_version":"0.1.0","engine_version":"2.5.0","schema_version":4,"auth_enabled":false,"client":"local","role":"referee"}
 ```
 
 Use this mode only on your own machine. When the server has any key, `BXAPI_ALLOW_ANONYMOUS` has no effect.

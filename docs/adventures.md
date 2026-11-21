@@ -41,7 +41,7 @@ export KEY=player-key-0123456789
 
 ## Validate a document
 
-Send a document to `POST /v1/adventures/validate` to check it without storing it. The server runs every check that the rules engine makes on an adventure: the document's structure, and every reference the adventure makes to a monster, an item, an area, or a quest. After you upload an adventure that passes, a session can play it.
+Send a document to `POST /v1/adventures/validate` to check it without storing it. The server runs every check that the rules engine makes on an adventure: the document's structure, every reference the adventure makes to a monster, an item, an area, or a quest, and content that a session couldn't play, like a treasure type letter outside `A` to `V`, a key in a level's `edges` that isn't the key of a side of a cell on the grid, or an area whose cells all belong to an area listed before it. After you upload an adventure that passes, a session can play it.
 
 ```sh
 curl -s -X POST http://127.0.0.1:8640/v1/adventures/validate -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d @barrow.json
@@ -106,9 +106,9 @@ curl -s -X POST http://127.0.0.1:8640/v1/adventures -H "Authorization: Bearer $K
   "party": null,
   "town": {"name": "Threshold", "description": "A walled market town at the edge of the moors."},
   "dungeons": [{"id": "barrow", "name": "The Barrow"}],
-  "id": "adv_OYCL9qF0YhQ0HVyLdsBthw",
+  "id": "adv_WGPW5ae_3LkxU1F45n24Aw",
   "builtin": false,
-  "created_at": "2026-11-21T00:27:05Z"
+  "created_at": "2026-11-21T05:24:33Z"
 }
 ```
 
@@ -145,13 +145,13 @@ Each upload stores a new adventure, even when the document is one you uploaded b
 The info contains only what a player may know before play, whatever the key's role. It leaves out the maps, monsters, treasure, triggers, and quests, and it doesn't say how many levels a dungeon has, because the player view shows only the levels a party has explored. A game that lists adventures for its players can show the info as it is. In the commands below, replace the adventure's id with the one your upload returned.
 
 ```sh
-curl -s http://127.0.0.1:8640/v1/adventures/adv_OYCL9qF0YhQ0HVyLdsBthw -H "Authorization: Bearer $KEY"
+curl -s http://127.0.0.1:8640/v1/adventures/adv_WGPW5ae_3LkxU1F45n24Aw -H "Authorization: Bearer $KEY"
 ```
 
 The response is the same info that the upload returned. The full document is for referees: `GET /v1/adventures/{adventure_id}/document` returns it as it was uploaded, and a player who asks gets 403 `referee_required`:
 
 ```sh
-curl -si http://127.0.0.1:8640/v1/adventures/adv_OYCL9qF0YhQ0HVyLdsBthw/document -H "Authorization: Bearer $KEY"
+curl -si http://127.0.0.1:8640/v1/adventures/adv_WGPW5ae_3LkxU1F45n24Aw/document -H "Authorization: Bearer $KEY"
 ```
 
 ```text
@@ -165,14 +165,14 @@ HTTP/1.1 403 Forbidden
 Start a session with the adventure's id and the id of a character you created, as [Play a game](play-a-game.md#create-a-character) shows. The rest of play is the same as with the built-in adventure:
 
 ```sh
-curl -s -X POST http://127.0.0.1:8640/v1/sessions -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"adventure_id": "adv_OYCL9qF0YhQ0HVyLdsBthw", "character_ids": ["chr_XSWUBj-UjQauxKNeDtopIg"]}'
+curl -s -X POST http://127.0.0.1:8640/v1/sessions -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"adventure_id": "adv_WGPW5ae_3LkxU1F45n24Aw", "character_ids": ["chr_PUtflt1xPCTJIwhqMcAIrA"]}'
 ```
 
 ```json
 {
-  "id": "ses_k38jq5pfILT6dAC9UeUsxg",
+  "id": "ses_XsUOF5owj4gNTroX5QZnwA",
   "name": "The Barrow, second edition",
-  "adventure_id": "adv_OYCL9qF0YhQ0HVyLdsBthw",
+  "adventure_id": "adv_WGPW5ae_3LkxU1F45n24Aw",
   "adventure_name": "The Barrow, second edition",
   "mode": "town",
   ...
@@ -184,7 +184,7 @@ curl -s -X POST http://127.0.0.1:8640/v1/sessions -H "Authorization: Bearer $KEY
 Delete an adventure you uploaded:
 
 ```sh
-curl -si -X DELETE http://127.0.0.1:8640/v1/adventures/adv_OYCL9qF0YhQ0HVyLdsBthw -H "Authorization: Bearer $KEY"
+curl -si -X DELETE http://127.0.0.1:8640/v1/adventures/adv_WGPW5ae_3LkxU1F45n24Aw -H "Authorization: Bearer $KEY"
 ```
 
 ```text

@@ -144,9 +144,13 @@ def get_monster(
 ) -> MonsterTemplate:
     """Return osrlib's template for one monster: attacks, saves, morale, treasure, and special abilities.
 
-    The template is the stat block every monster of the kind shares. To roll hit points for one or more of them, use
-    `POST /v1/generate/monsters`. `treasure` has the monster's treasure types, each a letter that
-    `POST /v1/generate/treasure` takes as `treasure_type`.
+    The template is the stat block every monster of the kind shares. `display_name` and `display_name_plural` are
+    what to call one or more of the monsters in a sentence, like `"giant centipede"` for the template named
+    `"Centipede, Giant"`. `family_id` is the id that every form of the same creature shares, and it's the
+    `family_id` that the player view reports for a group of these monsters.
+
+    To roll hit points for one or more of them, use `POST /v1/generate/monsters`. `treasure` has the monster's
+    treasure types, each a letter that `POST /v1/generate/treasure` takes as `treasure_type`.
     """
     return lookup(load_monsters().get, "monster", monster_id)
 

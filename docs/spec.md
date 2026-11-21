@@ -160,7 +160,7 @@ A stored character is `{id, name, class_id, level, created_at, character, derive
 - `xp_modifier_pct` and `level_title`, from the functions of those names in `osrlib.core.classes`. `level_title` is `null` past the class's last title.
 - `alignment_tongue` and `languages`.
 
-`derived` leaves out the movement rate, because the movement rate depends on the ruleset of the session the character plays in.
+`derived` leaves out the movement rate, because the movement rate depends on the ruleset of the session the character plays in. In a session, the player view has each member's `movement_rate_feet` under the session's ruleset, with the rest of the character sheet.
 
 The server creates a character with osrlib's step-by-step creation functions, in the order osrlib lists them: roll the scores (unless the request names an ability roll), check the class, check and apply the adjustment, check the first spells, roll hit points, check the extra languages, roll starting gold, buy each purchase, and equip each item. If a step refuses a choice, creation stops there with 422 `character_invalid`. The response includes osrlib's `rejections` when that step returns them. A class id or an item id osrlib doesn't have gets 422 `character_invalid` with `field` and `id`, and `index` for a list field, instead of `rejections`. So does an id in `equip_item_ids` that isn't in the purchases, or that appears there more times than the purchases buy it. Equipping a purchase equips all of it, whatever its `quantity`. A malformed body, like an unknown `alignment`, a `quantity` of 0, or a name longer than 100 characters, gets 422 `validation_error`.
 
@@ -201,7 +201,7 @@ Adventure info contains only what a player may know before play:
 
 Adventure info never contains map geometry, keyed areas, monsters, treasure, triggers, or quest internals.
 
-The server stores the adventure document as uploaded, and parses it again when a session starts. Two uploads of the same document store two adventures, each with a different id. The list puts the adventures that come with the server first, in id order, and then the client's adventures, newest first. `limit`, `offset`, and `total` count the two parts as one list. An upload that osrlib refuses gets 422 `content_invalid`, and a document stamped with a newer schema version gets 409 `version_unsupported`. `POST /v1/adventures/validate` returns `valid: false` in both cases, with `code` set to the code the upload would return.
+The server stores the adventure document as uploaded, and parses it again when a session starts. Two uploads of the same document store two adventures, each with a different id. The list puts the adventures that come with the server first, in id order, and then the client's adventures, newest first. `limit`, `offset`, and `total` count the two parts as one list. An upload that osrlib refuses gets 422 `content_invalid`, and a document stamped with a newer schema version gets 409 `version_unsupported`. `POST /v1/adventures/validate` returns `valid: false` in both cases, with `code` set to the code the upload would return. When a session starts, osrlib checks a stored adventure again, so a stored adventure that the server's osrlib refuses, like one that a server with an earlier osrlib release accepted, gets 422 `content_invalid` from `POST /v1/sessions`.
 
 A session embeds a copy of its adventure, so deleting an adventure doesn't affect a session that already started.
 
@@ -218,7 +218,7 @@ A session is one game in progress. It starts in town and ends in `game_over` or 
 | `DELETE /v1/sessions/{session_id}` | player | 204. The session's saves stay. |
 | `GET /v1/sessions/{session_id}/commands` | player | `mode`, `revision`, and `commands`: the `command_type` and `kind` of each command that's legal in the session's mode and that the caller's role may send. |
 | `POST /v1/sessions/{session_id}/commands` | player | The command outcome. |
-| `GET /v1/sessions/{session_id}/view` | player | osrlib's `PlayerView`. |
+| `GET /v1/sessions/{session_id}/view` | player | osrlib's `PlayerView`: each member's character sheet, the explored map, the encounter as the players see it, the journal, the quests, and the town's healing prices. |
 | `GET /v1/sessions/{session_id}/referee-view` | referee | osrlib's `RefereeView`. |
 | `GET /v1/sessions/{session_id}/events` | player | A page of the event log. |
 | `POST /v1/sessions/{session_id}/saves` | player | 201: save info. The body is `{"label": "..."}`, and both the body and `label` are optional. A save without a label has `label: null`. Saving doesn't change the session or its revision. |

@@ -42,7 +42,7 @@ HTTP/1.1 200 OK
 An error means the server didn't do what you asked, for example because the request has no key, it's malformed, or it refers to something that doesn't exist. A command with an unknown `command_type` is an error:
 
 ```sh
-curl -si -X POST http://127.0.0.1:8640/v1/sessions/ses_dJ_n8qHMPAHJ5zMNuRIhlQ/commands -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"command_type": "fly"}'
+curl -si -X POST http://127.0.0.1:8640/v1/sessions/ses_69rujo4njhlTcX0L0EgfEw/commands -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"command_type": "fly"}'
 ```
 
 ```text
@@ -50,7 +50,7 @@ HTTP/1.1 422 Unprocessable Content
 ...
 content-type: application/problem+json
 
-{"type":"about:blank","title":"Unprocessable Content","status":422,"detail":"The request failed validation. See `errors` for each field.","code":"validation_error","errors":[{"loc":["body"],"msg":"Input tag 'fly' found using 'command_type' does not match any of the expected tags: 'move_party', 'turn_party', 'reorder_part...","type":"union_tag_invalid"}],"error_count":1}
+{"type":"about:blank","title":"Unprocessable Content","status":422,"detail":"The request failed validation. See `errors` for each field.","code":"validation_error","errors":[{"loc":["body"],"msg":"'fly' isn't a value that 'command_type' accepts.","type":"union_tag_invalid"}],"error_count":1}
 ```
 
 Handle a refusal as a result of play: read `rejections` and tell the player. Handle an error as a bug in your client or as a reason to retry. The table below lists what to do for each code.
@@ -99,7 +99,7 @@ A request body with a field that the endpoint doesn't define is a `validation_er
 A caller with a player key who sets a command's `source` field gets 403 `referee_required`:
 
 ```sh
-curl -si -X POST http://127.0.0.1:8640/v1/sessions/ses_dJ_n8qHMPAHJ5zMNuRIhlQ/commands -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"command_type": "engage_battle", "source": "my-game"}'
+curl -si -X POST http://127.0.0.1:8640/v1/sessions/ses_69rujo4njhlTcX0L0EgfEw/commands -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"command_type": "engage_battle", "source": "my-game"}'
 ```
 
 ```text
@@ -111,7 +111,7 @@ HTTP/1.1 403 Forbidden
 A caller with a player key who sends a referee command gets `referee_command`, with the command's name:
 
 ```sh
-curl -si -X POST http://127.0.0.1:8640/v1/sessions/ses_dJ_n8qHMPAHJ5zMNuRIhlQ/commands -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"command_type": "grant_item", "character_id": "character-0001", "item_id": "sword"}'
+curl -si -X POST http://127.0.0.1:8640/v1/sessions/ses_69rujo4njhlTcX0L0EgfEw/commands -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"command_type": "grant_item", "character_id": "character-0001", "item_id": "sword"}'
 ```
 
 ```text
@@ -166,13 +166,13 @@ Handle it this way:
 An *ability roll* is a set of ability scores that the server rolled and stored for a new character, and you can create one character from it. A second request to create a character from the same `ability_roll_id` gets 409 `ability_roll_used`, whether or not the first character still exists, because deleting a character doesn't free its roll:
 
 ```sh
-curl -si -X POST http://127.0.0.1:8640/v1/characters -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"name": "Brenna the second", "class_id": "fighter", "alignment": "lawful", "ability_roll_id": "rol__zoeisiFGZ4tcVU2ozKMgA"}'
+curl -si -X POST http://127.0.0.1:8640/v1/characters -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"name": "Brenna the second", "class_id": "fighter", "alignment": "lawful", "ability_roll_id": "rol_yQsuUWgqmzpnDA6Sm51kQA"}'
 ```
 
 ```text
 HTTP/1.1 409 Conflict
 ...
-{"type":"about:blank","title":"Conflict","status":409,"detail":"A character was already created from the ability roll 'rol__zoeisiFGZ4tcVU2ozKMgA'.","code":"ability_roll_used"}
+{"type":"about:blank","title":"Conflict","status":409,"detail":"A character was already created from the ability roll 'rol_yQsuUWgqmzpnDA6Sm51kQA'.","code":"ability_roll_used"}
 ```
 
 Your client either asks for a new roll with `POST /v1/ability-rolls`, or it finds the character the roll created with `GET /v1/characters`. A request that failed with `character_invalid` doesn't use up the roll, so the player can try again with the same one.
