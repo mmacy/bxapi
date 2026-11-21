@@ -11,6 +11,9 @@ export default {
     // page loads the file when the reader opens the schema.
     embedOutDir: "./generated/embeds",
     framework: "docusaurus",
+    // Show only the tested examples from `openapi.json`, never synthetic `{}` or schema placeholders.
+    generateRequestBodyExamples: false,
+    generateResponseExamples: false,
   },
   display: {
     maxNestingLevel: 2,
