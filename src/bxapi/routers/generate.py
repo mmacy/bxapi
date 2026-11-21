@@ -47,8 +47,8 @@ class TreasureRequest(RequestModel):
     Use `basic` for a party whose highest level is 1 to 3, and `expert` from level 4.
     """
     seed: Seed | None = None
-    """The seed to roll with. To get the same treasure again, send the `seed` of an earlier response. When you
-    leave it out, the server draws a seed and returns it."""
+    """The seed to roll with. To get the same treasure again, send the same body with the `seed` of an earlier
+    response. When you leave it out, the server draws a seed and returns it."""
 
 
 class TreasureResponse(ApiModel):
@@ -67,8 +67,8 @@ class NpcPartyRequest(RequestModel):
     count: int = Field(ge=1, le=100)
     """How many adventurers the party has."""
     seed: Seed | None = None
-    """The seed to roll with. To get the same party again, send the `seed` of an earlier response. When you
-    leave it out, the server draws a seed and returns it."""
+    """The seed to roll with. To get the same party again, send the same body with the `seed` of an earlier
+    response. When you leave it out, the server draws a seed and returns it."""
 
 
 class NpcPartyResponse(ApiModel):
@@ -85,8 +85,8 @@ class RoomRequest(RequestModel):
     level_number: int = Field(ge=1)
     """The dungeon level the room is on, counting from 1 at the top."""
     seed: Seed | None = None
-    """The seed to roll with. To get the same room again, send the `seed` of an earlier response. When you
-    leave it out, the server draws a seed and returns it."""
+    """The seed to roll with. To get the same room again, send the same body with the `seed` of an earlier
+    response. When you leave it out, the server draws a seed and returns it."""
 
 
 class RoomResponse(ApiModel):
@@ -105,8 +105,8 @@ class MonstersRequest(RequestModel):
     count: int = Field(default=1, ge=1, le=100)
     """How many monsters to spawn."""
     seed: Seed | None = None
-    """The seed to roll with. To get the same monsters again, send the `seed` of an earlier response. When you
-    leave it out, the server draws a seed and returns it."""
+    """The seed to roll with. To get the same monsters again, send the same body with the `seed` of an earlier
+    response. When you leave it out, the server draws a seed and returns it."""
 
 
 class MonstersResponse(ApiModel):

@@ -399,9 +399,9 @@ curl -s http://127.0.0.1:8640/v1/sessions/ses_Bq2lhAvBgBLVtCRWuWkVUQ/view -H "Au
 
 The session is in the `encounter` mode and no battle has started, so `in_battle` is `false` and `member_distance_feet` is empty. These fields are the ones you use in the battle:
 
-- `party` lists each member's `id`, `name`, hit points, `conditions` (like `dead`), and inventory, and every other number on a B/X character sheet, like `scores`, `armour_class`, `thac0`, `saves`, and `thief_skills`. Use it to turn the ids in messages into names, and to draw each character's sheet. The `character-0001` in a message is Brenna.
+- `party` lists each member's `id`, `name`, hit points, `conditions` (like `dead`), and inventory. It also has every other number on a B/X character sheet, like `scores`, `armour_class`, `thac0`, `saves`, and `thief_skills`. Use it to turn the ids in messages into names, and to draw each character's sheet. The `character-0001` in a message is Brenna.
 - `location` and `explored` contain the party's position and the cells it has seen. The view doesn't include the parts of the map the party hasn't explored.
-- `encounter.groups` lists the groups of monsters. A group has an `id` to attack, a `count`, and its `distance_feet` from the party. `label` and `label_plural` are what to call one monster of the group and several, like `goblin` and `goblins`. They're text to show, so don't match on their words. To tell what kind of creature a group is, read `family_id`, which is the same for every group of goblins, and `categories`, like `undead` for a group that a cleric can turn. `visible_conditions` and `condition_counts` say which conditions the players can see on the group's living monsters, and how many monsters have each one. The player view lists groups, not individual monsters. When a message refers to `monster-0001` and the encounter has one group, the monster is in that group. When the encounter has more than one group, the player view doesn't say which group the monster is in. Only the [referee view](referee.md#read-the-referee-view) lists each group's `monster_ids`.
+- `encounter.groups` lists the groups of monsters. A group has an `id` to put in an attack's `target_group_id`, a `count`, and its `distance_feet` from the party. `label` and `label_plural` are what to call one monster of the group and several, like `goblin` and `goblins`. They're text to show, so don't match on their words. To tell what kind of creature a group is, read `family_id`, which is the same for every group of goblins, and `categories`, like `undead` for a group that a cleric can try to turn. `visible_conditions` lists the conditions the players can see on the group's living monsters, and `condition_counts` contains the number of monsters with each condition. The player view lists groups, not individual monsters. When a message refers to `monster-0001` and the encounter has one group, the monster is in that group. When the encounter has more than one group, the player view doesn't say which group the monster is in. Only the [referee view](referee.md#read-the-referee-view) lists each group's `monster_ids`.
 - `encounter.declarers` lists the members who must choose an action this round.
 - `encounter.front_rank` lists the members who can fight in melee. The others can't attack monsters in melee.
 
@@ -429,7 +429,7 @@ curl -s -X POST http://127.0.0.1:8640/v1/sessions/ses_Bq2lhAvBgBLVtCRWuWkVUQ/com
 
 ## Fight one battle round
 
-A battle runs in rounds. In each round, every member in `declarers` chooses an action, and the rules resolve all of them. Send `resolve_battle_round` with one declaration for each declarer. A declaration has a `character_id` and an `action`: `attack`, `cast`, `turn_undead`, `move`, `use_item`, `give_item`, or `hold`. An attack also has a `target_group_id`. The goblins are 20 feet away, so an attacker adds `"move": "close"` to walk up to them and attack in the same round.
+A battle runs in rounds. In each round, every member in `declarers` chooses an action, and the rules resolve all of them. Send `resolve_battle_round` with one declaration for each declarer. A declaration has a `character_id` and an `action`: `attack`, `cast`, `turn_undead`, `move`, `use_item`, `give_item`, or `hold`. `give_item` is how a member hands over an item in a battle, because the rules refuse `give_items` there. An attack also has a `target_group_id`. The goblins are 20 feet away, so an attacker adds `"move": "close"` to walk up to them and attack in the same round.
 
 First, send what a client might try: all three characters attack.
 
@@ -487,9 +487,9 @@ curl -s -X POST http://127.0.0.1:8640/v1/sessions/ses_Bq2lhAvBgBLVtCRWuWkVUQ/com
 
 The dice in the messages are random, so your round differs. The revision went from 4 to 5, and the battle goes on. Read the view again to see the party's hit points. In the game on this page, Brenna has 2 of 3 hit points left, and Tomas has 2 of 4. A character at 0 hit points has the condition `dead`, and the next round's `declarers` leaves that character out.
 
-The monsters fight in ranks too. Only a group's first living monsters, as many as the view's `formation_width`, make melee attacks on the party. In the guard room the width is 2, so both goblins can attack.
+The monsters fight in ranks too. In each group, only the first living monsters make melee attacks on the party, up to the number in the view's `encounter.formation_width`. In the guard room the width is 2, so both goblins can attack.
 
-When a group fails its morale check, the round's messages include a line like `group-0001 flees the battle!`, from a `battle.side.fled` event. The group runs, but its `fled` stays `false` until it stands more than 120 feet from every living member. Until then, a member can still close on it or shoot at it. Once `fled` is `true`, the rules refuse a declaration aimed at the group with `battle.declaration.unknown_group`. The battle ends when every group has fled or died.
+When a group fails its morale check, the round's messages include a line like `group-0001 flees the battle!`, from a `battle.side.fled` event. The group runs, but its `fled` stays `false` until it stands more than 120 feet from every living member. Until then, a member can still close on it or shoot at it. Once `fled` is `true`, the rules refuse any declaration aimed at the group, with the rejection `battle.declaration.unknown_group`. The battle ends when each group's `fled` is `true` or the group has no living monsters.
 
 ## Catch up on events
 

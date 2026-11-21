@@ -164,9 +164,9 @@ def _stored_info(row: AdventureRow) -> AdventureInfo:
             422: [
                 VALIDATION_ERROR,
                 "`content_invalid`: osrlib refuses the document. The envelope is wrong, the adventure doesn't match "
-                "osrlib's `Adventure` model, it refers to a monster, an item, an area, or a quest that doesn't "
-                "exist, or it has content that a session can't play, like a treasure type letter outside `A` to "
-                "`V`. `detail` lists the problems. Fix the document.",
+                "osrlib's `Adventure` model, the adventure refers to something that doesn't exist (a monster, an "
+                "item, an area, or a quest), or it has content that a session can't play, like a treasure type "
+                "letter outside `A` to `V`. `detail` lists the problems. Fix the document.",
             ],
         }
     ),

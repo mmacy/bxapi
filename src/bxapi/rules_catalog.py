@@ -91,8 +91,8 @@ class MonsterSummary(ApiModel):
     id: str
     """The monster id, like `"goblin"`."""
     name: str
-    """The name as the rules print it, like `"Goblin"` or `"Centipede, Giant"`. To name the monster in a sentence, use
-    the `display_name` of `GET /v1/rules/monsters/{monster_id}`, like `"giant centipede"`."""
+    """The name as the rulebook prints it, like `"Goblin"` or `"Centipede, Giant"`. To name the monster in a sentence,
+    use the `display_name` of `GET /v1/rules/monsters/{monster_id}`, like `"giant centipede"`."""
     hit_dice: MonsterHitDice
     """The monster's hit dice, as osrlib's `MonsterHitDice`."""
     ac: int | None

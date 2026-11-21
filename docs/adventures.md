@@ -41,7 +41,7 @@ export KEY=player-key-0123456789
 
 ## Validate a document
 
-Send a document to `POST /v1/adventures/validate` to check it without storing it. The server runs every check that the rules engine makes on an adventure: the document's structure, every reference the adventure makes to a monster, an item, an area, or a quest, and content that a session couldn't play, like a treasure type letter outside `A` to `V`, a key in a level's `edges` that isn't the key of a side of a cell on the grid, or an area whose cells all belong to an area listed before it. After you upload an adventure that passes, a session can play it.
+Send a document to `POST /v1/adventures/validate` to check it without storing it. The server runs every check that the rules engine makes on an adventure. It checks the document's structure, and every reference the adventure makes to a monster, an item, an area, or a quest. It also checks for content that a session couldn't play, like a treasure type letter outside `A` to `V`, a key in a level's `edges` that doesn't match a side of a cell on the grid, or an area whose cells all belong to areas listed before it. After you upload an adventure that passes, a session can play it.
 
 ```sh
 curl -s -X POST http://127.0.0.1:8640/v1/adventures/validate -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d @barrow.json
