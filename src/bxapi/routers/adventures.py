@@ -2,7 +2,7 @@
 
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Body, Request, Response
+from fastapi import APIRouter, Body, Path, Request, Response
 from osrlib.crawl.adventure import Adventure, PartySpec
 from osrlib.errors import ContentValidationError, SaveVersionError
 
@@ -25,9 +25,18 @@ __all__ = [
 
 router = APIRouter(prefix="/adventures", tags=["adventures"])
 
+AdventureId = Annotated[
+    str,
+    Path(
+        description="The adventure's id: `adv_` and 22 characters for a stored adventure, or an id like "
+        "`builtin-barrow` for an adventure that comes with the server."
+    ),
+]
+
 _DOCUMENT_BODY = Body(
     description="An adventure document: osrlib's `Adventure` model in osrlib's versioned envelope, with `kind` set "
-    "to `adventure`. Tools like osr-forge and osr-editor write these documents."
+    "to `adventure`. osr-forge converts adventure module PDFs into these documents, and osr-editor is a local "
+    "graphical application for writing and editing them. Both are separate projects by osrlib's author."
 )
 
 
@@ -191,7 +200,7 @@ def list_adventures(request: Request, principal: CurrentPrincipal, page: PageQue
 
 
 @router.get("/{adventure_id}", summary="Get an adventure's info", responses=problem_responses(404))
-def get_adventure(request: Request, principal: CurrentPrincipal, adventure_id: str) -> AdventureInfo:
+def get_adventure(request: Request, principal: CurrentPrincipal, adventure_id: AdventureId) -> AdventureInfo:
     """Return what a player may know about an adventure before play."""
     builtin = builtin_adventures().get(adventure_id)
     if builtin is not None:
@@ -207,7 +216,7 @@ def get_adventure(request: Request, principal: CurrentPrincipal, adventure_id: s
     summary="Get an adventure document",
     responses=problem_responses(403, 404),
 )
-def get_adventure_document(request: Request, principal: RefereePrincipal, adventure_id: str) -> dict[str, Any]:
+def get_adventure_document(request: Request, principal: RefereePrincipal, adventure_id: AdventureId) -> dict[str, Any]:
     """Return the whole adventure document, as uploaded, with the map, monsters, treasure, triggers, and quests.
 
     The document is the one the client uploaded, including any field osrlib ignores. Only a
@@ -228,7 +237,7 @@ def get_adventure_document(request: Request, principal: RefereePrincipal, advent
     summary="Delete a stored adventure",
     responses=problem_responses(403, 404),
 )
-def delete_adventure(request: Request, principal: CurrentPrincipal, adventure_id: str) -> Response:
+def delete_adventure(request: Request, principal: CurrentPrincipal, adventure_id: AdventureId) -> Response:
     """Delete an adventure the client stored. A session that already started has a copy and isn't affected.
 
     An adventure that comes with the server gets 403 `adventure_read_only`.

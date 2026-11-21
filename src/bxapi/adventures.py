@@ -1,8 +1,9 @@
 """Adventure documents: reading one, writing one, and the adventures that come with the server.
 
 An *adventure document* is osrlib's `Adventure` model inside osrlib's versioned envelope, with
-`kind` set to `"adventure"`. Tools like osr-forge and osr-editor write these documents, and a
-client uploads one to play it.
+`kind` set to `"adventure"`. osr-forge converts adventure module PDFs into these documents, and
+osr-editor is a local graphical application for writing and editing them. Both are separate
+projects by osrlib's author. A client uploads a document to play it.
 
 [`parse_adventure`][bxapi.adventures.parse_adventure] turns a document into an `Adventure`
 after it runs every check osrlib has on one, so the server can start a session with any adventure

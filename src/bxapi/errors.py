@@ -68,6 +68,8 @@ MAX_FIELD_ERRORS = 20
 
 _MAX_TEXT_SHOWN = 128
 
+_MAX_TAG_SHOWN = 64
+
 _BUSY_CODES = frozenset({sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED})
 
 _log = logging.getLogger("bxapi")
@@ -326,9 +328,28 @@ def problem_responses(*statuses: int) -> dict[int | str, dict[str, Any]]:
     return {status: {"description": HTTPStatus(status).phrase, "model": Problem} for status in statuses}
 
 
+def _quoted(name: str) -> str:
+    # Pydantic puts quotes around a discriminator's name in `ctx` but not around the tag.
+    return "'" + name.strip("'") + "'"
+
+
+def _message(entry: Any) -> str:
+    # Pydantic's message for an unknown tag lists every valid tag, and the response would cut it off at
+    # _MAX_TEXT_SHOWN characters in the middle of the list.
+    context = entry.get("ctx") or {}
+    match entry["type"]:
+        case "union_tag_invalid" if "tag" in context and "discriminator" in context:
+            tag = shorten(str(context["tag"]), _MAX_TAG_SHOWN)
+            return f"'{tag}' isn't a value that {_quoted(str(context['discriminator']))} accepts."
+        case "union_tag_not_found" if "discriminator" in context:
+            return f"The body needs {_quoted(str(context['discriminator']))}."
+        case _:
+            return str(entry["msg"])
+
+
 def _field_error(entry: Any) -> FieldError:
     location = [part if isinstance(part, int) else shorten(str(part), _MAX_TEXT_SHOWN) for part in entry["loc"]]
-    return FieldError(loc=location, msg=shorten(str(entry["msg"]), _MAX_TEXT_SHOWN), type=str(entry["type"]))
+    return FieldError(loc=location, msg=shorten(_message(entry), _MAX_TEXT_SHOWN), type=str(entry["type"]))
 
 
 def install_error_handlers(app: FastAPI) -> None:
@@ -339,7 +360,8 @@ def install_error_handlers(app: FastAPI) -> None:
     - [`ApiError`][bxapi.errors.ApiError], sent as raised.
     - A request FastAPI can't validate, sent as 422 `validation_error`. `errors` lists the
       first 20 of pydantic's errors, without the values the caller sent, and `error_count`
-      states how many there are.
+      states how many there are. For a `command_type` that's missing or unknown, the `msg` is a
+      short sentence instead of pydantic's message, which lists every valid value.
     - osrlib's `ContentValidationError`, sent as 422 `content_invalid`.
     - osrlib's `SaveVersionError` and `ReplayVersionError`, sent as 409
       `version_unsupported`.

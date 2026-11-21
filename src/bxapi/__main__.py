@@ -1,9 +1,11 @@
 """The `bxapi` command, which serves the API with uvicorn."""
 
 import copy
+import sys
 
 import uvicorn
 from pydantic import ValidationError
+from pydantic_core import ErrorDetails
 from uvicorn.config import LOGGING_CONFIG
 
 from bxapi.app import create_app
@@ -11,6 +13,24 @@ from bxapi.db import DatabaseOpenError
 from bxapi.settings import Settings, SettingsError
 
 __all__ = ["main"]
+
+_VALUE_ERROR_PREFIX = "Value error, "
+
+
+def _describe(problem: ErrorDetails) -> str:
+    """Write one settings problem as a line that names the environment variable.
+
+    The first element of the problem's location is the field name. Each later element is a
+    position in a list (written as a 1-based entry number) or a field of an entry. The line never
+    contains the value that failed.
+    """
+    message = problem["msg"].removeprefix(_VALUE_ERROR_PREFIX)
+    location = problem["loc"]
+    if not location:
+        return message
+    parts = [f"BXAPI_{str(location[0]).upper()}"]
+    parts += [f"entry {part + 1}" if isinstance(part, int) else str(part) for part in location[1:]]
+    return f"{', '.join(parts)}: {message}"
 
 
 def main() -> None:
@@ -22,12 +42,19 @@ def main() -> None:
     uvicorn's.
 
     When the settings are invalid, the database can't be opened, or the server has no API keys
-    and `BXAPI_ALLOW_ANONYMOUS` isn't set, the command prints why and exits with status 1.
+    and `BXAPI_ALLOW_ANONYMOUS` isn't set, the command prints why and exits with status 1. For an
+    invalid setting, it prints one line for each problem, like
+    `bxapi: BXAPI_SESSION_CACHE_SIZE: Input should be greater than or equal to 1`, and never
+    prints the value.
     """
     try:
         settings = Settings()
         app = create_app(settings)
-    except (ValidationError, SettingsError, DatabaseOpenError) as error:
+    except ValidationError as error:
+        for problem in error.errors(include_url=False, include_context=False, include_input=False):
+            print(f"bxapi: {_describe(problem)}", file=sys.stderr)
+        raise SystemExit(1) from None
+    except (SettingsError, DatabaseOpenError) as error:
         raise SystemExit(f"bxapi: {error}") from None
     log_config = copy.deepcopy(LOGGING_CONFIG)
     log_config["loggers"]["bxapi"] = {"handlers": ["default"], "level": "INFO", "propagate": False}
