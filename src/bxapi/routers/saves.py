@@ -168,7 +168,11 @@ def relabel_save(request: Request, principal: CurrentPrincipal, save_id: SaveId,
     responses=problem_responses({404: [_NOT_FOUND]}),
 )
 def delete_save(request: Request, principal: CurrentPrincipal, save_id: SaveId) -> Response:
-    """Delete a save. A session restored from the save doesn't change."""
+    """Delete a save. A session restored from the save doesn't change.
+
+    The save's bytes no longer count toward your client's storage, which `GET /v1/meta` reports. A retry of a delete
+    that succeeded gets 404 `not_found`.
+    """
     if not _db(request).delete_save(principal.client, save_id):
         raise not_found("save", save_id)
     return Response(status_code=204)

@@ -1,6 +1,6 @@
 // Writes the two files the reference pages are built from:
 //
-// - generated/openapi.json: bxapi's OpenAPI document, changed in the three ways Docs MD needs.
+// - generated/openapi.json: bxapi's OpenAPI document, changed in the four ways Docs MD needs.
 // - generated/curl-samples.json: one curl command for each operation, built from the example
 //   exchanges that bxapi's tests replay against a server.
 
@@ -88,6 +88,19 @@ function separateSchema(media, operationId, status) {
   }
 }
 
+// Every error response is a problem document, and Docs MD shows a response's whole schema in its
+// tab. With the `Problem` schema in each of an operation's error tabs, a page repeats it more than
+// a hundred times. This function gives each error response a schema with no members, so the tab
+// shows the response's codes and its example. It also adds a link to "Errors" in the API's
+// overview, which lists the members once. Docs MD shows a
+// response only when it has an object schema, and doesn't show the schema's description.
+function summarizeProblem(response, media, operationId, status) {
+  if (media.schema?.$ref === "#/components/schemas/Problem") {
+    media.schema = { type: "object", title: `${operationId}_${status}` };
+    response.description += "\n\nThe body is a problem document. [Errors](/reference#errors) lists its members.";
+  }
+}
+
 // The ids of the operations that need an API key.
 const keyed = new Set();
 for (const pathItem of Object.values(document.paths)) {
@@ -104,9 +117,38 @@ for (const pathItem of Object.values(document.paths)) {
     for (const [status, response] of Object.entries(operation.responses ?? {})) {
       for (const media of Object.values(response.content ?? {})) {
         inlineRefsInExamples(media);
+        summarizeProblem(response, media, operation.operationId, status);
         separateSchema(media, operation.operationId, status);
       }
     }
+  }
+}
+
+// No operation uses `Problem` now, or `FieldError`, which only `Problem` refers to. Docs MD 0.2.37
+// reports "unable to locate reference" for an unused schema, so the script removes each schema
+// that the paths don't reach.
+function schemaRefs(value, found = new Set()) {
+  if (Array.isArray(value)) {
+    value.forEach((item) => schemaRefs(item, found));
+  } else if (value !== null && typeof value === "object") {
+    for (const [key, child] of Object.entries(value)) {
+      if (key === "$ref" && typeof child === "string" && child.startsWith("#/components/schemas/")) {
+        found.add(child.slice("#/components/schemas/".length));
+      } else {
+        schemaRefs(child, found);
+      }
+    }
+  }
+  return found;
+}
+
+const reached = schemaRefs(document.paths);
+for (const name of reached) {
+  schemaRefs(document.components.schemas[name], reached);
+}
+for (const name of Object.keys(document.components.schemas)) {
+  if (!reached.has(name)) {
+    delete document.components.schemas[name];
   }
 }
 

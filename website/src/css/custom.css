@@ -19,3 +19,15 @@
   --ifm-color-primary-lighter: #ebb597;
   --ifm-color-primary-lightest: #f2d0bf;
 }
+
+/* Docs MD 0.2.37 puts an operation's response tabs in one row, and the row of an operation with 15
+   statuses runs into the table of contents. These rules let the row wrap, and align it with the
+   top of the section's title. Docs MD's class names end in a hash, so the selectors match their start. */
+[class^="titleContainer_"]:has(> [class^="tabs_"]) {
+  align-items: flex-start;
+}
+
+[class^="titleContainer_"] > [class^="tabs_"] {
+  flex-wrap: wrap;
+  min-width: 0;
+}

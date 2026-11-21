@@ -303,7 +303,9 @@ def get_adventure_document(request: Request, principal: RefereePrincipal, advent
 def delete_adventure(request: Request, principal: CurrentPrincipal, adventure_id: AdventureId) -> Response:
     """Delete an adventure the client stored. A session that already started has a copy and isn't affected.
 
-    An adventure that comes with the server gets 403 `adventure_read_only`.
+    An adventure that comes with the server gets 403 `adventure_read_only`. The adventure's bytes no longer count
+    toward your client's storage, which `GET /v1/meta` reports. A retry of a delete that succeeded gets 404
+    `not_found`.
     """
     if adventure_id in builtin_adventures():
         raise forbidden("adventure_read_only", f"The adventure {adventure_id!r} comes with the server.")
