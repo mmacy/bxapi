@@ -13,9 +13,10 @@ The server runs the first request with a key and stores its response. A later re
 same client with the same key gets the stored response, with the header `Idempotent-Replayed: true`,
 and the server runs nothing.
 
-Every route under `/v1` is an [`IdempotentRoute`][bxapi.idempotency.IdempotentRoute], which
-does this for a `POST` that has the header. The keys are rows of the `idempotency_keys` table, so
-the processes that share a database file share them.
+Every route under `/v1` that takes a body is an
+[`IdempotentRoute`][bxapi.idempotency.IdempotentRoute], which does this for a `POST` that has the
+header. The keys are rows of the `idempotency_keys` table, so the processes that share a database
+file share them.
 """
 
 import hashlib
@@ -34,6 +35,7 @@ from starlette.requests import ClientDisconnect
 
 from bxapi.db import Database, IdempotencyRow
 from bxapi.errors import ApiError, invalid, is_reported_error, validation_error
+from bxapi.json_body import JsonRequest, body_limit
 
 __all__ = [
     "IDEMPOTENCY_KEY_HEADER",
@@ -176,6 +178,11 @@ class IdempotentRoute(APIRoute):
     Pass the class as `route_class` to an `APIRouter`. A request with another method, or without the
     header, runs as on any route.
 
+    The route gives its endpoint a [`JsonRequest`][bxapi.json_body.JsonRequest], whatever the
+    method. So the server reads every body with [`parse_json`][bxapi.json_body.parse_json], and
+    refuses a body larger than [`SMALL_BODY_BYTES`][bxapi.json_body.SMALL_BODY_BYTES] unless the
+    endpoint is marked with [`accepts_document`][bxapi.json_body.accepts_document].
+
     For a `POST` with the header, the route claims the key for the caller's client before it runs
     the endpoint, in one database transaction. Then:
 
@@ -204,8 +211,11 @@ class IdempotentRoute(APIRoute):
     def get_route_handler(self) -> Callable[[Request], Coroutine[Any, Any, Response]]:
         """Return the route's handler, which checks the key before it runs the endpoint."""
         handler = super().get_route_handler()
+        max_body_bytes = body_limit(self.endpoint)
 
         async def idempotent(request: Request) -> Response:
+            # Nothing has read the body yet, so the new request reads it from the start.
+            request = JsonRequest(request.scope, request.receive, max_body_bytes=max_body_bytes)
             key = request.headers.get(IDEMPOTENCY_KEY_HEADER)
             if key is None or request.method != "POST":
                 return await handler(request)

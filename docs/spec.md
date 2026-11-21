@@ -17,6 +17,8 @@ The contract below covers version 1 of the API. For how to work in the repositor
 
 - **Base path.** Every endpoint except `GET /health` and the documentation paths in **OpenAPI** below is under `/v1`, and every request under `/v1` needs an API key, unless the server allows anonymous callers.
 - **Bodies.** Requests and responses are JSON. Field names are snake_case. A `POST`, `PUT`, or `PATCH` request with a body states that the body is JSON in its `Content-Type` header: `application/json`, or an `application` type whose name ends in `+json`, with or without parameters like `charset`. A body with another content type, or with none, gets 415 `unsupported_media_type`. A request with an empty body needs no `Content-Type`. A request body with a field the endpoint doesn't define gets 422 `validation_error`. A body or a field that is an osrlib model, like a command or a character's `adjustment`, is the exception: osrlib ignores unknown fields.
+- **Body size.** A request body is at most `BXAPI_MAX_BODY_BYTES`, on every path. On an operation that takes no document, a body is also at most 65,536 bytes. The operations that take a document are `POST /v1/adventures`, `POST /v1/adventures/validate`, `POST /v1/characters/import`, `POST /v1/saves/import`, and `POST /v1/sessions`, whose `party_document` is a document. A larger body gets 413 `content_too_large`. The server sets the 65,536-byte limit, and it isn't a rule of the game. It limits the time the server spends on one command or one set of character choices, and how much one accepted command adds to the session's save document.
+- **JSON values.** The server refuses a body with a value it can't store or can't send back as JSON, with 400 `bad_request`. The values are `NaN`, `Infinity`, and `-Infinity`, a number too large for a 64-bit float, like `1e400`, a string or a key with half of a UTF-16 surrogate pair, like `"\ud800"`, and arrays and objects nested more than 100 levels deep. A save document from osrlib nests 12 levels.
 - **Identifiers.** A stored resource has an id made of a prefix and 22 random URL-safe characters: `chr_` for a character, `rol_` for an ability roll, `adv_` for an adventure, `ses_` for a session, and `sav_` for a save. An adventure that comes with the server has an id that starts with `builtin-`.
 - **Timestamps.** UTC, in RFC 3339 format with whole seconds, like `2026-11-20T22:01:05Z`.
 - **Lists.** A list endpoint takes `limit` (1 to 200, default 50) and `offset` (0 to 2^53 - 1, default 0), and returns `{"items": [...], "total": n, "limit": n, "offset": n}`. Stored resources are listed newest first.
@@ -35,6 +37,7 @@ The contract below covers version 1 of the API. For how to work in the repositor
   - The server forgets a key 24 hours after the first request with it.
 
   The server writes the request's change and the stored response in two transactions. If the server stops between them, or the database refuses the second one, the change is in the database and the key has no stored response. A retry then gets `idempotency_key_in_progress` for 60 seconds and `idempotency_key_interrupted` afterward, and never runs the request a second time. Other methods ignore the header: `GET`, `PATCH`, and `DELETE` requests have the same effect however many times a client sends them.
+- **Browser security headers.** Every response has `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, and `Referrer-Policy: no-referrer`. Every response except the HTML pages at `/docs` and `/redoc` also has `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`. A browser that loads a response as a page runs nothing from it, and no page can show a response in a frame. The `bxapi` command sends no `Server` header.
 - **Request ids.** The server gives every request an id and returns it in the `X-Request-Id` response header, on every response, including an error and the answer to a CORS preflight request. A request can choose its id by sending `X-Request-Id` with 1 to 128 letters, digits, and the characters `.`, `_`, `~`, and `-`. For a request with no such header, or with any other value, the server draws an id made of `req_` and 22 random URL-safe characters. A problem document repeats the id as `request_id`. The server logs one line for each request to the `bxapi.access` logger when the response is sent: the id, the method, the path without the query string, the status, the time taken in milliseconds, and the client name of the request's API key, or `-` for a request with no valid key. The traceback the server logs for 500 `internal_error` has the id too.
 
 ### Authentication and roles
@@ -48,9 +51,13 @@ bxapi has no user accounts. A key identifies a client application, not a person.
 | `player` | Everything a game client needs: read the rules, roll dice, create characters, start and play sessions, save and restore. |
 | `referee` | Everything a player may do, and also: read the referee view and referee events, send referee commands, choose seeds, import characters and saves, and read full adventure and save documents. |
 
-A server with no keys doesn't start, unless `BXAPI_ALLOW_ANONYMOUS` is `true`. With that setting, the server asks for no key and treats every caller as a referee for the client `local`. Use it only on your own machine. With keys, `BXAPI_ALLOW_ANONYMOUS` has no effect. At startup, the server logs the number of keys, the client names, and the CORS origins, as a warning when it asks for no key.
+A server with no keys doesn't start, unless `BXAPI_ALLOW_ANONYMOUS` is `true`. With that setting, the server asks for no key and treats every caller as a referee for the client `local`. Use it only on your own machine. With keys, `BXAPI_ALLOW_ANONYMOUS` has no effect.
 
-The server checks the key before it reads the request's body, and it checks the body's size and arrival time before the body's `Content-Type`. A request under `/v1` with no key or an unknown key gets 401 `unauthorized`, whatever its path, method, or body. A CORS preflight request needs no key. A player's request for something only a referee may do gets 403 `referee_required`.
+A server that asks for no key answers a request under `/v1` only when the request's `Host` header is `localhost`, `127.0.0.1`, or `[::1]`, in any letter case, with or without a port. A request with another `Host`, or with none, gets 421 `misdirected_request`. Without the check, a web page on another site could read and change the server's data from the browser of the person who runs the server. The page points its own host name at `127.0.0.1`, which is called DNS rebinding, and the browser then lets the page call the server and read the responses. The browser sends the page's host name in `Host`, so the server refuses the request. The check doesn't stop a program that sends `Host: localhost` itself, so keep such a server on the default `BXAPI_HOST`. A server with keys answers any `Host`, because a page that has no key gets 401.
+
+At startup, the server logs the number of keys, the client names, and the CORS origins, as a warning when it asks for no key.
+
+The server checks the key, and the `Host` of a request to a server with no keys, before it reads the request's body, and it checks the body's size and arrival time before the body's `Content-Type`. A request under `/v1` with no key or an unknown key gets 401 `unauthorized`, whatever its path, method, or body. A CORS preflight request needs no key. A player's request for something only a referee may do gets 403 `referee_required`.
 
 ### Errors
 
@@ -58,7 +65,7 @@ Every error response is an RFC 9457 problem document with the media type `applic
 
 | Status | `code` | When | Extra members |
 | --- | --- | --- | --- |
-| 400 | `bad_request` | The server can't decode the body's bytes as text, or the body has an integer with more than 4,300 digits. The server decodes a body as UTF-8, or as UTF-16 or UTF-32 when the body starts with that encoding's byte order mark or zero bytes. | |
+| 400 | `bad_request` | The server can't decode the body's bytes as text, or the body has a value the server refuses: an integer with more than 4,300 digits, or one of the values that **JSON values** lists. `detail` states which. The server decodes a body as UTF-8, or as UTF-16 or UTF-32 when the body starts with that encoding's byte order mark or zero bytes. | |
 | 401 | `unauthorized` | The key is missing or unknown. | |
 | 403 | `referee_required` | A player asked for something only a referee may do, including a field like `seed`. | |
 | 403 | `referee_command` | A player sent a referee command. | `command_type` |
@@ -72,8 +79,9 @@ Every error response is an RFC 9457 problem document with the media type `applic
 | 409 | `idempotency_key_interrupted` | The server failed or stopped while it handled the first request with the `Idempotency-Key`, and has no record of whether that request took effect. | |
 | 409 | `version_unsupported` | A document is stamped with a schema version newer than the server's osrlib. | |
 | 408 | `request_timeout` | The request body didn't arrive within `BXAPI_BODY_TIMEOUT_SECONDS`. | |
-| 413 | `content_too_large` | The request body is larger than `BXAPI_MAX_BODY_BYTES`. | |
+| 413 | `content_too_large` | The request body is larger than `BXAPI_MAX_BODY_BYTES`, or larger than 65,536 bytes on an operation that takes no document. | |
 | 415 | `unsupported_media_type` | The request has a body, and its `Content-Type` isn't a JSON media type. | |
+| 421 | `misdirected_request` | The server asks for no API key, and the request's `Host` header isn't `localhost`, `127.0.0.1`, or `[::1]`. | |
 | 422 | `validation_error` | The request doesn't match the endpoint's schema, or its body decodes as text but isn't valid JSON. A body that isn't valid JSON gets one error with the type `json_invalid`. | `errors`, the first 20 of pydantic's errors. Each has `loc`, `msg`, and `type`, and no copy of the value sent. The server cuts each name in `loc` and each `msg` to 128 characters. `error_count` is how many errors there are. An object with more than 20 fields the endpoint doesn't define gets one error, whose `msg` states how many there are. |
 | 422 | `idempotency_key_reused` | The client already sent the `Idempotency-Key` with a different method, path, query string, body, or role. | |
 | 422 | `content_invalid` | osrlib refused a document or a value as malformed, or the server refused an imported character. | |
@@ -183,7 +191,7 @@ The server creates a character with osrlib's step-by-step creation functions, in
 
 When a choice breaks a rule, an ability roll named in the request stays unused. A successful creation marks the roll used and stores the character in one database transaction, so two creations from one roll never both succeed, and a failed creation never marks the roll used. Deleting the character doesn't free the roll. A second creation from the same roll gets 409 `ability_roll_used`. An `ability_roll_id` that matches no roll of the caller's client gets 404.
 
-The `document` column of a `characters` row is what osrlib's `Character.to_document` returns for the stored character. `POST /v1/characters/import` accepts the same document, with any character osrlib's `Character` model accepts, like a fighter at level 14. The endpoint stores the character with a new `chr_` id. It clears the `id` field of the `character` itself, because osrlib gives each party member without an id a new one when a session starts. The server builds `derived` before it stores anything. A document that isn't a valid character document gets 422 `content_invalid`, and so does a character osrlib can't compute `derived` for, like one that wears a magic item osrlib doesn't have. A document stamped with a newer schema version gets 409 `version_unsupported`.
+The `document` column of a `characters` row is what osrlib's `Character.to_document` returns for the stored character. `POST /v1/characters/import` accepts the same document, with any character osrlib's `Character` model accepts, like a fighter at level 14. The endpoint stores the character with a new `chr_` id. It clears the `id` field of the `character` itself, because osrlib gives each party member without an id a new one when a session starts. The server builds `derived` before it stores anything. A document that isn't a valid character document gets 422 `content_invalid`, and so does a character osrlib can't compute `derived` for, like one that wears a magic item osrlib doesn't have, and a character whose `max_hp` is larger than a SQLite integer. A document stamped with a newer schema version gets 409 `version_unsupported`.
 
 An import also gets 422 `content_invalid` when the character has a stat modifier, or a condition with an `effect_id`. Each of these refers to an effect in the game the character came from. In a new session such a condition would never end, and osrlib would remove such a modifier when an unrelated effect with the same `effect_id` ended. A condition with no `effect_id`, like `dead`, is accepted.
 
@@ -351,10 +359,10 @@ The primary key of `idempotency_keys` is `client` and `key`. `fingerprint` is a 
 | --- | --- | --- |
 | `BXAPI_DATABASE` | `bxapi.db` | The path of the SQLite file, or `:memory:`. |
 | `BXAPI_API_KEYS` | `[]` | A JSON list of `{"client", "key", "role"}`. `role` defaults to `player`, and a member other than `client`, `key`, and `role` is an error. |
-| `BXAPI_ALLOW_ANONYMOUS` | `false` | Whether a server with no API keys starts. Such a server asks for no key and treats every caller as a referee for the client `local`. |
+| `BXAPI_ALLOW_ANONYMOUS` | `false` | Whether a server with no API keys starts. Such a server asks for no key and treats every caller as a referee for the client `local`. It answers a request under `/v1` only when the `Host` header is `localhost`, `127.0.0.1`, or `[::1]`. |
 | `BXAPI_CORS_ORIGINS` | `[]` | A JSON list of the web origins whose pages may call the API. Each is a scheme, a host, and an optional port, like `https://game.example`, with no path and no trailing slash. `*` isn't allowed. Cross-origin responses expose the `WWW-Authenticate`, `Retry-After`, `ETag`, `Idempotent-Replayed`, and `X-Request-Id` headers. |
 | `BXAPI_SESSION_CACHE_SIZE` | `256` | How many sessions stay loaded in memory. |
-| `BXAPI_MAX_BODY_BYTES` | `8388608` | The largest request body. |
+| `BXAPI_MAX_BODY_BYTES` | `8388608` | The largest request body. On an operation that takes no document, the limit is 65,536 bytes when this setting is larger. |
 | `BXAPI_BODY_TIMEOUT_SECONDS` | `30` | How long the server waits for a request's whole body to arrive. |
 | `BXAPI_DOCS_ENABLED` | `true` | Whether the server serves `/docs`, `/redoc`, and `/openapi.json`. |
 | `BXAPI_HOST` | `127.0.0.1` | The address the `bxapi` command listens on. |

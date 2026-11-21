@@ -198,6 +198,9 @@ def test_the_shared_examples_are_what_the_server_returns() -> None:
                 "/v1/dice/roll", content=b" " * (settings.max_body_bytes + 1), headers=json_body
             ),
         }
+    anonymous = _FixedSettings(database=":memory:", allow_anonymous=True)
+    with TestClient(create_app(anonymous), base_url="http://game.example") as client:
+        sent["misdirected_request"] = client.get("/v1/meta", headers=request_id)
     for name, response in sent.items():
         assert response.json() == shared[name], name
 

@@ -49,7 +49,8 @@ def main() -> None:
     environment variables to configure it. It runs one process, and it runs until you stop it.
     It sends bxapi's log lines, like the one about API keys at startup, to the same place as
     uvicorn's. bxapi logs one line for each request, with the request's id, so the command turns
-    uvicorn's own line for each request off.
+    uvicorn's own line for each request off. It also turns off the `Server` response header, which
+    names uvicorn.
 
     When the settings are invalid, the database can't be opened, or the server has no API keys
     and `BXAPI_ALLOW_ANONYMOUS` isn't set, the command prints why and exits with status 1. For an
@@ -76,7 +77,9 @@ def main() -> None:
         raise SystemExit(f"bxapi: {error}") from None
     log_config = copy.deepcopy(LOGGING_CONFIG)
     log_config["loggers"]["bxapi"] = {"handlers": ["default"], "level": "INFO", "propagate": False}
-    uvicorn.run(app, host=settings.host, port=settings.port, log_config=log_config, access_log=False)
+    uvicorn.run(
+        app, host=settings.host, port=settings.port, log_config=log_config, access_log=False, server_header=False
+    )
 
 
 if __name__ == "__main__":

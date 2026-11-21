@@ -28,7 +28,7 @@ from functools import cache
 from importlib import resources
 from typing import Any
 
-from bxapi.auth import unauthorized
+from bxapi.auth import misdirected_request, unauthorized
 from bxapi.db import BUSY_TIMEOUT_SECONDS
 from bxapi.errors import (
     ApiError,
@@ -126,6 +126,13 @@ def shared_problems() -> tuple[SharedProblem, ...]:
             "Send no API key",
             "The response to a request under `/v1` with no API key, or with a key the server doesn't have.",
             unauthorized(),
+        ),
+        shared(
+            "misdirected_request",
+            "Call a server that asks for no key by another host name",
+            "The response to a request under `/v1` whose `Host` header isn't `localhost`, `127.0.0.1`, or `[::1]`, "
+            "from a server that asks for no API key.",
+            misdirected_request(),
         ),
         shared(
             "bad_request",

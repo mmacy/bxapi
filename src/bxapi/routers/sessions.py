@@ -30,6 +30,7 @@ from bxapi.commands import CommandKind, command_kind
 from bxapi.db import Database, JsonObject, SaveRow, SessionRow
 from bxapi.errors import INTERNAL_ERROR, VALIDATION_ERROR, ApiError, forbidden, invalid, not_found, problem_responses
 from bxapi.idempotency import IdempotentRoute
+from bxapi.json_body import accepts_document
 from bxapi.models import ApiModel, RequestModel, left_out_when_none
 from bxapi.pagination import Page, PageQuery
 from bxapi.seeds import Seed, referee_seed
@@ -423,6 +424,7 @@ def _party(db: Database, principal: Principal, body: CreateSessionRequest) -> Pa
         }
     ),
 )
+@accepts_document
 def create_session(request: Request, principal: CurrentPrincipal, body: CreateSessionRequest) -> SessionInfo:
     """Start a game of an adventure with a party. The session starts in town, at revision 0.
 

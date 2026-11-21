@@ -46,6 +46,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from bxapi.models import left_out_when_none
 from bxapi.request_ids import REQUEST_ID_HEADER, request_id_of
+from bxapi.security_headers import API_HEADERS
 
 __all__ = [
     "INTERNAL_ERROR",
@@ -359,17 +360,21 @@ def database_busy() -> ApiError:
     )
 
 
-def content_too_large(max_bytes: int) -> ApiError:
-    """Build the 413 for a request body over the server's size limit.
+def content_too_large(max_bytes: int, *, for_document: bool = True) -> ApiError:
+    """Build the 413 for a request body over a size limit.
 
     Args:
-        max_bytes: The largest body the server accepts, in bytes.
+        max_bytes: The largest body the server accepts for the request, in bytes.
+        for_document: Whether `max_bytes` is the server's `max_body_bytes` setting, which limits
+            every body. `False` when it's the smaller limit of an operation that takes no
+            document, [`SMALL_BODY_BYTES`][bxapi.json_body.SMALL_BODY_BYTES].
 
     Returns:
         An [`ApiError`][bxapi.errors.ApiError] with the code `content_too_large`.
     """
+    scope = "" if for_document else " for an operation that takes no document"
     return ApiError(
-        413, "content_too_large", f"The request body is larger than the {max_bytes} bytes this server accepts."
+        413, "content_too_large", f"The request body is larger than the {max_bytes} bytes this server accepts{scope}."
     )
 
 
@@ -596,7 +601,9 @@ def install_error_handlers(app: FastAPI) -> None:
             "unhandled error on %s %s, request %s", request.method, request.url.path, request_id, exc_info=error
         )
         response = respond(request, internal_error())
+        # Starlette sends this response from outside every middleware, so SecurityHeadersMiddleware can't add its
+        # headers and HeadMiddleware can't drop the body.
+        response.headers.update(API_HEADERS)
         if request.method == "HEAD":
-            # Starlette sends this response from outside every middleware, so HeadMiddleware can't drop its body.
             response.body = b""
         return response

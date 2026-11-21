@@ -23,7 +23,7 @@ from bxapi.idempotency import (
 from bxapi.session_manager import SessionManager
 from bxapi.settings import Settings
 
-from .conftest import problem_without_id
+from .conftest import LOCAL_URL, problem_without_id
 
 FIGHTER = {"name": "Brenna", "class_id": "fighter", "alignment": "lawful"}
 ENTER = {"command_type": "enter_dungeon", "dungeon_id": "barrow"}
@@ -229,7 +229,7 @@ def _buggy(settings: Settings) -> TestClient:
         raise RuntimeError("SECRET")
 
     app.state.db.insert_ability_roll = explode
-    return TestClient(app, raise_server_exceptions=False)
+    return TestClient(app, base_url=LOCAL_URL, raise_server_exceptions=False)
 
 
 def test_an_unexpected_error_leaves_the_key_interrupted(settings: Settings) -> None:
@@ -375,7 +375,10 @@ def test_releasing_a_key_leaves_a_recorded_outcome() -> None:
 
 
 def test_two_processes_share_the_keys(settings: Settings) -> None:
-    with TestClient(create_app(settings)) as one, TestClient(create_app(settings)) as two:
+    with (
+        TestClient(create_app(settings), base_url=LOCAL_URL) as one,
+        TestClient(create_app(settings), base_url=LOCAL_URL) as two,
+    ):
         first = one.post("/v1/characters", json=FIGHTER, headers=key("create"))
         assert_replay(first, two.post("/v1/characters", json=FIGHTER, headers=key("create")))
         assert two.get("/v1/characters").json()["total"] == 1
@@ -423,6 +426,7 @@ def test_a_client_that_disconnects_in_the_body_gets_400_and_claims_no_key(settin
         "query_string": b"",
         "root_path": "",
         "headers": [
+            (b"host", b"localhost"),
             (b"content-type", b"application/json"),
             (b"content-length", b"100"),
             (b"idempotency-key", b"roll"),

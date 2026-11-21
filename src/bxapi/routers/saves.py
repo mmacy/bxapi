@@ -15,6 +15,7 @@ from bxapi.auth import CurrentPrincipal, RefereePrincipal
 from bxapi.db import Database, JsonObject, SaveRow, fits_integer_column
 from bxapi.errors import INTERNAL_ERROR, VALIDATION_ERROR, invalid, not_found, problem_responses
 from bxapi.idempotency import IdempotentRoute
+from bxapi.json_body import accepts_document
 from bxapi.models import RequestModel
 from bxapi.pagination import Page, PageQuery
 from bxapi.routers.sessions import NAME_MAX_LENGTH, SaveInfo, SessionInfo, save_info, session_info
@@ -96,6 +97,7 @@ def list_saves(
         }
     ),
 )
+@accepts_document
 def import_save(
     request: Request,
     principal: RefereePrincipal,

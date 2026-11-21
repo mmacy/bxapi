@@ -310,7 +310,7 @@ def test_head_has_no_body_when_the_server_fails(settings: Settings) -> None:
             "raw_path": b"/v1/bug",
             "query_string": b"",
             "root_path": "",
-            "headers": [],
+            "headers": [(b"host", b"localhost")],
             "client": ("127.0.0.1", 1),
             "server": ("127.0.0.1", 8640),
         }

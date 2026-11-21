@@ -9,7 +9,7 @@ from bxapi.app import create_app
 from bxapi.request_ids import REQUEST_ID_HEADER
 from bxapi.settings import Settings
 
-from .conftest import REFEREE_KEY, bearer
+from .conftest import LOCAL_URL, REFEREE_KEY, bearer
 
 DRAWN = re.compile(r"req_[A-Za-z0-9_-]{22}")
 
@@ -85,7 +85,7 @@ def test_an_unexpected_error_has_the_id_in_the_response_and_in_the_log(
     settings: Settings, caplog: pytest.LogCaptureFixture
 ) -> None:
     with (
-        TestClient(_failing_app(settings), raise_server_exceptions=False) as client,
+        TestClient(_failing_app(settings), base_url=LOCAL_URL, raise_server_exceptions=False) as client,
         caplog.at_level(logging.INFO, logger="bxapi"),
     ):
         response = client.get("/v1/bug", headers={REQUEST_ID_HEADER: "trace-500"})

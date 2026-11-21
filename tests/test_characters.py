@@ -396,7 +396,7 @@ def test_equipping_more_than_was_bought_says_so(
         FIGHTER | {"purchases": [{"item_id": "dagger", "quantity": 10_001}]},
         FIGHTER | {"purchases": [{"item_id": "dagger", "quantity": 10**30}]},
         FIGHTER | {"name": "x" * 101},
-        FIGHTER | {"name": "x" * 7_000_000},
+        FIGHTER | {"name": "x" * 60_000},
         FIGHTER | {"purchases": [{"item_id": "dagger", "lots": 1}]},
         FIGHTER | {"adjustment": {"lowered": {"int": -2}}},
         FIGHTER | {"seed": -1},
@@ -605,6 +605,17 @@ def test_an_import_with_effects_from_another_game_is_refused(referee: TestClient
     response = referee.post("/v1/characters/import", json=document)
     assert (response.status_code, response.json()["code"]) == (422, "content_invalid")
     assert referee.get("/v1/characters").json()["total"] == 0
+
+
+def test_an_import_with_hit_points_the_database_cannot_store_is_refused(referee: TestClient) -> None:
+    document: dict[str, Any] = osrlib_character(4).character.to_document()
+    document["payload"]["max_hp"] = 2**63
+    Character.from_document(document)
+    response = referee.post("/v1/characters/import", json=document)
+    assert (response.status_code, response.json()["code"]) == (422, "content_invalid")
+    assert referee.get("/v1/characters").json()["total"] == 0
+    document["payload"]["max_hp"] = 2**63 - 1
+    assert referee.post("/v1/characters/import", json=document).status_code == 201
 
 
 def test_an_import_accepts_what_osrlibs_model_accepts(referee: TestClient) -> None:

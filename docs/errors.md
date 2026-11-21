@@ -80,7 +80,7 @@ Unlike the commands endpoint, the endpoints that create a character, `POST /v1/c
 
 | Status | `code` | When it happens | What your client does | Extra members |
 | --- | --- | --- | --- | --- |
-| 400 | `bad_request` | The server can't decode the body as text, or the body has an integer of more than 4,300 digits. Send JSON in UTF-8. | Fix the request. Don't retry. | |
+| 400 | `bad_request` | The server can't decode the body as text, or the body has a value the server refuses: an integer of more than 4,300 digits, `NaN`, `Infinity`, a number too large for a 64-bit float, like `1e400`, a string with half of a UTF-16 surrogate pair, like `"\ud800"`, or arrays and objects nested more than 100 levels deep. | Read `detail`, which states the cause. Send JSON in UTF-8 without the value. Don't retry. | |
 | 401 | `unauthorized` | The key is missing or unknown. | Check the key. See [Authentication](authentication.md#handle-a-401). | |
 | 403 | `referee_required` | A caller with a player key asked for something only a referee may do: a referee endpoint, or a field like `seed`, `source`, or `party_document`, or `visibility=referee`. | Use a referee key, or leave the field out. | |
 | 403 | `referee_command` | A caller with a player key sent a referee command. | Use a referee key, or send a play command. | `command_type` |
@@ -94,8 +94,9 @@ Unlike the commands endpoint, the endpoints that create a character, `POST /v1/c
 | 409 | `version_unsupported` | A document you uploaded or imported has a schema version newer than the server's osrlib reads. | Export the document in an older version, or run a newer server. Check `schema_version` in `GET /v1/meta`. | |
 | 409 | `idempotency_key_in_progress` | The first request with the same `Idempotency-Key` is still running. The response has the header `Retry-After: 1`. | Wait the number of seconds in `Retry-After`, then send the request again. | |
 | 409 | `idempotency_key_interrupted` | The server failed or stopped while it handled the first request with the same `Idempotency-Key`, and it has no record of whether that request took effect. | Read the resource the request would have changed. If the request didn't take effect, send it again with a new key. On an overloaded server the first request can still be running, so read the resource again before you do. | |
-| 413 | `content_too_large` | The request body is larger than `BXAPI_MAX_BODY_BYTES`. | Send a smaller body. | |
+| 413 | `content_too_large` | The request body is larger than the server accepts. For a request that takes a document, like an adventure upload or a save import, the limit is `BXAPI_MAX_BODY_BYTES`. For any other request, like a command, it's 65,536 bytes. | Send a smaller body. | |
 | 415 | `unsupported_media_type` | The request has a body, and its `Content-Type` header doesn't say that the body is JSON. curl's `-d` option sends `application/x-www-form-urlencoded` unless you set the header. | Send the body as JSON with the header `Content-Type: application/json`. | |
+| 421 | `misdirected_request` | The server asks for no API key, and your request's `Host` header isn't `localhost`, `127.0.0.1`, or `[::1]`. | Call the server as `localhost` or `127.0.0.1`, or ask whoever runs it to set API keys. See [Authentication](authentication.md#run-without-keys-on-your-own-machine). | |
 | 422 | `validation_error` | The request doesn't match the endpoint's schema, or the body isn't valid JSON. | Fix the request. Read `errors`. | `errors`, `error_count` |
 | 422 | `content_invalid` | The rules engine refused a value or a document as malformed, like a dice expression it can't parse or an adventure that refers to a monster that doesn't exist. | Fix the value or the document. Read `detail`. | |
 | 422 | `character_invalid` | The choices for a new character break a rule, or name a class or an item that doesn't exist. | Show the player the `rejections` and let them choose again. | `rejections`, or `field`, `index`, and `id` |
