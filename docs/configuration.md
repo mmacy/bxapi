@@ -99,7 +99,7 @@ access-control-allow-headers: authorization,content-type
 ...
 ```
 
-The server lists `WWW-Authenticate`, `Retry-After`, `ETag`, and `X-Request-Id` in `access-control-expose-headers`, so a page's code can read them. A request from an origin that isn't in the list gets no `access-control-allow-origin` header, so the browser stops the page from reading the response. A key in a web page's code is readable by every player, so use a player key there and never a referee key. For more on that, see [An application with many users](authentication.md#an-application-with-many-users).
+The server lists `WWW-Authenticate`, `Retry-After`, `ETag`, `Idempotent-Replayed`, and `X-Request-Id` in `access-control-expose-headers`, so a page's code can read them. A request from an origin that isn't in the list gets no `access-control-allow-origin` header, so the browser stops the page from reading the response. A key in a web page's code is readable by every player, so use a player key there and never a referee key. For more on that, see [An application with many users](authentication.md#an-application-with-many-users).
 
 ### Choose where the database lives and back it up
 
@@ -117,7 +117,7 @@ The backup is a normal SQLite file. The `.backup` command creates it with your u
 chmod 600 bxapi-backup.db
 ```
 
-To restore, stop the server, put the backup where `BXAPI_DATABASE` points, and start the server. The server refuses to start with a file whose table layout it doesn't know, and its message states the path and the versions.
+To restore, stop the server, put the backup where `BXAPI_DATABASE` points, and start the server. A newer bxapi adds the tables it needs to a file that an older bxapi created, when it opens the file. The server refuses to start with a file that a newer bxapi created, and its message states the path and the table layout versions. So back up the file before you upgrade bxapi, in case you need to go back to the older version.
 
 ### Put a reverse proxy in front
 

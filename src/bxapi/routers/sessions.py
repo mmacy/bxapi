@@ -28,6 +28,7 @@ from bxapi.auth import CurrentPrincipal, Principal, RefereePrincipal
 from bxapi.commands import CommandKind, command_kind
 from bxapi.db import Database, JsonObject, SaveRow, SessionRow
 from bxapi.errors import INTERNAL_ERROR, VALIDATION_ERROR, ApiError, forbidden, invalid, not_found, problem_responses
+from bxapi.idempotency import IdempotentRoute
 from bxapi.models import ApiModel, RequestModel
 from bxapi.pagination import Page, PageQuery
 from bxapi.seeds import Seed, referee_seed
@@ -50,7 +51,7 @@ __all__ = [
     "session_info",
 ]
 
-router = APIRouter(prefix="/sessions", tags=["sessions"])
+router = APIRouter(prefix="/sessions", tags=["sessions"], route_class=IdempotentRoute)
 
 NAME_MAX_LENGTH = 200
 """The longest session name or save label, in characters."""

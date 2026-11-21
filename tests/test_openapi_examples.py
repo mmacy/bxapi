@@ -183,7 +183,11 @@ def test_the_shared_examples_are_what_the_server_returns() -> None:
     key = {**request_id, "Authorization": f"Bearer {_KEYS[Role.REFEREE]}"}
     json_body = {**key, "Content-Type": "application/json"}
     with TestClient(create_app(settings)) as client:
+        client.post("/v1/dice/roll", json={"expression": "1d6"}, headers={**key, "Idempotency-Key": "roll-1"})
         sent = {
+            "idempotency_key_reused": client.post(
+                "/v1/dice/roll", json={"expression": "2d6"}, headers={**key, "Idempotency-Key": "roll-1"}
+            ),
             "unauthorized": client.get("/v1/meta", headers=request_id),
             "validation_error": client.post("/v1/dice/roll", json={}, headers=key),
             "bad_request": client.post("/v1/dice/roll", content=b'{"expression": "\xff1d6"}', headers=json_body),

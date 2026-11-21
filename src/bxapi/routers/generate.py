@@ -13,6 +13,7 @@ from osrlib.data import load_monsters, load_treasure_tables
 from pydantic import Field
 
 from bxapi.errors import VALIDATION_ERROR, invalid, problem_responses
+from bxapi.idempotency import IdempotentRoute
 from bxapi.models import ApiModel, RequestModel
 from bxapi.seeds import Seed, seed_or_draw
 
@@ -28,7 +29,7 @@ __all__ = [
     "router",
 ]
 
-router = APIRouter(prefix="/generate", tags=["generate"])
+router = APIRouter(prefix="/generate", tags=["generate"], route_class=IdempotentRoute)
 
 STOCKING_STREAM = "stocking"
 """The key of the stream the server rolls rooms from. osrlib's `StreamName` has no member for it. The example in the

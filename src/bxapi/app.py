@@ -44,6 +44,7 @@ from bxapi.errors import (
     request_timeout,
     unsupported_media_type,
 )
+from bxapi.idempotency import IDEMPOTENCY_KEY_HEADER, REPLAYED_HEADER
 from bxapi.openapi_examples import add_examples
 from bxapi.request_ids import REQUEST_ID_HEADER, RequestIdMiddleware, request_id_of
 from bxapi.routers import V1_ROUTERS, meta
@@ -142,6 +143,13 @@ exist.
   200 with the new content when it has changed. Use it to poll a session's info or view.
 - **HEAD.** Every `GET` operation also answers `HEAD`, with the same status and headers and no
   body.
+- **Idempotency keys.** To send a `POST` again without running it twice, put a value you chose,
+  like a UUID, in the `Idempotency-Key` header of the first request and of every retry. The
+  server runs the first request and stores a 2xx response for 24 hours. A retry with the same
+  key gets the stored response, with the header `Idempotent-Replayed: true`. A request that fails
+  with a problem other than 500 `internal_error` changed nothing, and the server forgets its key,
+  so the same key runs the request again. A key is 1 to 255 printable ASCII characters with no
+  spaces, and it belongs to your client.
 - **Request ids.** Every response has an `X-Request-Id` header, like
   `req_Zk3uY0mWq1x8Jr5cTt2aLw`, and the server logs the id with the request. To choose the id,
   send `X-Request-Id` with 1 to 128 letters, digits, and the characters `.`, `_`, `~`, and `-`.
@@ -176,10 +184,11 @@ schema lists. Each operation's responses list the codes it returns, with what to
 
 `request_id` is the id in the response's `X-Request-Id` header.
 
-Three codes can succeed when you send the same request again: 409 `session_busy`, 503
-`database_busy` after the one second in its `Retry-After` header, and 408 `request_timeout`. For
-any other code, change the request first. For a 500, report the `request_id` to whoever runs
-the server.
+Four codes can succeed when you send the same request again: 409 `session_busy`, 409
+`idempotency_key_in_progress` and 503 `database_busy` after the one second in their `Retry-After`
+headers, and 408 `request_timeout`. For any other code, change the request first. When no
+response arrives at all, send the same `POST` again with the same `Idempotency-Key`. For a 500,
+report the `request_id` to whoever runs the server.
 """
 
 _TAGS = [
@@ -571,6 +580,60 @@ def _describe_problems(schema: dict[str, Any]) -> None:
             del schemas[name]
 
 
+_IDEMPOTENCY_ERRORS = {
+    "409": [
+        "`idempotency_key_in_progress`: The first request with this `Idempotency-Key` is still running. Wait the one "
+        "second that the `Retry-After` header states, and send the request again.",
+        "`idempotency_key_interrupted`: The server failed or stopped while it handled the first request with this "
+        "`Idempotency-Key`, and it has no record of whether that request took effect. Read the resource the request "
+        "would have changed. If the request didn't take effect, send it again with a new key.",
+    ],
+    "422": [
+        "`idempotency_key_reused`: Your client already sent this `Idempotency-Key` with another request: a different "
+        "method, path, query, body, or role. Send each new request with a new key.",
+    ],
+}
+
+
+def _describe_idempotency(schema: dict[str, Any]) -> None:
+    key = {
+        "name": IDEMPOTENCY_KEY_HEADER,
+        "in": "header",
+        "required": False,
+        "description": "A value you choose, like a UUID, that identifies this request: 1 to 255 printable ASCII "
+        "characters with no spaces. Send the same key when you send the same request again, and the server returns "
+        "the first response without running the request twice. The server remembers a key for 24 hours.",
+        "schema": {"type": "string", "minLength": 1, "maxLength": 255, "pattern": "^[!-~]+$"},
+        "example": "0b6f7c1e-3f9a-4f0e-9f57-2d1c6e8a4b11",
+    }
+    # One definition of the response header, which every POST operation refers to.
+    schema.setdefault("components", {}).setdefault("headers", {})[REPLAYED_HEADER] = {
+        "description": "`true` when the response is the stored response to an earlier request with the same "
+        "`Idempotency-Key`. The server leaves the header out of the response to the first request.",
+        "schema": {"type": "string", "enum": ["true"]},
+    }
+    replayed = {"$ref": f"#/components/headers/{REPLAYED_HEADER}"}
+    for path_name, path in schema.get("paths", {}).items():
+        operation = path.get("post")
+        if operation is None or not path_name.startswith("/v1/"):
+            continue
+        operation.setdefault("parameters", []).append(dict(key))
+        responses = operation.setdefault("responses", {})
+        for status, response in responses.items():
+            if status.startswith("2"):
+                response.setdefault("headers", {})[REPLAYED_HEADER] = replayed
+        for status, entries in _IDEMPOTENCY_ERRORS.items():
+            listed = "\n".join(f"- {entry}" for entry in entries)
+            response = responses.setdefault(status, {"description": "", "content": _problem_content()})
+            response["description"] = "\n".join(part for part in (response["description"], listed) if part)
+        retry_after = responses["409"].setdefault("headers", {})
+        retry_after["Retry-After"] = {
+            "description": "With `idempotency_key_in_progress`, the seconds to wait before you send the request "
+            "again: `1`.",
+            "schema": {"type": "integer"},
+        }
+
+
 def _describe_conditional_gets(schema: dict[str, Any]) -> None:
     if_none_match = {
         "name": "If-None-Match",
@@ -662,6 +725,7 @@ def _install_openapi(app: FastAPI) -> None:
                 license_info=app.license_info,
             )
             _describe_problems(schema)
+            _describe_idempotency(schema)
             _describe_conditional_gets(schema)
             _describe_request_ids(schema)
             _require_discriminators(schema)
@@ -755,7 +819,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             allow_origins=list(settings.cors_origins),
             allow_methods=["*"],
             allow_headers=["*"],
-            expose_headers=["WWW-Authenticate", "Retry-After", "ETag", REQUEST_ID_HEADER],
+            expose_headers=["WWW-Authenticate", "Retry-After", "ETag", REPLAYED_HEADER, REQUEST_ID_HEADER],
         )
     app.add_middleware(GZipMiddleware, minimum_size=COMPRESSION_MINIMUM_BYTES, compresslevel=6)
     app.add_middleware(HeadMiddleware)

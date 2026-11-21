@@ -10,6 +10,7 @@ from bxapi.adventures import builtin_adventures, is_builtin, parse_adventure
 from bxapi.auth import CurrentPrincipal, RefereePrincipal
 from bxapi.db import AdventureRow, Database
 from bxapi.errors import VALIDATION_ERROR, forbidden, not_found, problem_responses
+from bxapi.idempotency import IdempotentRoute
 from bxapi.models import ApiModel
 from bxapi.pagination import Page, PageQuery
 
@@ -23,7 +24,7 @@ __all__ = [
     "router",
 ]
 
-router = APIRouter(prefix="/adventures", tags=["adventures"])
+router = APIRouter(prefix="/adventures", tags=["adventures"], route_class=IdempotentRoute)
 
 AdventureId = Annotated[
     str,
