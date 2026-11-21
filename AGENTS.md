@@ -74,7 +74,7 @@ npm run serve
 `npm start` serves the site and reloads a page when its file under `generated/` changes. After you edit a hand-written page, run `node scripts/stage-pages.mjs` in a second terminal to copy it again.
 
 - Edit a hand-written page where git tracks it, never under `website/generated/`.
-- Link from one hand-written page to another with a relative path to the file, like `../README.md#get-it-running`. The link then works on GitHub and on the site. The build fails on a broken link or anchor.
+- Link from one hand-written page to another with a relative path to the file, like `../README.md#start-the-server`. The link then works on GitHub and on the site. The build fails on a broken link or anchor.
 - When you add a file to `docs/`, add it to `website/sidebars.js` and to the list in `README.md`.
 - To change the text of the reference, change the route's summary, docstring, models, error entries, or examples in `src/bxapi/`. Docs MD copies them from the OpenAPI document.
 - `package.json` pins `@speakeasy-api/docs-md` to one version, because four parts of the build work around defects in 0.2.37. `inlineRefs` in `scripts/prepare-openapi.mjs` exists because Docs MD stops with an error on a `$ref` key in an example. `separateSchema` in the same script exists because Docs MD shows the first response's examples on every response of an operation that has the same schema, and leaves some of those responses out. `src/remark/unescape-code-braces.mjs` removes the backslash that Docs MD writes before each brace in code. `src/remark/curl-samples.mjs` replaces the curl samples that Docs MD makes up from the schemas. When you move to a newer version, remove each workaround the new version doesn't need.

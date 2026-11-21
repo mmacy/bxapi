@@ -1,14 +1,18 @@
 # bxapi
 
-bxapi is an HTTP API for the rules of B/X (Basic/Expert), a fantasy adventure game published in 1981. A game or utility that you write sends it JSON requests and gets JSON back. You can look up monsters, spells, and equipment, roll dice, generate treasure, and create characters. You can also run a whole dungeon crawl, a game in which a party of characters explores a dungeon. For a dungeon crawl, bxapi starts the game, applies your players' commands under the B/X rules, stores each game in its database, and returns what the players see. It's built with [FastAPI](https://fastapi.tiangolo.com/) on [osrlib](https://github.com/mmacy/osrlib-python), a Python rules engine that applies every rule, so your application doesn't implement any.
+bxapi is an HTTP API for the rules of B/X (Basic/Expert), a fantasy adventure game published in 1981. Use it as the JSON backend for a game or utility that you write: look up monsters, spells, and equipment, roll dice, generate treasure, create characters, or run a whole dungeon crawl.
+
+A *dungeon crawl* is a game in which a party of characters explores a dungeon. bxapi starts the game, applies your players' commands under the B/X rules, stores each game in its database, and returns what the players see. bxapi is built with [FastAPI](https://fastapi.tiangolo.com/) on [osrlib](https://github.com/mmacy/osrlib-python), a Python rules engine that applies every rule, so your application doesn't implement any of them.
 
 ## Prerequisites
 
+Install these three tools before you start:
+
 - [git](https://git-scm.com/) to clone the repository.
 - [uv](https://docs.astral.sh/uv/) to install and run bxapi. uv downloads Python 3.14 if you don't have it.
-- [curl](https://curl.se/) to try the API from a terminal.
+- [curl](https://curl.se/) to send requests to the API from a terminal.
 
-## Get it running
+## Start the server
 
 Clone the repository and start the server:
 
@@ -18,11 +22,11 @@ cd bxapi
 BXAPI_ALLOW_ANONYMOUS=true uv run bxapi
 ```
 
-The server listens on <http://127.0.0.1:8640>. The first time you run `uv run bxapi`, it takes longer to start, because uv installs the dependencies, and Python 3.14 if you don't have it.
+The server listens on <http://127.0.0.1:8640>. The first `uv run bxapi` takes longer to start, because uv installs the dependencies, and Python 3.14 if you don't have it.
 
-A server with no API keys refuses to start unless `BXAPI_ALLOW_ANONYMOUS` is `true`. With that setting, the server asks for no key and treats every caller as a *referee*, a caller who may see a game's hidden state and change the game directly. Use the setting only on your own machine. Such a server answers only a request that calls it as `localhost`, `127.0.0.1`, or `[::1]`. To run a server for other people, see [Run it for other people](docs/configuration.md#run-it-for-other-people).
+`BXAPI_ALLOW_ANONYMOUS=true` starts the server in *anonymous mode*, and a server with no API keys won't start without it. A server in anonymous mode doesn't require an API key and treats every caller as a *referee*, a caller who may see a game's hidden state and change the game directly. Use anonymous mode only on your own machine. A server in anonymous mode answers only requests addressed to `localhost`, `127.0.0.1`, or `[::1]`. To run a server for other people, see [Deploy a shared server](docs/configuration.md#deploy-a-shared-server).
 
-In a second terminal, check that the server answers:
+In a second terminal, confirm that the server responds:
 
 ```sh
 curl -s http://127.0.0.1:8640/health
@@ -30,9 +34,9 @@ curl -s http://127.0.0.1:8640/health
 
 The server returns `{"status":"ok"}`.
 
-## Make a first request
+## Make your first request
 
-Roll three six-sided dice. The dice endpoint accepts an optional `seed`, a number that determines the roll. The same seed gives the same roll, so you get the response shown here. If you leave `seed` out, the server picks a random one and returns it.
+Roll three six-sided dice with the dice endpoint. The endpoint accepts an optional `seed`, a number that determines the roll. The same seed always produces the same roll, so this request returns the response shown here. If you omit `seed`, the server picks a random seed and returns it.
 
 ```sh
 curl -s -X POST http://127.0.0.1:8640/v1/dice/roll -H "Content-Type: application/json" -d '{"expression": "3d6", "seed": 7}'
@@ -42,7 +46,7 @@ curl -s -X POST http://127.0.0.1:8640/v1/dice/roll -H "Content-Type: application
 {"expression":"3d6","seed":7,"rolls":[{"rolls":[3,2,4],"modifier":0,"multiplier":1,"total":9}]}
 ```
 
-Look up a monster. The `q` parameter matches part of a monster's id or name:
+Next, look up a monster. The `q` parameter matches part of a monster's ID or name:
 
 ```sh
 curl -s "http://127.0.0.1:8640/v1/rules/monsters?q=goblin&limit=1"
@@ -54,9 +58,11 @@ curl -s "http://127.0.0.1:8640/v1/rules/monsters?q=goblin&limit=1"
 
 ## Play a game
 
-With four requests, you create a character, start a game, enter a dungeon, and move one step inside it. The game uses the *adventure* that comes with the server. An adventure is the town, dungeons, monsters, and treasure that a game is played in. The server returns an id for each thing it creates, and you pass that id in the next request. Your ids differ from the ones shown here, so replace each id in a `curl` command with the one your server returned. The server returns compact JSON, and we've shortened the responses here with `...`.
+Four requests create a character, start a game, enter a dungeon, and move one step inside it. The game uses the built-in *adventure*. An adventure is the town, dungeons, monsters, and treasure that a game is played in.
 
-Create a character. The server rolls the character's *ability scores*, the six numbers like strength and dexterity that the rules use for the character, so your response differs from the one shown here:
+The server returns an ID for each resource it creates, and you pass that ID in the next request. Your IDs differ from the ones shown here, so replace each ID in a `curl` command with the one your server returned. The server returns compact JSON, and the responses here are shortened with `...`.
+
+Create a character. The server rolls the character's *ability scores*, the six numbers such as strength and dexterity that the rules use for the character, so your response differs from the one shown here:
 
 ```sh
 curl -s -X POST http://127.0.0.1:8640/v1/characters -H "Content-Type: application/json" -d '{"name": "Brenna", "class_id": "fighter", "alignment": "lawful"}'
@@ -66,7 +72,7 @@ curl -s -X POST http://127.0.0.1:8640/v1/characters -H "Content-Type: applicatio
 {"id":"chr_YT8cPTCkC64HI8WyN-Vq6A","name":"Brenna","class_id":"fighter","level":1,"created_at":"2026-11-21T05:25:55Z","character":{...},"derived":{...}}
 ```
 
-Start a *session*, which is one game in progress. Its *party*, the group of characters that plays, is the character you created, and its adventure is `builtin-barrow`:
+Start a *session*, which is a single game in progress. This request makes the character you created the session's *party*, the group of characters that plays, and sets the session's adventure to `builtin-barrow`:
 
 ```sh
 curl -s -X POST http://127.0.0.1:8640/v1/sessions -H "Content-Type: application/json" -d '{"adventure_id": "builtin-barrow", "character_ids": ["chr_YT8cPTCkC64HI8WyN-Vq6A"]}'
@@ -76,7 +82,7 @@ curl -s -X POST http://127.0.0.1:8640/v1/sessions -H "Content-Type: application/
 {"id":"ses_BVmUCi5oRTQ0qSr1NadnJw","name":"The Barrow of the Forgotten King","adventure_id":"builtin-barrow","adventure_name":"The Barrow of the Forgotten King","mode":"town","ended":false,"revision":0,...}
 ```
 
-The session starts in town. Send it the command to enter the dungeon:
+The session starts in town. Send the command that enters the dungeon:
 
 ```sh
 curl -s -X POST http://127.0.0.1:8640/v1/sessions/ses_BVmUCi5oRTQ0qSr1NadnJw/commands -H "Content-Type: application/json" -d '{"command_type": "enter_dungeon", "dungeon_id": "barrow"}'
@@ -96,19 +102,19 @@ curl -s -X POST http://127.0.0.1:8640/v1/sessions/ses_BVmUCi5oRTQ0qSr1NadnJw/com
 {"accepted":true,"rejections":[],"events":[...],"messages":["The party moves to (1, 0), facing east."],"mode":"exploring","ended":false,"revision":2}
 ```
 
-On a server that allows anonymous callers, you act as a referee. A game client normally sends a key with the *player* role, and the server shows that client only what a player may see. [Play a game](docs/play-a-game.md) repeats these steps with a player key and goes on through a battle, a save, and a restore.
+You act as a referee in these requests, because the server runs in anonymous mode. A game client normally sends a key with the *player* role, and the server shows that client only what a player may see. [Play a game](docs/play-a-game.md) repeats these steps with a player key and continues through a battle, a save, and a restore.
 
-## Read the API reference
+## API reference
 
-The documentation site has a reference for every endpoint at <https://mmacy.github.io/bxapi/reference/>, with a tested `curl` command for each one.
+The documentation site has a reference page for every endpoint at <https://mmacy.github.io/bxapi/reference/>, each with a tested `curl` command.
 
-The running server also documents every endpoint at <http://127.0.0.1:8640/docs>, with a form to try each one, and at <http://127.0.0.1:8640/redoc>. Both pages are built from the server's OpenAPI document, a machine-readable description of the API that a tool can use to generate a client:
+A running server also documents every endpoint. The page at <http://127.0.0.1:8640/docs> has a form for trying each endpoint, and the page at <http://127.0.0.1:8640/redoc> shows the same reference in a second layout. Both pages are built from the server's OpenAPI document, a machine-readable description of the API that a tool can use to generate a client. Fetch the document from a running server:
 
 ```sh
 curl -s http://127.0.0.1:8640/openapi.json
 ```
 
-To get the same document without a running server, run the `bxapi.openapi` module. It builds the bxapi application with fixed settings, reads no environment variable and no file, and prints the document to standard output:
+To get the same document without a running server, run the `bxapi.openapi` module. The module builds the bxapi application with fixed settings, reads no environment variables or files, and prints the document to standard output:
 
 ```sh
 uv run python -m bxapi.openapi > openapi.json
@@ -116,20 +122,20 @@ uv run python -m bxapi.openapi > openapi.json
 
 ## Documentation
 
-The documentation site at <https://mmacy.github.io/bxapi/> has these pages and the API reference:
+The documentation site at <https://mmacy.github.io/bxapi/> hosts the API reference and these guides:
 
 - [Play a game](docs/play-a-game.md): a walkthrough of one game, from an ability roll to a saved battle.
-- [Authentication](docs/authentication.md): API keys, roles, and whose data a key can reach.
-- [Errors](docs/errors.md): the error format, every error code, and what to do about each.
+- [Authentication](docs/authentication.md): API keys, roles, and which client's data a key can reach.
+- [Errors](docs/errors.md): the error format, every error code, and how to handle each one.
 - [Rules reference and generators](docs/reference-and-generators.md): look up rules content, roll dice, and generate treasure and monsters.
 - [Adventures](docs/adventures.md): upload and validate your own adventure.
-- [Run games as a referee](docs/referee.md): what a referee key adds.
-- [Configuration](docs/configuration.md): every setting, and how to run a server for other people.
+- [Run games as a referee](docs/referee.md): the capabilities that a referee key adds.
+- [Configuration](docs/configuration.md): every setting, and how to deploy a server for other people.
 - [Example client](examples/README.md): a Python script that plays the first battle of the built-in adventure.
 
 ## Contribute
 
-A pull request must pass these four commands:
+Every pull request must pass these four checks:
 
 ```sh
 uv run ruff format --check
@@ -138,7 +144,7 @@ uv run pyright
 uv run pytest
 ```
 
-A pull request must also build the documentation site in `website/`, which contains these pages and an API reference generated from the OpenAPI document. The build needs [Node.js](https://nodejs.org/) 22 or later:
+A pull request must also build the documentation site in `website/`, which combines these guides with an API reference generated from the OpenAPI document. The build requires [Node.js](https://nodejs.org/) 22 or later:
 
 ```sh
 cd website
@@ -146,12 +152,12 @@ npm ci
 npm run build
 ```
 
-[AGENTS.md](AGENTS.md) has the rules for working in the repository, and [docs/spec.md](docs/spec.md) is the API's contract, which every endpoint must match.
+[AGENTS.md](AGENTS.md) contains the rules for working in the repository, and [docs/spec.md](docs/spec.md) is the API's contract, which every endpoint must match.
 
 ## License
 
 The code is licensed under the [MIT license](LICENSE).
 
-The rules content that the API serves comes from osrlib. It's Open Game Content under the Open Game License 1.0a, which `GET /v1/rules/license` returns with its Section 15 copyright notice.
+The rules content that the API serves comes from osrlib. That content is Open Game Content under the Open Game License 1.0a, and `GET /v1/rules/license` returns the license with its Section 15 copyright notice.
 
 bxapi is an independent project, not affiliated with or endorsed by Necrotic Gnome. "Old-School Essentials" is a trademark of Necrotic Gnome, used here only to identify the source document of the rules content. bxapi makes no claim of compatibility.
