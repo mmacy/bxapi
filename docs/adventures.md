@@ -1,0 +1,210 @@
+# Adventures
+
+Upload your own adventure so a session can play it, and check a document before you store it.
+
+An *adventure* is the content a session plays: a town, dungeons with maps, monsters and treasure, and the triggers and quests that drive them. An *adventure document* is an adventure written as JSON. The document has four members:
+
+- `kind` is `adventure`.
+- `schema_version` and `engine_version` are the versions of the rules engine that wrote it.
+- `payload` is the adventure itself, in the format of the `Adventure` model of [osrlib](https://mmacy.github.io/osrlib-python/), the rules engine that bxapi runs.
+
+You don't write a document by hand. Two tools write them: [osr-forge](https://github.com/mmacy/osr-forge) converts a tabletop adventure module PDF into a document, and [osr-editor](https://github.com/mmacy/osr-editor) is a graphical editor for creating and changing one. Both write the `adventure.json` file that bxapi accepts as a request body. A program that uses osrlib can also write one.
+
+The server comes with one adventure, `builtin-barrow`, so a new client can start a game without uploading anything. Its id starts with `builtin-`, and every client can read it and none can delete it.
+
+The examples use a key in the shell variable `KEY`, as [Play a game](play-a-game.md#start-a-server-with-a-player-key) sets up. A player key can upload, validate, list, and delete adventures. To follow along you need a document, and the built-in adventure's document is one you can read with a referee key, as [Run games as a referee](referee.md) describes. Save it as `barrow.json`:
+
+```sh
+export KEY=referee-key-0123456789
+```
+
+```sh
+curl -s http://127.0.0.1:8640/v1/adventures/builtin-barrow/document -H "Authorization: Bearer $KEY" -o barrow.json
+```
+
+```sh
+head -c 200 barrow.json
+```
+
+```text
+{"kind":"adventure","schema_version":4,"engine_version":"2.4.0","payload":{"name":"The Barrow of the Forgotten King","description":"A plundered barrow outside town, and the idol the temple wants back.
+```
+
+The rest of this page uses a player key:
+
+```sh
+export KEY=player-key-0123456789
+```
+
+## Validate a document
+
+Send a document to `POST /v1/adventures/validate` to check it without storing it. The server runs every check that the rules engine makes on an adventure: the document's structure, and every reference the adventure makes to a monster, an item, an area, or a quest. An adventure that passes can start a session.
+
+```sh
+curl -s -X POST http://127.0.0.1:8640/v1/adventures/validate -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d @barrow.json
+```
+
+```json
+{
+  "valid": true,
+  "adventure": {
+    "name": "The Barrow of the Forgotten King",
+    "description": "A plundered barrow outside town, and the idol the temple wants back.",
+    "hooks": ["The temple pays 200 gp for the Jade Idol's return."],
+    "party": null,
+    "town": {"name": "Threshold", "description": "A walled market town at the edge of the moors."},
+    "dungeons": [{"id": "barrow", "name": "The Barrow"}],
+    "id": null,
+    "builtin": false,
+    "created_at": null
+  }
+}
+```
+
+The response is 200 whether or not the document is valid. When it's valid, `adventure` is the adventure's info, described below, with `id` and `created_at` set to `null` because nothing was stored.
+
+To see a document that fails, change the goblins' monster id in a copy of the file to one that doesn't exist:
+
+```sh
+sed 's/"goblin"/"gobbin"/' barrow.json > broken.json
+```
+
+```sh
+curl -s -X POST http://127.0.0.1:8640/v1/adventures/validate -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d @broken.json
+```
+
+```json
+{
+  "valid": false,
+  "code": "content_invalid",
+  "detail": "adventure validation failed:\nbarrow level 1: area 'guard_room' references unknown monster 'gobbin'"
+}
+```
+
+`code` is the error code that an upload of the same document returns, and `detail` says what's wrong. A document written by a newer release of the rules engine than the server runs gets `version_unsupported` instead. The `detail` lists at most 20 problems.
+
+## Upload an adventure
+
+`POST /v1/adventures` runs the same checks and stores the document. Change the adventure's name in a copy of the file, so you can tell your adventure from the built-in one, and upload it:
+
+```sh
+sed 's/The Barrow of the Forgotten King/The Barrow, second edition/' barrow.json > mine.json
+```
+
+```sh
+curl -s -X POST http://127.0.0.1:8640/v1/adventures -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d @mine.json
+```
+
+```json
+{
+  "name": "The Barrow, second edition",
+  "description": "A plundered barrow outside town, and the idol the temple wants back.",
+  "hooks": ["The temple pays 200 gp for the Jade Idol's return."],
+  "party": null,
+  "town": {"name": "Threshold", "description": "A walled market town at the edge of the moors."},
+  "dungeons": [{"id": "barrow", "name": "The Barrow"}],
+  "id": "adv_OYCL9qF0YhQ0HVyLdsBthw",
+  "builtin": false,
+  "created_at": "2026-11-21T00:27:05Z"
+}
+```
+
+The status is 201. The server stores the document as you sent it, and returns the adventure's info with the new `id`. Your id differs. A document that fails a check gets 422 `content_invalid`, the same `detail` as validation, and the server stores nothing:
+
+```sh
+curl -si -X POST http://127.0.0.1:8640/v1/adventures -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d @broken.json
+```
+
+```text
+HTTP/1.1 422 Unprocessable Content
+...
+{"type":"about:blank","title":"Unprocessable Content","status":422,"detail":"adventure validation failed:\nbarrow level 1: area 'guard_room' references unknown monster 'gobbin'","code":"content_invalid"}
+```
+
+Each upload stores a new adventure, even when the document is one you uploaded before. The body can be up to 8 MiB by default. See [Configuration](configuration.md) to change the limit.
+
+## Read an adventure's info
+
+`GET /v1/adventures` lists the adventures a client can play: the ones that come with the server first, then your client's, newest first. `GET /v1/adventures/{adventure_id}` returns one. Both return the adventure's *info*:
+
+| Field | Meaning |
+| --- | --- |
+| `id` | The adventure's id. `builtin-` and a name for an adventure that comes with the server, and `adv_` and 22 random characters for one you uploaded. |
+| `name` | The adventure's title. |
+| `builtin` | Whether the adventure comes with the server. |
+| `created_at` | When your client stored the adventure. `null` for a built-in adventure. |
+| `description` | The text the author wrote to describe the adventure. |
+| `hooks` | The reasons the author gives for a party to take the adventure on. |
+| `party` | The character levels and party size the adventure is written for, or `null` when the author gives none. |
+| `town` | The name and description of the town where a session starts. |
+| `dungeons` | The `id` and `name` of each dungeon. A session's `enter_dungeon` command takes a dungeon's `id`. |
+
+The info has what a player may know before play and nothing else, whatever the key's role. It leaves out the maps, monsters, treasure, triggers, and quests, and it doesn't say how many levels a dungeon has, because the player view shows only the levels a party has explored. A game that lists adventures for its players can show the info as it is.
+
+```sh
+curl -s http://127.0.0.1:8640/v1/adventures/adv_OYCL9qF0YhQ0HVyLdsBthw -H "Authorization: Bearer $KEY"
+```
+
+The response is the same info that the upload returned. The full document is for referees: `GET /v1/adventures/{adventure_id}/document` returns it as it was uploaded, and a player who asks gets 403 `referee_required`:
+
+```sh
+curl -si http://127.0.0.1:8640/v1/adventures/adv_OYCL9qF0YhQ0HVyLdsBthw/document -H "Authorization: Bearer $KEY"
+```
+
+```text
+HTTP/1.1 403 Forbidden
+...
+{"type":"about:blank","title":"Forbidden","status":403,"detail":"This request needs an API key with the referee role.","code":"referee_required"}
+```
+
+## Play an uploaded adventure
+
+Start a session with the adventure's id. Everything else is the same as with the built-in adventure:
+
+```sh
+curl -s -X POST http://127.0.0.1:8640/v1/sessions -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"adventure_id": "adv_OYCL9qF0YhQ0HVyLdsBthw", "character_ids": ["chr_XSWUBj-UjQauxKNeDtopIg"]}'
+```
+
+```json
+{
+  "id": "ses_k38jq5pfILT6dAC9UeUsxg",
+  "name": "The Barrow, second edition",
+  "adventure_id": "adv_OYCL9qF0YhQ0HVyLdsBthw",
+  "adventure_name": "The Barrow, second edition",
+  "mode": "town",
+  ...
+}
+```
+
+The character id is one you created. See [Play a game](play-a-game.md#create-a-character).
+
+## Delete an adventure
+
+Delete an adventure you uploaded:
+
+```sh
+curl -si -X DELETE http://127.0.0.1:8640/v1/adventures/adv_OYCL9qF0YhQ0HVyLdsBthw -H "Authorization: Bearer $KEY"
+```
+
+```text
+HTTP/1.1 204 No Content
+...
+```
+
+A session that already started with the adventure keeps playing, because a session has its own copy. After the delete, a request for the adventure gets 404 `not_found`, and so do new sessions. An attempt to delete a built-in adventure gets 403 `adventure_read_only`:
+
+```sh
+curl -si -X DELETE http://127.0.0.1:8640/v1/adventures/builtin-barrow -H "Authorization: Bearer $KEY"
+```
+
+```text
+HTTP/1.1 403 Forbidden
+...
+{"type":"about:blank","title":"Forbidden","status":403,"detail":"The adventure 'builtin-barrow' comes with the server.","code":"adventure_read_only"}
+```
+
+## Next steps
+
+- [Play a game](play-a-game.md): start a session with an adventure.
+- [Run games as a referee](referee.md): read the full document of an adventure.
+- [Errors](errors.md): every error code, including `content_invalid` and `version_unsupported`.
