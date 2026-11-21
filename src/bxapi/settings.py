@@ -136,6 +136,11 @@ class Settings(BaseSettings):
     """The web origins whose pages may call the API from a browser, like `"https://game.example"`.
     Each is a scheme, a host, and an optional port, with no path and no trailing slash. When the
     tuple is empty, the server sends no cross-origin headers."""
+    rate_limit_per_minute: int = Field(default=600, ge=0)
+    """How many requests under `/v1` each client may send in a minute, in each server process. A
+    client can send that many at once, and regains them at a steady rate. A request over the
+    limit gets a 429. Requests with no valid API key share one budget of the same size. 0 turns
+    the limit off."""
     session_cache_size: int = Field(default=256, ge=1)
     """How many sessions the server keeps loaded in memory. When the count passes this number,
     the server drops the session that was used longest ago and loads it from the database the

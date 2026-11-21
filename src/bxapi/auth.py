@@ -19,7 +19,8 @@ refuses the request.
 
 [`AuthMiddleware`][bxapi.auth.AuthMiddleware] checks the key of every request under `/v1`
 before anything reads the request's body, so a caller without a valid key gets a 401 and the
-server parses nothing it sent. An endpoint declares what it needs with one of two parameter
+server parses nothing it sent. It also counts the request against the client's rate limit, as
+[`bxapi.rate_limit`][bxapi.rate_limit] describes. An endpoint declares what it needs with one of two parameter
 types. [`CurrentPrincipal`][bxapi.auth.CurrentPrincipal] accepts any caller with a valid key.
 [`RefereePrincipal`][bxapi.auth.RefereePrincipal] accepts only a referee.
 """
@@ -36,6 +37,7 @@ from starlette.datastructures import Headers
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from bxapi.errors import ApiError, forbidden, problem_response
+from bxapi.rate_limit import NO_KEY, RateLimiter, rate_limited
 from bxapi.request_ids import request_id_of
 from bxapi.settings import Role, Settings
 
@@ -192,14 +194,21 @@ class AuthMiddleware:
     [`is_loopback_host`][bxapi.auth.is_loopback_host] defines it, with the 421 problem document
     with the code `misdirected_request`.
 
+    Each request that passes those checks takes one request from its client's budget in the
+    rate limiter, and each request without a valid key takes one from the budget they share. A
+    request whose budget is empty gets the 429 problem document with the code `rate_limited`, in
+    place of the 401 when it has no valid key.
+
     Args:
         app: The ASGI application to wrap.
         settings: The server's settings, with the keys to accept.
+        limiter: The rate limiter that counts the requests.
     """
 
-    def __init__(self, app: ASGIApp, settings: Settings) -> None:
+    def __init__(self, app: ASGIApp, settings: Settings, limiter: RateLimiter) -> None:
         self.app = app
         self.settings = settings
+        self.limiter = limiter
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         """Pass the request to the wrapped application if it needs no key or has a valid one."""
@@ -210,15 +219,21 @@ class AuthMiddleware:
         headers = Headers(scope=scope)
         principal = find_principal(self.settings, headers.get("authorization"))
         error = None
-        if principal is None:
-            error = unauthorized()
-        elif not self.settings.auth_enabled and not is_loopback_host(headers.get("host")):
+        if principal is not None and not self.settings.auth_enabled and not is_loopback_host(headers.get("host")):
             error = misdirected_request()
+        else:
+            if principal is not None:
+                # The line the server logs for a refused request then states which client sent it.
+                scope.setdefault("state", {})["principal"] = principal
+            retry_after = self.limiter.take(NO_KEY if principal is None else principal.client)
+            if retry_after:
+                error = rate_limited(self.limiter.per_minute, retry_after, has_key=principal is not None)
+            elif principal is None:
+                error = unauthorized()
         if error is not None:
             response = problem_response(error.problem(), error.headers, request_id=request_id_of(scope))
             await response(scope, receive, send)
             return
-        scope.setdefault("state", {})["principal"] = principal
         await self.app(scope, receive, send)
 
 

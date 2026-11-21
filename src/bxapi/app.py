@@ -49,6 +49,7 @@ from bxapi.errors import (
 from bxapi.idempotency import IDEMPOTENCY_KEY_HEADER, REPLAYED_HEADER
 from bxapi.json_body import MAX_JSON_DEPTH, SMALL_BODY_BYTES, body_limit
 from bxapi.openapi_examples import add_examples
+from bxapi.rate_limit import RateLimiter
 from bxapi.request_ids import REQUEST_ID_HEADER, RequestIdMiddleware, request_id_of
 from bxapi.routers import V1_ROUTERS, meta
 from bxapi.security_headers import SecurityHeadersMiddleware
@@ -168,7 +169,10 @@ exist.
   `req_Zk3uY0mWq1x8Jr5cTt2aLw`, and the server logs the id with the request. To choose the id,
   send `X-Request-Id` with 1 to 128 letters, digits, and the characters `.`, `_`, `~`, and `-`.
   The server replaces any other value with an id it draws.
-- **Rate limits.** The server has none.
+- **Rate limits.** Each client may send as many requests a minute as the server's
+  `BXAPI_RATE_LIMIT_PER_MINUTE` setting allows, which is 600 by default. You can send that many at
+  once, and you regain them at a steady rate. A request over the limit gets 429 `rate_limited`,
+  with the seconds to wait in the `Retry-After` header.
 
 ## Refused commands
 
@@ -198,9 +202,9 @@ schema lists. Each operation's responses list the codes it returns, with what to
 
 `request_id` is the id in the response's `X-Request-Id` header.
 
-Four codes can succeed when you send the same request again: 409 `session_busy`, 409
-`idempotency_key_in_progress` and 503 `database_busy` after the one second in their `Retry-After`
-headers, and 408 `request_timeout`. For any other code, change the request first. When no
+Five codes can succeed when you send the same request again: 409 `session_busy`, 409
+`idempotency_key_in_progress`, 429 `rate_limited`, and 503 `database_busy` after the seconds in
+their `Retry-After` headers, and 408 `request_timeout`. For any other code, change the request first. When no
 response arrives at all, send the same `POST` again with the same `Idempotency-Key`. For a 500,
 report the `request_id` to whoever runs the server.
 """
@@ -400,6 +404,12 @@ _SHARED_ERRORS = problem_responses(
             "set API keys. A server with API keys never returns this code."
         ],
         422: [VALIDATION_ERROR],
+        429: [
+            "`rate_limited`: Your client sent more requests in a minute than the server allows, which its "
+            "`BXAPI_RATE_LIMIT_PER_MINUTE` setting sets and which is 600 by default. Wait the seconds that the "
+            "`Retry-After` header states, and send the request again. Requests with no valid API key share one "
+            "limit, and get this code in place of 401 `unauthorized` when they pass it."
+        ],
         500: [INTERNAL_ERROR],
         503: [
             "`database_busy`: Another process held the database's write lock for more than 5 seconds. Wait the one "
@@ -409,6 +419,12 @@ _SHARED_ERRORS = problem_responses(
 )
 _SHARED_ERRORS[401]["headers"] = {
     "WWW-Authenticate": {"description": "`Bearer`, the scheme the server accepts.", "schema": {"type": "string"}}
+}
+_SHARED_ERRORS[429]["headers"] = {
+    "Retry-After": {
+        "description": "The seconds to wait before you send the request again, at least `1`.",
+        "schema": {"type": "integer"},
+    }
 }
 _SHARED_ERRORS[503]["headers"] = {
     "Retry-After": {
@@ -854,7 +870,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(
         BodyLimitMiddleware, max_bytes=settings.max_body_bytes, timeout_seconds=settings.body_timeout_seconds
     )
-    app.add_middleware(AuthMiddleware, settings=settings)
+    app.add_middleware(AuthMiddleware, settings=settings, limiter=RateLimiter(settings.rate_limit_per_minute))
     app.add_middleware(ConditionalGetMiddleware, vary="Accept-Encoding")
     if settings.cors_origins:
         app.add_middleware(

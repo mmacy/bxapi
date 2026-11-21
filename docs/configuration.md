@@ -44,6 +44,7 @@ The server exits with status 1.
 | `BXAPI_API_KEYS` | none | A JSON list of API keys. See [Authentication](authentication.md#configure-api-keys). |
 | `BXAPI_ALLOW_ANONYMOUS` | `false` | Whether a server with no API keys may start. Such a server answers only a request that calls it as `localhost`, `127.0.0.1`, or `[::1]`. |
 | `BXAPI_CORS_ORIGINS` | none | A JSON list of the web origins whose pages may call the API from a browser. |
+| `BXAPI_RATE_LIMIT_PER_MINUTE` | `600` | How many requests each client may send in a minute. 0 turns the limit off. |
 | `BXAPI_SESSION_CACHE_SIZE` | `256` | How many sessions (games in progress) the server keeps loaded in memory, at least 1. |
 | `BXAPI_MAX_BODY_BYTES` | `8388608` | The largest request body, in bytes, at least 1,024. A request that takes no document, like a command, is also limited to 65,536 bytes. |
 | `BXAPI_BODY_TIMEOUT_SECONDS` | `30` | How long the server waits for a request's whole body to arrive, in seconds. |
@@ -56,6 +57,7 @@ Examples:
 - `BXAPI_DATABASE=/var/lib/bxapi/game.db` stores the data in that file. The server creates the file if it doesn't exist, readable and writable only by the user that runs the server.
 - `BXAPI_API_KEYS='[{"client": "my-game", "key": "player-key-0123456789", "role": "player"}]'` accepts one player key. With no keys, the server starts only when `BXAPI_ALLOW_ANONYMOUS` is `true`, and then asks for no key and treats every caller as a referee. Use that only on your own machine.
 - `BXAPI_CORS_ORIGINS='["https://game.example"]'` lets pages from that origin call the API. An origin is a scheme, a host, and an optional port, like `http://localhost:3000`, with no path and no trailing slash. `*` isn't allowed.
+- `BXAPI_RATE_LIMIT_PER_MINUTE=6000` lets each client send 6,000 requests a minute, which is 100 a second. A client can send a minute's requests at once, and regains them at a steady rate. A request over the limit gets 429 `rate_limited` with a `Retry-After` header. The limit is for each client name, so every key of one application shares it. Raise it for an application whose own server sends the requests of many players with one key.
 - `BXAPI_SESSION_CACHE_SIZE=32` keeps 32 sessions loaded. When the cache is full, the server drops the session used longest ago and loads it from the database the next time a request needs it, so a smaller cache saves memory and makes some requests slower.
 - `BXAPI_MAX_BODY_BYTES=1048576` refuses a request body of more than 1 MiB with 413 `content_too_large`. A save document grows with every command, so a server that imports saves needs a limit larger than its biggest save. The setting is the limit for the five requests that take a document: an adventure upload, an adventure check, a character import, a save import, and a new session, which can contain a party document. Every other request body is also limited to 65,536 bytes, and no setting raises that limit.
 - `BXAPI_BODY_TIMEOUT_SECONDS=10` gives a client 10 seconds to send a body. A slower one gets 408 `request_timeout`.
@@ -121,7 +123,7 @@ To restore, stop the server, put the backup where `BXAPI_DATABASE` points, and s
 
 ### Put a reverse proxy in front
 
-The server limits how long a request's body takes to arrive, with `BXAPI_BODY_TIMEOUT_SECONDS`, but it can't limit how long a client takes to send a request's headers or how long a connection stays open between requests. Run a deployed server behind a *reverse proxy*, a server like nginx or Caddy that accepts the connections from the internet and forwards the requests to bxapi. Set the proxy to enforce timeouts for headers and idle connections, to end TLS, and to limit the body size. bxapi has no rate limits, so set the proxy to limit how many requests and connections one address may make. Keep bxapi on the default `BXAPI_HOST` of `127.0.0.1`, so only the proxy on the same machine can reach it, or on a private network address.
+The server limits how long a request's body takes to arrive, with `BXAPI_BODY_TIMEOUT_SECONDS`, but it can't limit how long a client takes to send a request's headers or how long a connection stays open between requests. Run a deployed server behind a *reverse proxy*, a server like nginx or Caddy that accepts the connections from the internet and forwards the requests to bxapi. Set the proxy to enforce timeouts for headers and idle connections, to end TLS, and to limit the body size. bxapi limits the requests of each client name, with `BXAPI_RATE_LIMIT_PER_MINUTE`, and not the requests of each network address. So also set the proxy to limit how many requests and connections one address may make. Keep bxapi on the default `BXAPI_HOST` of `127.0.0.1`, so only the proxy on the same machine can reach it, or on a private network address.
 
 ### Find a request in the log
 
@@ -144,6 +146,8 @@ The `bxapi` command runs one process. You can start several against one database
 When another process writes the session after a request reads it and before the request writes it, the command has no effect, and the client gets 409 `session_busy` with the session's current `revision`. A client handles it as [Errors](errors.md#session_busy) describes: it reads the session if it sent `expected_revision`, and sends the command again if it didn't. A client that sends `expected_revision` with every command never repeats a command by mistake.
 
 Processes also take turns writing to the database. A process that waits more than 5 seconds for the write lock answers with 503 `database_busy` and the header `Retry-After: 1`. Have your client wait the number of seconds in `Retry-After` and send the request again.
+
+Each process counts a client's requests by itself, so with two processes a client can send twice `BXAPI_RATE_LIMIT_PER_MINUTE`.
 
 All processes need the same keys, so give them the same `BXAPI_API_KEYS`. Run them from the same version of bxapi. If a process with a different release of the rules engine wrote a session, a process that can't load that session answers 500 `session_unreadable`.
 

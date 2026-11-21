@@ -41,6 +41,7 @@ from bxapi.errors import (
     validation_error,
 )
 from bxapi.idempotency import key_in_progress, key_interrupted, key_reused
+from bxapi.rate_limit import rate_limited
 from bxapi.session_manager import LOCK_TIMEOUT_SECONDS, session_busy, session_unreadable
 from bxapi.settings import Settings
 
@@ -114,6 +115,7 @@ def shared_problems() -> tuple[SharedProblem, ...]:
     """
     max_bytes: int = Settings.model_fields["max_body_bytes"].default
     timeout_seconds: float = Settings.model_fields["body_timeout_seconds"].default
+    per_minute: int = Settings.model_fields["rate_limit_per_minute"].default
     missing = {"type": "missing", "loc": ("body", "expression"), "msg": "Field required"}
 
     def shared(name: str, summary: str, description: str, error: ApiError, *operations: str) -> SharedProblem:
@@ -133,6 +135,13 @@ def shared_problems() -> tuple[SharedProblem, ...]:
             "The response to a request under `/v1` whose `Host` header isn't `localhost`, `127.0.0.1`, or `[::1]`, "
             "from a server that asks for no API key.",
             misdirected_request(),
+        ),
+        shared(
+            "rate_limited",
+            "Send requests faster than the limit",
+            f"The response to a request from a client that sent more than {per_minute} requests in a minute, the "
+            "server's default limit.",
+            rate_limited(per_minute, 1),
         ),
         shared(
             "bad_request",
