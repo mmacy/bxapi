@@ -10,7 +10,7 @@ from osrlib.crawl.session import GameSession
 from starlette.types import Message
 
 from bxapi.app import create_app
-from bxapi.db import LAYOUT_VERSION, Database
+from bxapi.db import Database
 from bxapi.idempotency import (
     IDEMPOTENCY_KEY_HEADER,
     IN_PROGRESS_SECONDS,
@@ -27,7 +27,6 @@ from .conftest import problem_without_id
 
 FIGHTER = {"name": "Brenna", "class_id": "fighter", "alignment": "lawful"}
 ENTER = {"command_type": "enter_dungeon", "dungeon_id": "barrow"}
-ABILITIES = ("str", "int", "wis", "dex", "con", "cha")
 
 
 def key(value: str) -> dict[str, str]:
@@ -380,23 +379,6 @@ def test_two_processes_share_the_keys(settings: Settings) -> None:
         first = one.post("/v1/characters", json=FIGHTER, headers=key("create"))
         assert_replay(first, two.post("/v1/characters", json=FIGHTER, headers=key("create")))
         assert two.get("/v1/characters").json()["total"] == 1
-
-
-def test_a_version_1_file_gets_the_table_and_keeps_its_rows(settings: Settings) -> None:
-    Database(settings.database).close()
-    with sqlite3.connect(settings.database) as connection:
-        connection.execute("DROP TABLE idempotency_keys")
-        connection.execute("PRAGMA user_version = 1")
-        connection.execute(
-            "INSERT INTO ability_rolls (id, client, scores, seed, used, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-            ("rol_old", "local", json.dumps(dict.fromkeys(ABILITIES, 12)), 7, 0, "2026-11-20T22:01:05Z"),
-        )
-    with TestClient(create_app(settings)) as client:
-        assert client.get("/v1/ability-rolls/rol_old").json()["scores"]["str"] == 12
-        first = client.post("/v1/ability-rolls", headers=key("k"))
-        assert_replay(first, client.post("/v1/ability-rolls", headers=key("k")))
-    with sqlite3.connect(settings.database) as connection:
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == LAYOUT_VERSION == 2
 
 
 # The OpenAPI document

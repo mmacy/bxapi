@@ -1,5 +1,6 @@
 """Every fenced `python` block in the docstrings under `src/bxapi/` lints clean and runs as written."""
 
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -21,3 +22,11 @@ def test_docstring_example(example: CodeExample, eval_example: EvalExample, monk
     # An example that writes a file writes it in the test's temporary directory.
     monkeypatch.chdir(eval_example.tmp_path)
     eval_example.run(example)
+
+
+def test_every_fenced_python_block_is_an_example() -> None:
+    # find_examples pairs triple quotes with a regular expression, so a string that isn't a docstring can hide the
+    # examples in the docstrings after it.
+    found = Counter(example.path for example in find_examples(_SOURCE))
+    fenced = {path: path.read_text("utf-8").count("```python") for path in _SOURCE.rglob("*.py")}
+    assert dict(found) == {path: count for path, count in fenced.items() if count}

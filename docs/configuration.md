@@ -117,7 +117,7 @@ The backup is a normal SQLite file. The `.backup` command creates it with your u
 chmod 600 bxapi-backup.db
 ```
 
-To restore, stop the server, put the backup where `BXAPI_DATABASE` points, and start the server. A newer bxapi adds the tables it needs to a file that an older bxapi created, when it opens the file. The server refuses to start with a file that a newer bxapi created, and its message states the path and the table layout versions. So back up the file before you upgrade bxapi, in case you need to go back to the older version.
+To restore, stop the server, put the backup where `BXAPI_DATABASE` points, and start the server. The server refuses to start with a file whose table layout it doesn't know, and its message states the path and the versions.
 
 ### Put a reverse proxy in front
 
