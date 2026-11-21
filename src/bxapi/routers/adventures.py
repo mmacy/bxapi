@@ -11,6 +11,7 @@ from bxapi.auth import CurrentPrincipal, RefereePrincipal
 from bxapi.db import AdventureRow, Database
 from bxapi.errors import VALIDATION_ERROR, forbidden, not_found, problem_responses
 from bxapi.idempotency import IdempotentRoute
+from bxapi.json_body import accepts_document
 from bxapi.models import ApiModel
 from bxapi.pagination import Page, PageQuery
 
@@ -172,6 +173,7 @@ def _stored_info(row: AdventureRow) -> AdventureInfo:
         }
     ),
 )
+@accepts_document
 def upload_adventure(
     request: Request, principal: CurrentPrincipal, document: Annotated[dict[str, Any], _DOCUMENT_BODY]
 ) -> AdventureInfo:
@@ -197,6 +199,7 @@ def upload_adventure(
     summary="Check an adventure document without storing it",
     response_description="`valid` with the adventure's info, or the reason the upload would fail.",
 )
+@accepts_document
 def validate_adventure(document: Annotated[dict[str, Any], _DOCUMENT_BODY]) -> ValidAdventure | InvalidAdventure:
     """Run the checks of `POST /v1/adventures` on a document, and store nothing.
 

@@ -206,6 +206,18 @@ curl -s http://127.0.0.1:8640/v1/meta
 
 Use this mode only on your own machine. When the server has any key, `BXAPI_ALLOW_ANONYMOUS` has no effect.
 
+A server that asks for no key answers a request under `/v1` only when you call it as `localhost`, `127.0.0.1`, or `[::1]`, with or without a port. The server reads the name from the request's `Host` header, which your HTTP client fills in from the URL. A request with another name gets status 421 and the code `misdirected_request`:
+
+```sh
+curl -s http://127.0.0.1:8640/v1/meta -H "Host: game.example"
+```
+
+```json
+{"type":"about:blank","title":"Misdirected Request","status":421,"detail":"This server asks for no API key, so it answers only a request whose Host header is localhost, 127.0.0.1, or [::1]. To call the server by another name, set BXAPI_API_KEYS and send a key.","code":"misdirected_request","request_id":"req_Zk3uY0mWq1x8Jr5cTt2aLw"}
+```
+
+The check protects your data from the web pages you visit while the server runs. A page on another site can make your browser send requests to `127.0.0.1`. If the page first points its own host name at `127.0.0.1`, which is called DNS rebinding, your browser also lets the page read the responses. The browser then sends the page's host name in `Host`, and the server refuses the request. To reach the server from another machine, or under another name, set `BXAPI_API_KEYS`. A server with keys answers any `Host`.
+
 ## Next steps
 
 - [Errors](errors.md): every error code and what to do about it.

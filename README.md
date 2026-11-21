@@ -20,7 +20,7 @@ BXAPI_ALLOW_ANONYMOUS=true uv run bxapi
 
 The server listens on <http://127.0.0.1:8640>. The first time you run `uv run bxapi`, it takes longer to start, because uv installs the dependencies, and Python 3.14 if you don't have it.
 
-A server with no API keys refuses to start unless `BXAPI_ALLOW_ANONYMOUS` is `true`. With that setting, the server asks for no key and treats every caller as a *referee*, a caller who may see a game's hidden state and change the game directly. Use the setting only on your own machine. To run a server for other people, see [Run it for other people](docs/configuration.md#run-it-for-other-people).
+A server with no API keys refuses to start unless `BXAPI_ALLOW_ANONYMOUS` is `true`. With that setting, the server asks for no key and treats every caller as a *referee*, a caller who may see a game's hidden state and change the game directly. Use the setting only on your own machine. Such a server answers only a request that calls it as `localhost`, `127.0.0.1`, or `[::1]`. To run a server for other people, see [Run it for other people](docs/configuration.md#run-it-for-other-people).
 
 In a second terminal, check that the server answers:
 

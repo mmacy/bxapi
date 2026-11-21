@@ -25,7 +25,7 @@ from bxapi.errors import (
 )
 from bxapi.settings import Settings
 
-from .conftest import PLAYER_KEY, bearer, problem_without_id
+from .conftest import LOCAL_URL, PLAYER_KEY, bearer, problem_without_id
 
 
 class _Body(BaseModel):
@@ -72,7 +72,7 @@ def app(settings: Settings) -> FastAPI:
 
 @pytest.fixture
 def api(app: FastAPI) -> Iterator[TestClient]:
-    with TestClient(app, raise_server_exceptions=False) as client:
+    with TestClient(app, base_url=LOCAL_URL, raise_server_exceptions=False) as client:
         yield client
 
 
@@ -326,8 +326,8 @@ def test_a_body_with_many_unknown_fields_gets_one_error(referee: TestClient) -> 
     few = referee.post("/v1/dice/roll", json={"expression": "1d6"} | {f"f{n}": 0 for n in range(20)}).json()
     assert few["error_count"] == 20
     assert {entry["type"] for entry in few["errors"]} == {"extra_forbidden"}
-    many = referee.post("/v1/dice/roll", json={"expression": "1d6"} | {f"f{n}": 0 for n in range(50_000)}).json()
+    many = referee.post("/v1/dice/roll", json={"expression": "1d6"} | {f"f{n}": 0 for n in range(4_000)}).json()
     assert many["error_count"] == 1
     [entry] = many["errors"]
     assert (entry["loc"], entry["type"]) == (["body"], "extra_forbidden")
-    assert "50000" in entry["msg"]
+    assert "4000" in entry["msg"]

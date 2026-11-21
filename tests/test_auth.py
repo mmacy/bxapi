@@ -2,6 +2,7 @@ import logging
 import os
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
 from fastapi import APIRouter, FastAPI
@@ -10,11 +11,11 @@ from pydantic import ValidationError
 
 from bxapi.__main__ import main
 from bxapi.app import create_app
-from bxapi.auth import RefereePrincipal
+from bxapi.auth import RefereePrincipal, misdirected_request
 from bxapi.errors import PROBLEM_MEDIA_TYPE, install_error_handlers
 from bxapi.settings import ApiKey, Settings, SettingsError
 
-from .conftest import PLAYER_KEY, REFEREE_KEY, bearer
+from .conftest import PLAYER_KEY, REFEREE_KEY, bearer, problem_without_id
 
 
 def test_missing_key_is_401(keyed_settings: Settings, make_client: Callable[..., TestClient]) -> None:
@@ -107,6 +108,54 @@ def test_allow_anonymous_has_no_effect_with_keys(
 ) -> None:
     assert keyed_settings.allow_anonymous
     assert make_client(keyed_settings).get("/v1/meta").status_code == 401
+
+
+@pytest.mark.parametrize("host", ["localhost", "localhost:8640", "LocalHost:8640", "127.0.0.1:8640", "[::1]:8640"])
+def test_a_server_with_no_keys_answers_a_request_addressed_to_the_machine_itself(client: TestClient, host: str) -> None:
+    response = client.get("/v1/meta", headers={"Host": host})
+    assert response.status_code == 200
+    assert response.json()["client"] == "local"
+
+
+@pytest.mark.parametrize(
+    "host",
+    [
+        "game.example",
+        "game.example:8640",
+        "localhost.game.example:8640",
+        "127.0.0.1.game.example",
+        "127.0.0.2:8640",
+        "192.168.1.20:8640",
+        "[::1].game.example",
+        "localhost:8640.game.example",
+        "",
+    ],
+)
+def test_a_server_with_no_keys_refuses_a_request_addressed_to_another_host(client: TestClient, host: str) -> None:
+    for method, path in (("GET", "/v1/meta"), ("POST", "/v1/ability-rolls"), ("DELETE", "/v1/sessions/ses_none")):
+        response = client.request(method, path, headers={"Host": host})
+        assert response.status_code == 421, (method, path)
+        assert response.headers["content-type"] == PROBLEM_MEDIA_TYPE
+        assert problem_without_id(response) == misdirected_request().problem().model_dump(mode="json")
+    assert client.get("/v1/characters").json()["total"] == 0
+
+
+def test_a_server_with_no_keys_refuses_another_host_before_it_reads_the_body(client: TestClient) -> None:
+    response = client.post(
+        "/v1/dice/roll", content=b"not json", headers={"Host": "game.example", "Content-Type": "text/plain"}
+    )
+    assert (response.status_code, response.json()["code"]) == (421, "misdirected_request")
+
+
+def test_the_paths_that_need_no_key_answer_any_host(client: TestClient) -> None:
+    for path in ("/health", "/openapi.json", "/docs"):
+        assert client.get(path, headers={"Host": "game.example"}).status_code == 200
+
+
+def test_a_server_with_keys_answers_any_host(player: TestClient) -> None:
+    response = player.get("/v1/meta", headers={"Host": "game.example"})
+    assert response.status_code == 200
+    assert response.json()["client"] == "game"
 
 
 def test_startup_logs_a_warning_when_anonymous(
@@ -206,6 +255,26 @@ def _run_main_with(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, **environmen
     with pytest.raises(SystemExit) as exited:
         main()
     return exited.value
+
+
+def test_the_command_serves_without_uvicorns_server_header_and_request_log(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    served: dict[str, Any] = {}
+
+    def run(app: FastAPI, **options: Any) -> None:
+        served.update(options)
+        app.state.db.close()
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("BXAPI_DATABASE", ":memory:")
+    monkeypatch.setenv("BXAPI_ALLOW_ANONYMOUS", "true")
+    monkeypatch.setenv("BXAPI_PORT", "8700")
+    monkeypatch.setattr("bxapi.__main__.uvicorn.run", run)
+    main()
+    assert (served["host"], served["port"]) == ("127.0.0.1", 8700)
+    assert served["server_header"] is False
+    assert served["access_log"] is False
 
 
 def test_a_bad_setting_names_its_environment_variable(

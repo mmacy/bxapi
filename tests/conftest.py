@@ -15,6 +15,8 @@ PLAYER_KEY = "player-key-0123456789"
 REFEREE_KEY = "referee-key-0123456789"
 OTHER_KEY = "other-key-0123456789"
 
+LOCAL_URL = "http://localhost"
+
 API_KEYS = (
     ApiKey.model_validate({"client": "game", "key": PLAYER_KEY, "role": Role.PLAYER}),
     ApiKey.model_validate({"client": "game", "key": REFEREE_KEY, "role": Role.REFEREE}),
@@ -54,7 +56,8 @@ def make_client() -> Iterator[Callable[..., TestClient]]:
     clients: list[TestClient] = []
 
     def _make(settings: Settings, key: str | None = None) -> TestClient:
-        client = TestClient(create_app(settings), headers=bearer(key) if key else None)
+        # A server with no API keys answers a request under /v1 only when its Host is a name for the machine itself.
+        client = TestClient(create_app(settings), base_url=LOCAL_URL, headers=bearer(key) if key else None)
         client.__enter__()
         clients.append(client)
         return client

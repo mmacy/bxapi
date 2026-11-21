@@ -23,6 +23,8 @@ from bxapi.db import (
 )
 from bxapi.settings import Settings
 
+from .conftest import LOCAL_URL
+
 ME = "game"
 OTHER = "other"
 
@@ -519,7 +521,7 @@ def test_app_opens_the_database_and_closes_it_at_shutdown(settings: Settings) ->
     db = app.state.db
     assert isinstance(db, Database)
     session_id = _session(db)
-    with TestClient(app) as client:
+    with TestClient(app, base_url=LOCAL_URL) as client:
         assert client.get("/health").status_code == 200
         assert client.get("/v1/meta").status_code == 200
         assert db.get_session_revision(ME, session_id) == 0

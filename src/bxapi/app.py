@@ -1,8 +1,9 @@
 """The application factory.
 
 [`create_app`][bxapi.app.create_app] builds the FastAPI application: the database, the error
-handlers, the API key check, the request body limits, the cross-origin headers, compression,
-conditional requests, and every router. Serve it with the `bxapi` command, or point an ASGI server at the factory:
+handlers, the API key check, the request body limits, the cross-origin headers, the browser
+security headers, compression, conditional requests, and every router. Serve it with the `bxapi`
+command, or point an ASGI server at the factory:
 
 ```sh
 uvicorn bxapi.app:create_app --factory --port 8640
@@ -45,9 +46,11 @@ from bxapi.errors import (
     unsupported_media_type,
 )
 from bxapi.idempotency import IDEMPOTENCY_KEY_HEADER, REPLAYED_HEADER
+from bxapi.json_body import MAX_JSON_DEPTH, SMALL_BODY_BYTES, body_limit
 from bxapi.openapi_examples import add_examples
 from bxapi.request_ids import REQUEST_ID_HEADER, RequestIdMiddleware, request_id_of
 from bxapi.routers import V1_ROUTERS, meta
+from bxapi.security_headers import SecurityHeadersMiddleware
 from bxapi.session_manager import SessionManager
 from bxapi.settings import Settings, SettingsError
 
@@ -91,7 +94,9 @@ name and a role. Every path under `/v1` needs a key. `GET /health`, `/docs`, `/r
 
 A server started with no keys and with `BXAPI_ALLOW_ANONYMOUS=true` asks for no key. It treats
 every caller as a referee of the client `local`, and `GET /v1/meta` returns `auth_enabled` set to
-`false`.
+`false`. Such a server answers a request under `/v1` only when the request's `Host` header is
+`localhost`, `127.0.0.1`, or `[::1]`, with or without a port. A request with another host gets 421
+`misdirected_request`.
 
 A key has one of two roles:
 
@@ -135,7 +140,14 @@ exist.
   the request: a command or another request body gets 422 `validation_error`, and an uploaded or
   imported document, like an adventure, gets 422 `content_invalid`.
 - **JSON bodies.** Send a request body as JSON with the header `Content-Type: application/json`.
-  A body with another content type, or with none, gets 415 `unsupported_media_type`.
+  A body with another content type, or with none, gets 415 `unsupported_media_type`. The server
+  refuses a body with `NaN`, `Infinity`, a number too large for a 64-bit float, a string with half
+  of a UTF-16 surrogate pair, or arrays and objects nested more than 100 levels deep, with 400
+  `bad_request`.
+- **Body size.** A body is at most 65,536 bytes. On the operations that take an osrlib document,
+  the limit is the server's `BXAPI_MAX_BODY_BYTES` setting instead, which is 8,388,608 bytes by
+  default: `POST /v1/adventures`, `POST /v1/adventures/validate`, `POST /v1/characters/import`,
+  `POST /v1/saves/import`, and `POST /v1/sessions`. A larger body gets 413 `content_too_large`.
 - **Compression.** Send `Accept-Encoding: gzip`, and the server compresses every response of
   1,024 bytes or more. Most HTTP clients send the header and decompress the response for you.
 - **Conditional requests.** Every 200 response to a `GET` has an `ETag` header, a short name for
@@ -381,6 +393,11 @@ _SHARED_ERRORS = problem_responses(
             "`Authorization: Bearer <key>` with a key from whoever runs the server. The same request gets the same "
             "error."
         ],
+        421: [
+            "`misdirected_request`: The server asks for no API key, and the request's `Host` header isn't "
+            "`localhost`, `127.0.0.1`, or `[::1]`. Call the server by one of those names, or ask whoever runs it to "
+            "set API keys. A server with API keys never returns this code."
+        ],
         422: [VALIDATION_ERROR],
         500: [INTERNAL_ERROR],
         503: [
@@ -400,15 +417,24 @@ _SHARED_ERRORS[503]["headers"] = {
 }
 
 _BODY_ERRORS = {
-    400: "- `bad_request`: The server can't decode the body as text, or the body has an integer with more than 4,300 "
-    "digits. Send the body as JSON in UTF-8.",
+    400: "- `bad_request`: The server can't decode the body as text, or the body has a value the server refuses: an "
+    "integer with more than 4,300 digits, `NaN`, `Infinity`, a number too large for a 64-bit float, a string with "
+    f"half of a UTF-16 surrogate pair, or arrays and objects nested more than {MAX_JSON_DEPTH} levels deep. `detail` "
+    "states which. Send the body as JSON in UTF-8, without those values.",
     408: "- `request_timeout`: The whole body didn't arrive within the time the server waits, which its "
     "`BXAPI_BODY_TIMEOUT_SECONDS` setting sets and which is 30 seconds by default. Send the request again.",
-    413: "- `content_too_large`: The body is larger than the server accepts, which its `BXAPI_MAX_BODY_BYTES` setting "
-    "sets and which is 8,388,608 bytes by default. The same body gets the same error.",
+    413: "- `content_too_large`: The body is larger than the server accepts for an operation that takes a document, "
+    "which its `BXAPI_MAX_BODY_BYTES` setting sets and which is 8,388,608 bytes by default. The same body gets the "
+    "same error.",
     415: "- `unsupported_media_type`: The request has a body, and its `Content-Type` header doesn't say that the body "
     "is JSON. Send the body as JSON with the header `Content-Type: application/json`.",
 }
+
+_SMALL_BODY_TOO_LARGE = (
+    f"- `content_too_large`: The body is larger than {SMALL_BODY_BYTES:,} bytes, the most the server accepts for an "
+    "operation that takes no document, or larger than the server's `BXAPI_MAX_BODY_BYTES` setting when that's "
+    "smaller. The same body gets the same error."
+)
 
 _JSON_BODY_METHODS = frozenset({"POST", "PUT", "PATCH"})
 
@@ -557,12 +583,14 @@ def _problem_content() -> dict[str, Any]:
     return {PROBLEM_MEDIA_TYPE: {"schema": {"$ref": _PROBLEM_REF}}}
 
 
-def _describe_problems(schema: dict[str, Any]) -> None:
+def _describe_problems(schema: dict[str, Any], small_body_operations: frozenset[str]) -> None:
     for path_name, path in schema.get("paths", {}).items():
         for operation in path.values():
             responses = operation.setdefault("responses", {})
             if path_name.startswith("/v1/") and "requestBody" in operation:
                 for status, description in _BODY_ERRORS.items():
+                    if status == 413 and operation.get("operationId") in small_body_operations:
+                        description = _SMALL_BODY_TOO_LARGE
                     responses.setdefault(str(status), {"description": description, "content": _problem_content()})
             for response in responses.values():
                 json_schema = response.get("content", {}).get("application/json", {}).get("schema", {})
@@ -725,7 +753,13 @@ def _install_openapi(app: FastAPI) -> None:
                 tags=app.openapi_tags,
                 license_info=app.license_info,
             )
-            _describe_problems(schema)
+            small_body_operations = frozenset(
+                route.name
+                for router in V1_ROUTERS
+                for route in router.routes
+                if isinstance(route, APIRoute) and body_limit(route.endpoint) is not None
+            )
+            _describe_problems(schema, small_body_operations)
             _describe_idempotency(schema)
             _describe_conditional_gets(schema)
             _describe_request_ids(schema)
@@ -745,8 +779,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     Every route under `/v1` requires a valid API key. `GET /health`, and the documentation at
     `/docs`, `/redoc`, and `/openapi.json`, need none. A server with no API keys starts only
-    when [`allow_anonymous`][bxapi.settings.Settings.allow_anonymous] is set, and then asks
-    for no key.
+    when [`allow_anonymous`][bxapi.settings.Settings.allow_anonymous] is set. It then asks for no
+    key, and answers a request under `/v1` only when the request's `Host` header is `localhost`,
+    `127.0.0.1`, or `[::1]`.
 
     The function loads the adventures that come with the server, so if an adventure file is
     broken, the server stops before it serves a request. It opens the database in the settings and puts
@@ -799,16 +834,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         docs_url="/docs" if settings.docs_enabled else None,
         redoc_url="/redoc" if settings.docs_enabled else None,
         openapi_url="/openapi.json" if settings.docs_enabled else None,
+        # The API has no OAuth2 flow, so the server doesn't serve the page that Swagger UI uses for one.
+        swagger_ui_oauth2_redirect_url=None,
     )
     _install_openapi(app)
     app.state.settings = settings
     app.state.db = Database(settings.database)
     app.state.sessions = SessionManager(app.state.db, cache_size=settings.session_cache_size)
     install_error_handlers(app)
-    # Each middleware added wraps the ones before it. A request gets its id first. A HEAD request
-    # becomes a GET, and the response loses its body last, after compression. Then the request
-    # passes the CORS headers, the conditional check, the API key check, and the body limits, so
-    # the server reads no body from a caller without a key.
+    # Each middleware added wraps the ones before it. A request gets its id first, and every
+    # response gets the browser security headers. A HEAD request becomes a GET, and the response
+    # loses its body last, after compression. Then the request passes the CORS headers, the
+    # conditional check, the API key check, and the body limits, so the server reads no body from
+    # a caller without a key.
     app.add_middleware(
         BodyLimitMiddleware, max_bytes=settings.max_body_bytes, timeout_seconds=settings.body_timeout_seconds
     )
@@ -824,6 +862,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
     app.add_middleware(GZipMiddleware, minimum_size=COMPRESSION_MINIMUM_BYTES, compresslevel=6)
     app.add_middleware(HeadMiddleware)
+    app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(RequestIdMiddleware)
     app.include_router(meta.health_router)
     v1 = APIRouter(

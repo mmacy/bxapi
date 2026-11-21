@@ -10,7 +10,12 @@ The server looks the key up in [`Settings.api_keys`][bxapi.settings.Settings.api
 a [`Principal`][bxapi.auth.Principal]: the client's name and its
 [`Role`][bxapi.settings.Role]. A server started with no keys and with
 [`allow_anonymous`][bxapi.settings.Settings.allow_anonymous] set asks for no key and treats
-every caller as a referee for the client named `local`.
+every caller as a referee for the client named `local`. Such a server answers a request under
+`/v1` only when the request's `Host` header is `localhost`, `127.0.0.1`, or `[::1]`, with or
+without a port. A web page on another site can make a browser send requests to a server on the
+same machine, and can read the responses if it first points its own host name at `127.0.0.1`, an
+attack called DNS rebinding. The browser then sends the page's host name in `Host`, so the check
+refuses the request.
 
 [`AuthMiddleware`][bxapi.auth.AuthMiddleware] checks the key of every request under `/v1`
 before anything reads the request's body, so a caller without a valid key gets a 401 and the
@@ -21,6 +26,7 @@ types. [`CurrentPrincipal`][bxapi.auth.CurrentPrincipal] accepts any caller with
 
 import hashlib
 import hmac
+import re
 from typing import Annotated
 
 from fastapi import Depends, Request
@@ -41,6 +47,8 @@ __all__ = [
     "RefereePrincipal",
     "authenticate",
     "find_principal",
+    "is_loopback_host",
+    "misdirected_request",
     "require_referee",
     "unauthorized",
 ]
@@ -49,6 +57,8 @@ LOCAL_CLIENT = "local"
 """The client name every caller gets when the server allows anonymous callers."""
 
 _PROTECTED_PREFIX = "/v1"
+
+_LOOPBACK_HOST = re.compile(r"(localhost|127\.0\.0\.1|\[::1\])(:[0-9]{1,5})?", re.IGNORECASE)
 
 _bearer = HTTPBearer(
     auto_error=False,
@@ -133,6 +143,42 @@ def unauthorized() -> ApiError:
     )
 
 
+def is_loopback_host(host: str | None) -> bool:
+    """Return whether a `Host` header addresses the machine the server runs on.
+
+    Args:
+        host: The value of the request's `Host` header, or `None` if the request has none.
+
+    Returns:
+        `True` for `localhost`, `127.0.0.1`, and `[::1]`, in any letter case, with or without a port.
+
+    Examples:
+        ```python
+        from bxapi.auth import is_loopback_host
+
+        assert is_loopback_host("localhost:8640")
+        assert is_loopback_host("[::1]")
+        assert not is_loopback_host("game.example")
+        assert not is_loopback_host("localhost.game.example:8640")
+        ```
+    """
+    return host is not None and _LOOPBACK_HOST.fullmatch(host) is not None
+
+
+def misdirected_request() -> ApiError:
+    """Build the 421 for a request that a server with no API keys gets under another host name.
+
+    Returns:
+        An [`ApiError`][bxapi.errors.ApiError] with the code `misdirected_request`.
+    """
+    return ApiError(
+        421,
+        "misdirected_request",
+        "This server asks for no API key, so it answers only a request whose Host header is localhost, 127.0.0.1, "
+        "or [::1]. To call the server by another name, set BXAPI_API_KEYS and send a key.",
+    )
+
+
 class AuthMiddleware:
     """Refuse a request under `/v1` that has no valid API key, before anything reads its body.
 
@@ -140,6 +186,11 @@ class AuthMiddleware:
     [`authenticate`][bxapi.auth.authenticate] reads it. A request without a valid key gets the
     401 problem document with the code `unauthorized`. A path outside `/v1`, like `/health` or
     `/docs`, needs no key.
+
+    A server with no API keys asks for none. There, the middleware refuses a request under `/v1`
+    whose `Host` header isn't a name for the machine itself, as
+    [`is_loopback_host`][bxapi.auth.is_loopback_host] defines it, with the 421 problem document
+    with the code `misdirected_request`.
 
     Args:
         app: The ASGI application to wrap.
@@ -156,9 +207,14 @@ class AuthMiddleware:
         if scope["type"] != "http" or not (path == _PROTECTED_PREFIX or path.startswith(_PROTECTED_PREFIX + "/")):
             await self.app(scope, receive, send)
             return
-        principal = find_principal(self.settings, Headers(scope=scope).get("authorization"))
+        headers = Headers(scope=scope)
+        principal = find_principal(self.settings, headers.get("authorization"))
+        error = None
         if principal is None:
             error = unauthorized()
+        elif not self.settings.auth_enabled and not is_loopback_host(headers.get("host")):
+            error = misdirected_request()
+        if error is not None:
             response = problem_response(error.problem(), error.headers, request_id=request_id_of(scope))
             await response(scope, receive, send)
             return

@@ -19,9 +19,10 @@ from bxapi.creation import (
     roll_character,
     scores_from_json,
 )
-from bxapi.db import AbilityRollRow, CharacterDocumentRow, Database
+from bxapi.db import AbilityRollRow, CharacterDocumentRow, Database, fits_integer_column
 from bxapi.errors import VALIDATION_ERROR, ApiError, conflict, invalid, not_found, problem_responses
 from bxapi.idempotency import IdempotentRoute
+from bxapi.json_body import accepts_document
 from bxapi.models import ApiModel, RequestModel
 from bxapi.pagination import Page, PageQuery
 from bxapi.seeds import Seed, referee_seed, seed_or_draw
@@ -346,6 +347,7 @@ def create_character(request: Request, principal: CurrentPrincipal, body: Charac
         }
     ),
 )
+@accepts_document
 def import_character(
     request: Request,
     principal: RefereePrincipal,
@@ -371,6 +373,8 @@ def import_character(
     condition that has an `effect_id`, gets 422 `content_invalid`. A condition with no
     `effect_id`, like `dead`, is accepted.
 
+    A character whose `max_hp` is larger than 2^63 - 1, the largest integer the server's database
+    stores, gets 422 `content_invalid` too.
     """
     character = Character.from_document(document)
     if character.stat_modifiers or any(condition.effect_id is not None for condition in character.conditions):
@@ -379,6 +383,8 @@ def import_character(
             "The character has conditions or stat modifiers from effects in another game. Remove `stat_modifiers` and "
             "each condition with an `effect_id` before you import it.",
         )
+    if not fits_integer_column(character.max_hp):
+        raise invalid("content_invalid", "The character's max_hp is larger than the server can store.")
     character.id = None
     return _store(_db(request), principal.client, character)
 
