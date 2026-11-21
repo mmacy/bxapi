@@ -54,8 +54,9 @@ def test_openapi_describes_errors_as_problem_documents(client: TestClient) -> No
     schema = client.get("/openapi.json").json()
     responses = schema["paths"]["/v1/meta"]["get"]["responses"]
     for status in ("401", "422"):
-        assert responses[status]["content"] == {
-            "application/problem+json": {"schema": {"$ref": "#/components/schemas/Problem"}}
+        assert list(responses[status]["content"]) == ["application/problem+json"]
+        assert responses[status]["content"]["application/problem+json"]["schema"] == {
+            "$ref": "#/components/schemas/Problem"
         }
     assert "application/json" in responses["200"]["content"]
     assert "HTTPValidationError" not in schema["components"]["schemas"]
@@ -126,14 +127,15 @@ def test_problem_documents_its_extra_members(client: TestClient) -> None:
 
 def test_openapi_documents_server_errors_and_body_limits(client: TestClient) -> None:
     schema = client.get("/openapi.json").json()
-    problem = {"application/problem+json": {"schema": {"$ref": "#/components/schemas/Problem"}}}
+    problem = {"$ref": "#/components/schemas/Problem"}
     for path, operations in schema["paths"].items():
         if not path.startswith("/v1/"):
             continue
         for method, operation in operations.items():
             responses = operation["responses"]
             for status in ("401", "500", "503"):
-                assert responses[status]["content"] == problem, f"{method} {path} {status}"
+                assert list(responses[status]["content"]) == ["application/problem+json"], f"{method} {path} {status}"
+                assert responses[status]["content"]["application/problem+json"]["schema"] == problem, status
             has_body = "requestBody" in operation
             for status in ("400", "408", "413"):
                 assert (status in responses) == has_body, f"{method} {path} {status}"

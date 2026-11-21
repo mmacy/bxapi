@@ -1,6 +1,6 @@
 // Writes the two files the reference pages are built from:
 //
-// - generated/openapi.json: bxapi's OpenAPI document, changed in the two ways Docs MD needs.
+// - generated/openapi.json: bxapi's OpenAPI document, changed in the three ways Docs MD needs.
 // - generated/curl-samples.json: one curl command for each operation, built from the example
 //   exchanges that bxapi's tests replay against a server.
 
@@ -77,6 +77,17 @@ function inlineRefsInExamples(holder) {
   }
 }
 
+// Docs MD 0.2.37 gives the responses of an operation that have the same schema one set of
+// examples, the first response's, and it shows only some of those responses. Every error response
+// is a `Problem`, so each error tab showed the first error's example, and some statuses had no
+// tab. This function puts each response's schema inside an `allOf` with a title of its own, and
+// Docs MD then treats each response as distinct. The title doesn't appear on the page.
+function separateSchema(media, operationId, status) {
+  if (media.schema?.$ref) {
+    media.schema = { allOf: [{ $ref: media.schema.$ref }], title: `${operationId}_${status}` };
+  }
+}
+
 // The ids of the operations that need an API key.
 const keyed = new Set();
 for (const pathItem of Object.values(document.paths)) {
@@ -90,8 +101,11 @@ for (const pathItem of Object.values(document.paths)) {
     }
     operation.parameters?.forEach(inlineRefsInExamples);
     Object.values(operation.requestBody?.content ?? {}).forEach(inlineRefsInExamples);
-    for (const response of Object.values(operation.responses ?? {})) {
-      Object.values(response.content ?? {}).forEach(inlineRefsInExamples);
+    for (const [status, response] of Object.entries(operation.responses ?? {})) {
+      for (const media of Object.values(response.content ?? {})) {
+        inlineRefsInExamples(media);
+        separateSchema(media, operation.operationId, status);
+      }
     }
   }
 }

@@ -2776,7 +2776,7 @@
       "path": "/v1/ability-rolls",
       "status": 201,
       "response": {
-        "id": "rol_JR_fKUslBOPzLaG_QT6ddA",
+        "id": "rol_8zQBiQpW63CsOYK2dxMYRw",
         "scores": {
           "str": 9,
           "int": 9,
@@ -2795,7 +2795,7 @@
           "thief"
         ],
         "used": false,
-        "created_at": "2026-11-21T05:18:02Z"
+        "created_at": "2026-11-21T06:51:24Z"
       }
     }
   },
@@ -2819,7 +2819,7 @@
       },
       "status": 201,
       "response": {
-        "id": "rol_Cc6nFXXxLcCwVPNVSqe9UQ",
+        "id": "rol_0wwUlQDMjHsRa3F6Qpmv6Q",
         "scores": {
           "str": 4,
           "int": 10,
@@ -2838,7 +2838,7 @@
           "thief"
         ],
         "used": false,
-        "created_at": "2026-11-21T05:18:02Z"
+        "created_at": "2026-11-21T06:51:24Z"
       }
     }
   },
@@ -2852,10 +2852,10 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/ability-rolls/rol_JR_fKUslBOPzLaG_QT6ddA",
+      "path": "/v1/ability-rolls/rol_8zQBiQpW63CsOYK2dxMYRw",
       "status": 200,
       "response": {
-        "id": "rol_JR_fKUslBOPzLaG_QT6ddA",
+        "id": "rol_8zQBiQpW63CsOYK2dxMYRw",
         "scores": {
           "str": 9,
           "int": 9,
@@ -2874,7 +2874,7 @@
           "thief"
         ],
         "used": false,
-        "created_at": "2026-11-21T05:18:02Z"
+        "created_at": "2026-11-21T06:51:24Z"
       }
     }
   },
@@ -2899,7 +2899,7 @@
         "name": "Wren",
         "class_id": "magic_user",
         "alignment": "neutral",
-        "ability_roll_id": "rol_JR_fKUslBOPzLaG_QT6ddA"
+        "ability_roll_id": "rol_8zQBiQpW63CsOYK2dxMYRw"
       },
       "status": 422,
       "response": {
@@ -2954,7 +2954,7 @@
         "name": "Aldric",
         "class_id": "fighter",
         "alignment": "lawful",
-        "ability_roll_id": "rol_JR_fKUslBOPzLaG_QT6ddA",
+        "ability_roll_id": "rol_8zQBiQpW63CsOYK2dxMYRw",
         "purchases": [
           {
             "item_id": "sword"
@@ -2970,11 +2970,11 @@
       },
       "status": 201,
       "response": {
-        "id": "chr_Fp0wv9V6fusTgcfUDmU9iA",
+        "id": "chr_JtwoF62CRDfnfr_3ZZFtHQ",
         "name": "Aldric",
         "class_id": "fighter",
         "level": 1,
-        "created_at": "2026-11-21T05:18:02Z",
+        "created_at": "2026-11-21T06:51:24Z",
         "character": {
           "id": null,
           "name": "Aldric",
@@ -3102,14 +3102,14 @@
         "name": "Aldric",
         "class_id": "fighter",
         "alignment": "lawful",
-        "ability_roll_id": "rol_JR_fKUslBOPzLaG_QT6ddA"
+        "ability_roll_id": "rol_8zQBiQpW63CsOYK2dxMYRw"
       },
       "status": 409,
       "response": {
         "type": "about:blank",
         "title": "Conflict",
         "status": 409,
-        "detail": "A character was already created from the ability roll 'rol_JR_fKUslBOPzLaG_QT6ddA'.",
+        "detail": "A character was already created from the ability roll 'rol_8zQBiQpW63CsOYK2dxMYRw'.",
         "code": "ability_roll_used"
       }
     }
@@ -3129,12 +3129,12 @@
       "response": {
         "items": [
           {
-            "id": "chr_Fp0wv9V6fusTgcfUDmU9iA",
+            "id": "chr_JtwoF62CRDfnfr_3ZZFtHQ",
             "name": "Aldric",
             "class_id": "fighter",
             "level": 1,
             "max_hp": 8,
-            "created_at": "2026-11-21T05:18:02Z"
+            "created_at": "2026-11-21T06:51:24Z"
           }
         ],
         "total": 1,
@@ -3153,14 +3153,14 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/characters/chr_Fp0wv9V6fusTgcfUDmU9iA",
+      "path": "/v1/characters/chr_JtwoF62CRDfnfr_3ZZFtHQ",
       "status": 200,
       "response": {
-        "id": "chr_Fp0wv9V6fusTgcfUDmU9iA",
+        "id": "chr_JtwoF62CRDfnfr_3ZZFtHQ",
         "name": "Aldric",
         "class_id": "fighter",
         "level": 1,
-        "created_at": "2026-11-21T05:18:02Z",
+        "created_at": "2026-11-21T06:51:24Z",
         "character": {
           "id": null,
           "name": "Aldric",
@@ -3368,11 +3368,11 @@
       },
       "status": 201,
       "response": {
-        "id": "chr_pblGTj15HCTNBkHd57YFFg",
+        "id": "chr_GDORUalU6lT9Snyvsgv4jg",
         "name": "Aldric",
         "class_id": "fighter",
         "level": 1,
-        "created_at": "2026-11-21T05:18:02Z",
+        "created_at": "2026-11-21T06:51:24Z",
         "character": {
           "id": null,
           "name": "Aldric",
@@ -4558,9 +4558,9 @@
             "name": "The Old Well"
           }
         ],
-        "id": "adv_N1LsoJnFbcJxuj0vFwdVmw",
+        "id": "adv_F3Jyn0BaxxCi0eT6BITMzA",
         "builtin": false,
-        "created_at": "2026-11-21T05:18:02Z"
+        "created_at": "2026-11-21T06:51:24Z"
       }
     }
   },
@@ -4584,12 +4584,12 @@
       "body": {
         "adventure_id": "builtin-barrow",
         "character_ids": [
-          "chr_Fp0wv9V6fusTgcfUDmU9iA"
+          "chr_JtwoF62CRDfnfr_3ZZFtHQ"
         ]
       },
       "status": 201,
       "response": {
-        "id": "ses_BVR2FtF3K6qhiMHldg_GuQ",
+        "id": "ses_3fZEebbFSeyAyMEUBwt2PA",
         "name": "The Barrow of the Forgotten King",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
@@ -4603,8 +4603,8 @@
         },
         "schema_version": 4,
         "engine_version": "2.5.0",
-        "created_at": "2026-11-21T05:18:02Z",
-        "updated_at": "2026-11-21T05:18:02Z"
+        "created_at": "2026-11-21T06:51:24Z",
+        "updated_at": "2026-11-21T06:51:24Z"
       }
     }
   },
@@ -4623,7 +4623,7 @@
       "response": {
         "items": [
           {
-            "id": "ses_BVR2FtF3K6qhiMHldg_GuQ",
+            "id": "ses_3fZEebbFSeyAyMEUBwt2PA",
             "name": "The Barrow of the Forgotten King",
             "adventure_id": "builtin-barrow",
             "adventure_name": "The Barrow of the Forgotten King",
@@ -4637,8 +4637,8 @@
             },
             "schema_version": 4,
             "engine_version": "2.5.0",
-            "created_at": "2026-11-21T05:18:02Z",
-            "updated_at": "2026-11-21T05:18:02Z"
+            "created_at": "2026-11-21T06:51:24Z",
+            "updated_at": "2026-11-21T06:51:24Z"
           }
         ],
         "total": 1,
@@ -4657,10 +4657,10 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_BVR2FtF3K6qhiMHldg_GuQ",
+      "path": "/v1/sessions/ses_3fZEebbFSeyAyMEUBwt2PA",
       "status": 200,
       "response": {
-        "id": "ses_BVR2FtF3K6qhiMHldg_GuQ",
+        "id": "ses_3fZEebbFSeyAyMEUBwt2PA",
         "name": "The Barrow of the Forgotten King",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
@@ -4674,8 +4674,8 @@
         },
         "schema_version": 4,
         "engine_version": "2.5.0",
-        "created_at": "2026-11-21T05:18:02Z",
-        "updated_at": "2026-11-21T05:18:02Z"
+        "created_at": "2026-11-21T06:51:24Z",
+        "updated_at": "2026-11-21T06:51:24Z"
       }
     }
   },
@@ -4692,13 +4692,13 @@
     },
     "recorded": {
       "method": "PATCH",
-      "path": "/v1/sessions/ses_BVR2FtF3K6qhiMHldg_GuQ",
+      "path": "/v1/sessions/ses_3fZEebbFSeyAyMEUBwt2PA",
       "body": {
         "name": "Aldric's first delve"
       },
       "status": 200,
       "response": {
-        "id": "ses_BVR2FtF3K6qhiMHldg_GuQ",
+        "id": "ses_3fZEebbFSeyAyMEUBwt2PA",
         "name": "Aldric's first delve",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
@@ -4712,8 +4712,8 @@
         },
         "schema_version": 4,
         "engine_version": "2.5.0",
-        "created_at": "2026-11-21T05:18:02Z",
-        "updated_at": "2026-11-21T05:18:02Z"
+        "created_at": "2026-11-21T06:51:24Z",
+        "updated_at": "2026-11-21T06:51:24Z"
       }
     }
   },
@@ -4727,7 +4727,7 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_BVR2FtF3K6qhiMHldg_GuQ/commands",
+      "path": "/v1/sessions/ses_3fZEebbFSeyAyMEUBwt2PA/commands",
       "status": 200,
       "response": {
         "mode": "town",
@@ -4810,7 +4810,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_BVR2FtF3K6qhiMHldg_GuQ/commands",
+      "path": "/v1/sessions/ses_3fZEebbFSeyAyMEUBwt2PA/commands",
       "query": {
         "expected_revision": 0
       },
@@ -4871,7 +4871,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_BVR2FtF3K6qhiMHldg_GuQ/commands",
+      "path": "/v1/sessions/ses_3fZEebbFSeyAyMEUBwt2PA/commands",
       "query": {
         "expected_revision": 1
       },
@@ -4915,7 +4915,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_BVR2FtF3K6qhiMHldg_GuQ/commands",
+      "path": "/v1/sessions/ses_3fZEebbFSeyAyMEUBwt2PA/commands",
       "query": {
         "expected_revision": 1
       },
@@ -4964,7 +4964,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_BVR2FtF3K6qhiMHldg_GuQ/commands",
+      "path": "/v1/sessions/ses_3fZEebbFSeyAyMEUBwt2PA/commands",
       "query": {
         "expected_revision": 1
       },
@@ -4993,7 +4993,7 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_BVR2FtF3K6qhiMHldg_GuQ/view",
+      "path": "/v1/sessions/ses_3fZEebbFSeyAyMEUBwt2PA/view",
       "status": 200,
       "response": {
         "adventure_name": "The Barrow of the Forgotten King",
@@ -5226,7 +5226,7 @@
     "role": "referee",
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_BVR2FtF3K6qhiMHldg_GuQ/referee-view",
+      "path": "/v1/sessions/ses_3fZEebbFSeyAyMEUBwt2PA/referee-view",
       "status": 200,
       "response": {
         "ruleset": {
@@ -6025,7 +6025,7 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_BVR2FtF3K6qhiMHldg_GuQ/events",
+      "path": "/v1/sessions/ses_3fZEebbFSeyAyMEUBwt2PA/events",
       "status": 200,
       "response": {
         "events": [
@@ -6082,14 +6082,14 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_BVR2FtF3K6qhiMHldg_GuQ/saves",
+      "path": "/v1/sessions/ses_3fZEebbFSeyAyMEUBwt2PA/saves",
       "body": {
         "label": "Inside the barrow"
       },
       "status": 201,
       "response": {
-        "id": "sav_Ip0JPQYFaw2Md2_5tb0n1A",
-        "session_id": "ses_BVR2FtF3K6qhiMHldg_GuQ",
+        "id": "sav_QcXxpTLMu9nqJK1Lxcr7lA",
+        "session_id": "ses_3fZEebbFSeyAyMEUBwt2PA",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
         "label": "Inside the barrow",
@@ -6099,7 +6099,7 @@
           "turns": 2,
           "days": 0
         },
-        "created_at": "2026-11-21T05:18:02Z"
+        "created_at": "2026-11-21T06:51:24Z"
       }
     }
   },
@@ -6118,14 +6118,14 @@
       "method": "GET",
       "path": "/v1/saves",
       "query": {
-        "session_id": "ses_BVR2FtF3K6qhiMHldg_GuQ"
+        "session_id": "ses_3fZEebbFSeyAyMEUBwt2PA"
       },
       "status": 200,
       "response": {
         "items": [
           {
-            "id": "sav_Ip0JPQYFaw2Md2_5tb0n1A",
-            "session_id": "ses_BVR2FtF3K6qhiMHldg_GuQ",
+            "id": "sav_QcXxpTLMu9nqJK1Lxcr7lA",
+            "session_id": "ses_3fZEebbFSeyAyMEUBwt2PA",
             "adventure_id": "builtin-barrow",
             "adventure_name": "The Barrow of the Forgotten King",
             "label": "Inside the barrow",
@@ -6135,7 +6135,7 @@
               "turns": 2,
               "days": 0
             },
-            "created_at": "2026-11-21T05:18:02Z"
+            "created_at": "2026-11-21T06:51:24Z"
           }
         ],
         "total": 1,
@@ -6154,11 +6154,11 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/saves/sav_Ip0JPQYFaw2Md2_5tb0n1A",
+      "path": "/v1/saves/sav_QcXxpTLMu9nqJK1Lxcr7lA",
       "status": 200,
       "response": {
-        "id": "sav_Ip0JPQYFaw2Md2_5tb0n1A",
-        "session_id": "ses_BVR2FtF3K6qhiMHldg_GuQ",
+        "id": "sav_QcXxpTLMu9nqJK1Lxcr7lA",
+        "session_id": "ses_3fZEebbFSeyAyMEUBwt2PA",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
         "label": "Inside the barrow",
@@ -6168,7 +6168,7 @@
           "turns": 2,
           "days": 0
         },
-        "created_at": "2026-11-21T05:18:02Z"
+        "created_at": "2026-11-21T06:51:24Z"
       }
     }
   },
@@ -6185,14 +6185,14 @@
     },
     "recorded": {
       "method": "PATCH",
-      "path": "/v1/saves/sav_Ip0JPQYFaw2Md2_5tb0n1A",
+      "path": "/v1/saves/sav_QcXxpTLMu9nqJK1Lxcr7lA",
       "body": {
         "label": "Past the first door"
       },
       "status": 200,
       "response": {
-        "id": "sav_Ip0JPQYFaw2Md2_5tb0n1A",
-        "session_id": "ses_BVR2FtF3K6qhiMHldg_GuQ",
+        "id": "sav_QcXxpTLMu9nqJK1Lxcr7lA",
+        "session_id": "ses_3fZEebbFSeyAyMEUBwt2PA",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
         "label": "Past the first door",
@@ -6202,7 +6202,7 @@
           "turns": 2,
           "days": 0
         },
-        "created_at": "2026-11-21T05:18:02Z"
+        "created_at": "2026-11-21T06:51:24Z"
       }
     }
   },
@@ -6217,7 +6217,7 @@
     "role": "referee",
     "recorded": {
       "method": "GET",
-      "path": "/v1/saves/sav_Ip0JPQYFaw2Md2_5tb0n1A/document",
+      "path": "/v1/saves/sav_QcXxpTLMu9nqJK1Lxcr7lA/document",
       "status": 200,
       "response": {
         "kind": "save",
@@ -7830,7 +7830,7 @@
       },
       "status": 201,
       "response": {
-        "id": "sav_fsCYdOh54R0-9jYCOvVK3w",
+        "id": "sav_ihCc_biiXJUb4n1if2y16A",
         "session_id": null,
         "adventure_id": null,
         "adventure_name": "The Barrow of the Forgotten King",
@@ -7841,7 +7841,7 @@
           "turns": 2,
           "days": 0
         },
-        "created_at": "2026-11-21T05:18:02Z"
+        "created_at": "2026-11-21T06:51:24Z"
       }
     }
   },
@@ -7858,13 +7858,13 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/saves/sav_Ip0JPQYFaw2Md2_5tb0n1A/restore",
+      "path": "/v1/saves/sav_QcXxpTLMu9nqJK1Lxcr7lA/restore",
       "body": {
         "name": "Aldric, second try"
       },
       "status": 201,
       "response": {
-        "id": "ses_jTNKiX7Xr7gzE-wV9J3dTA",
+        "id": "ses_EiMZhcD4NxGDVEAAt89Obg",
         "name": "Aldric, second try",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
@@ -7878,8 +7878,8 @@
         },
         "schema_version": 4,
         "engine_version": "2.5.0",
-        "created_at": "2026-11-21T05:18:02Z",
-        "updated_at": "2026-11-21T05:18:02Z"
+        "created_at": "2026-11-21T06:51:24Z",
+        "updated_at": "2026-11-21T06:51:24Z"
       }
     }
   },
@@ -7893,7 +7893,7 @@
     },
     "recorded": {
       "method": "DELETE",
-      "path": "/v1/saves/sav_fsCYdOh54R0-9jYCOvVK3w",
+      "path": "/v1/saves/sav_ihCc_biiXJUb4n1if2y16A",
       "status": 204,
       "response": null
     }
@@ -7908,7 +7908,7 @@
     },
     "recorded": {
       "method": "DELETE",
-      "path": "/v1/sessions/ses_jTNKiX7Xr7gzE-wV9J3dTA",
+      "path": "/v1/sessions/ses_EiMZhcD4NxGDVEAAt89Obg",
       "status": 204,
       "response": null
     }
@@ -7923,7 +7923,7 @@
     },
     "recorded": {
       "method": "DELETE",
-      "path": "/v1/adventures/adv_N1LsoJnFbcJxuj0vFwdVmw",
+      "path": "/v1/adventures/adv_F3Jyn0BaxxCi0eT6BITMzA",
       "status": 204,
       "response": null
     }
@@ -7938,9 +7938,2762 @@
     },
     "recorded": {
       "method": "DELETE",
-      "path": "/v1/characters/chr_pblGTj15HCTNBkHd57YFFg",
+      "path": "/v1/characters/chr_GDORUalU6lT9Snyvsgv4jg",
       "status": 204,
       "response": null
+    }
+  },
+  {
+    "name": "unknown_class",
+    "operation": "get_class",
+    "summary": "Read a class osrlib doesn't have",
+    "request": {
+      "method": "GET",
+      "path": "/v1/rules/classes/paladin"
+    },
+    "recorded": {
+      "method": "GET",
+      "path": "/v1/rules/classes/paladin",
+      "status": 404,
+      "response": {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No class has the id 'paladin'.",
+        "code": "not_found",
+        "resource": "class",
+        "id": "paladin"
+      }
+    }
+  },
+  {
+    "name": "unknown_monster_id",
+    "operation": "get_monster",
+    "summary": "Read a monster osrlib doesn't have",
+    "request": {
+      "method": "GET",
+      "path": "/v1/rules/monsters/tarrasque"
+    },
+    "recorded": {
+      "method": "GET",
+      "path": "/v1/rules/monsters/tarrasque",
+      "status": 404,
+      "response": {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No monster has the id 'tarrasque'.",
+        "code": "not_found",
+        "resource": "monster",
+        "id": "tarrasque"
+      }
+    }
+  },
+  {
+    "name": "spells_of_unknown_class",
+    "operation": "list_spells",
+    "summary": "List the spells of a class osrlib doesn't have",
+    "request": {
+      "method": "GET",
+      "path": "/v1/rules/spells",
+      "query": {
+        "class_id": "paladin"
+      }
+    },
+    "recorded": {
+      "method": "GET",
+      "path": "/v1/rules/spells",
+      "query": {
+        "class_id": "paladin"
+      },
+      "status": 404,
+      "response": {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No class has the id 'paladin'.",
+        "code": "not_found",
+        "resource": "class",
+        "id": "paladin"
+      }
+    }
+  },
+  {
+    "name": "unknown_spell",
+    "operation": "get_spell",
+    "summary": "Read a spell osrlib doesn't have",
+    "request": {
+      "method": "GET",
+      "path": "/v1/rules/spells/wish"
+    },
+    "recorded": {
+      "method": "GET",
+      "path": "/v1/rules/spells/wish",
+      "status": 404,
+      "response": {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No spell has the id 'wish'.",
+        "code": "not_found",
+        "resource": "spell",
+        "id": "wish"
+      }
+    }
+  },
+  {
+    "name": "unknown_equipment_item",
+    "operation": "get_equipment_item",
+    "summary": "Read an item osrlib doesn't have",
+    "request": {
+      "method": "GET",
+      "path": "/v1/rules/equipment/musket"
+    },
+    "recorded": {
+      "method": "GET",
+      "path": "/v1/rules/equipment/musket",
+      "status": 404,
+      "response": {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No equipment item has the id 'musket'.",
+        "code": "not_found",
+        "resource": "equipment item",
+        "id": "musket"
+      }
+    }
+  },
+  {
+    "name": "unknown_magic_item",
+    "operation": "get_magic_item",
+    "summary": "Read a magic item osrlib doesn't have",
+    "request": {
+      "method": "GET",
+      "path": "/v1/rules/magic-items/vorpal_sword"
+    },
+    "recorded": {
+      "method": "GET",
+      "path": "/v1/rules/magic-items/vorpal_sword",
+      "status": 404,
+      "response": {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No magic item has the id 'vorpal_sword'.",
+        "code": "not_found",
+        "resource": "magic item",
+        "id": "vorpal_sword"
+      }
+    }
+  },
+  {
+    "name": "unknown_table",
+    "operation": "get_table",
+    "summary": "Read a table that doesn't exist",
+    "request": {
+      "method": "GET",
+      "path": "/v1/rules/tables/weather"
+    },
+    "recorded": {
+      "method": "GET",
+      "path": "/v1/rules/tables/weather",
+      "status": 404,
+      "response": {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No table has the id 'weather'.",
+        "code": "not_found",
+        "resource": "table",
+        "id": "weather"
+      }
+    }
+  },
+  {
+    "name": "unknown_command",
+    "operation": "get_command",
+    "summary": "Read a command that doesn't exist",
+    "request": {
+      "method": "GET",
+      "path": "/v1/rules/commands/teleport"
+    },
+    "recorded": {
+      "method": "GET",
+      "path": "/v1/rules/commands/teleport",
+      "status": 404,
+      "response": {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No command has the id 'teleport'.",
+        "code": "not_found",
+        "resource": "command",
+        "id": "teleport"
+      }
+    }
+  },
+  {
+    "name": "unknown_die_size",
+    "operation": "roll_dice",
+    "summary": "Roll a die size osrlib doesn't use",
+    "request": {
+      "method": "POST",
+      "path": "/v1/dice/roll",
+      "body": {
+        "expression": "3d7"
+      }
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/dice/roll",
+      "body": {
+        "expression": "3d7"
+      },
+      "status": 422,
+      "response": {
+        "type": "about:blank",
+        "title": "Unprocessable Content",
+        "status": 422,
+        "detail": "die size must be one of [2, 3, 4, 6, 8, 10, 12, 20, 100]: '3d7'",
+        "code": "content_invalid"
+      }
+    }
+  },
+  {
+    "name": "unknown_treasure_type",
+    "operation": "generate_treasure",
+    "summary": "Roll a treasure type that doesn't exist",
+    "request": {
+      "method": "POST",
+      "path": "/v1/generate/treasure",
+      "body": {
+        "treasure_type": "Z",
+        "tier": "basic"
+      }
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/generate/treasure",
+      "body": {
+        "treasure_type": "Z",
+        "tier": "basic"
+      },
+      "status": 422,
+      "response": {
+        "type": "about:blank",
+        "title": "Unprocessable Content",
+        "status": 422,
+        "detail": "unknown treasure type 'Z'",
+        "code": "content_invalid"
+      }
+    }
+  },
+  {
+    "name": "monsters_of_unknown_id",
+    "operation": "generate_monsters",
+    "summary": "Roll monsters osrlib doesn't have",
+    "request": {
+      "method": "POST",
+      "path": "/v1/generate/monsters",
+      "body": {
+        "monster_id": "tarrasque",
+        "count": 1
+      }
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/generate/monsters",
+      "body": {
+        "monster_id": "tarrasque",
+        "count": 1
+      },
+      "status": 422,
+      "response": {
+        "type": "about:blank",
+        "title": "Unprocessable Content",
+        "status": 422,
+        "detail": "unknown monster id 'tarrasque'",
+        "code": "content_invalid"
+      }
+    }
+  },
+  {
+    "name": "generated_item_not_bought",
+    "operation": "generate_character",
+    "summary": "Equip an item the character didn't buy",
+    "request": {
+      "method": "POST",
+      "path": "/v1/generate/character",
+      "body": {
+        "name": "Wren",
+        "class_id": "fighter",
+        "alignment": "neutral",
+        "equip_item_ids": [
+          "sword"
+        ]
+      }
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/generate/character",
+      "body": {
+        "name": "Wren",
+        "class_id": "fighter",
+        "alignment": "neutral",
+        "equip_item_ids": [
+          "sword"
+        ]
+      },
+      "status": 422,
+      "response": {
+        "type": "about:blank",
+        "title": "Unprocessable Content",
+        "status": 422,
+        "detail": "The purchases don't include 'sword'.",
+        "code": "character_invalid",
+        "id": "sword",
+        "field": "equip_item_ids",
+        "index": 0
+      }
+    }
+  },
+  {
+    "name": "player_roll_seed",
+    "operation": "create_ability_roll",
+    "summary": "Choose a seed with a player key",
+    "request": {
+      "method": "POST",
+      "path": "/v1/ability-rolls",
+      "body": {
+        "seed": 20261120
+      }
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/ability-rolls",
+      "body": {
+        "seed": 20261120
+      },
+      "status": 403,
+      "response": {
+        "type": "about:blank",
+        "title": "Forbidden",
+        "status": 403,
+        "detail": "Only an API key with the referee role can choose a seed.",
+        "code": "referee_required"
+      }
+    }
+  },
+  {
+    "name": "missing_ability_roll",
+    "operation": "get_ability_roll",
+    "summary": "Read an ability roll that doesn't exist",
+    "request": {
+      "method": "GET",
+      "path": "/v1/ability-rolls/rol_5mJq0nY2bXr8TzW4cH1eKd"
+    },
+    "recorded": {
+      "method": "GET",
+      "path": "/v1/ability-rolls/rol_5mJq0nY2bXr8TzW4cH1eKd",
+      "status": 404,
+      "response": {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No ability roll has the id 'rol_5mJq0nY2bXr8TzW4cH1eKd'.",
+        "code": "not_found",
+        "resource": "ability roll",
+        "id": "rol_5mJq0nY2bXr8TzW4cH1eKd"
+      }
+    }
+  },
+  {
+    "name": "player_character_seed",
+    "operation": "create_character",
+    "summary": "Choose a seed with a player key",
+    "request": {
+      "method": "POST",
+      "path": "/v1/characters",
+      "body": {
+        "name": "Wren",
+        "class_id": "fighter",
+        "alignment": "neutral",
+        "seed": 20261120
+      }
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/characters",
+      "body": {
+        "name": "Wren",
+        "class_id": "fighter",
+        "alignment": "neutral",
+        "seed": 20261120
+      },
+      "status": 403,
+      "response": {
+        "type": "about:blank",
+        "title": "Forbidden",
+        "status": 403,
+        "detail": "Only an API key with the referee role can choose a seed.",
+        "code": "referee_required"
+      }
+    }
+  },
+  {
+    "name": "character_from_missing_roll",
+    "operation": "create_character",
+    "summary": "Create a character from a roll that doesn't exist",
+    "request": {
+      "method": "POST",
+      "path": "/v1/characters",
+      "body": {
+        "name": "Wren",
+        "class_id": "fighter",
+        "alignment": "neutral",
+        "ability_roll_id": "rol_5mJq0nY2bXr8TzW4cH1eKd"
+      }
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/characters",
+      "body": {
+        "name": "Wren",
+        "class_id": "fighter",
+        "alignment": "neutral",
+        "ability_roll_id": "rol_5mJq0nY2bXr8TzW4cH1eKd"
+      },
+      "status": 404,
+      "response": {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No ability roll has the id 'rol_5mJq0nY2bXr8TzW4cH1eKd'.",
+        "code": "not_found",
+        "resource": "ability roll",
+        "id": "rol_5mJq0nY2bXr8TzW4cH1eKd"
+      }
+    }
+  },
+  {
+    "name": "player_character_import",
+    "operation": "import_character",
+    "summary": "Import a character with a player key",
+    "request": {
+      "method": "POST",
+      "path": "/v1/characters/import",
+      "body": {
+        "kind": "character",
+        "schema_version": "{meta.schema_version}",
+        "engine_version": "{meta.engine_version}",
+        "payload": "{aldric.character}"
+      }
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/characters/import",
+      "body": {
+        "kind": "character",
+        "schema_version": 4,
+        "engine_version": "2.5.0",
+        "payload": {
+          "id": null,
+          "name": "Aldric",
+          "class_id": "fighter",
+          "custom_class": null,
+          "race": "human",
+          "level": 1,
+          "xp": 0,
+          "scores": {
+            "str": 9,
+            "int": 9,
+            "wis": 12,
+            "dex": 15,
+            "con": 12,
+            "cha": 5
+          },
+          "alignment": "lawful",
+          "extra_languages": [],
+          "max_hp": 8,
+          "current_hp": 8,
+          "nonregen_damage": 0,
+          "inventory": {
+            "items": [],
+            "purse": {
+              "pp": 0,
+              "gp": 80,
+              "ep": 0,
+              "sp": 0,
+              "cp": 0
+            },
+            "valuables": [],
+            "worn_armour": {
+              "instance_type": "item",
+              "template": {
+                "item_type": "armour",
+                "id": "leather",
+                "name": "Leather",
+                "cost_gp": 20,
+                "weight_coins": 200,
+                "ac": 7,
+                "ac_ascending": 12,
+                "ac_bonus": null,
+                "category": "light",
+                "overrides_applied": []
+              },
+              "quantity": 1
+            },
+            "shield": null,
+            "wielded": [
+              {
+                "instance_type": "item",
+                "template": {
+                  "item_type": "weapon",
+                  "id": "sword",
+                  "name": "Sword",
+                  "cost_gp": 10,
+                  "weight_coins": 60,
+                  "damage": "1d8",
+                  "qualities": [
+                    "melee"
+                  ],
+                  "missile_ranges": null,
+                  "material": "standard",
+                  "overrides_applied": []
+                },
+                "quantity": 1
+              }
+            ],
+            "rings": []
+          },
+          "carrying_treasure": false,
+          "conditions": [],
+          "stat_modifiers": [],
+          "spell_book": [],
+          "memorized_spells": []
+        }
+      },
+      "status": 403,
+      "response": {
+        "type": "about:blank",
+        "title": "Forbidden",
+        "status": 403,
+        "detail": "This request needs an API key with the referee role.",
+        "code": "referee_required"
+      }
+    }
+  },
+  {
+    "name": "import_not_a_character",
+    "operation": "import_character",
+    "summary": "Import a document that isn't a character",
+    "role": "referee",
+    "request": {
+      "method": "POST",
+      "path": "/v1/characters/import",
+      "body": {
+        "kind": "adventure",
+        "schema_version": "{meta.schema_version}",
+        "engine_version": "{meta.engine_version}",
+        "payload": "{aldric.character}"
+      }
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/characters/import",
+      "body": {
+        "kind": "adventure",
+        "schema_version": 4,
+        "engine_version": "2.5.0",
+        "payload": {
+          "id": null,
+          "name": "Aldric",
+          "class_id": "fighter",
+          "custom_class": null,
+          "race": "human",
+          "level": 1,
+          "xp": 0,
+          "scores": {
+            "str": 9,
+            "int": 9,
+            "wis": 12,
+            "dex": 15,
+            "con": 12,
+            "cha": 5
+          },
+          "alignment": "lawful",
+          "extra_languages": [],
+          "max_hp": 8,
+          "current_hp": 8,
+          "nonregen_damage": 0,
+          "inventory": {
+            "items": [],
+            "purse": {
+              "pp": 0,
+              "gp": 80,
+              "ep": 0,
+              "sp": 0,
+              "cp": 0
+            },
+            "valuables": [],
+            "worn_armour": {
+              "instance_type": "item",
+              "template": {
+                "item_type": "armour",
+                "id": "leather",
+                "name": "Leather",
+                "cost_gp": 20,
+                "weight_coins": 200,
+                "ac": 7,
+                "ac_ascending": 12,
+                "ac_bonus": null,
+                "category": "light",
+                "overrides_applied": []
+              },
+              "quantity": 1
+            },
+            "shield": null,
+            "wielded": [
+              {
+                "instance_type": "item",
+                "template": {
+                  "item_type": "weapon",
+                  "id": "sword",
+                  "name": "Sword",
+                  "cost_gp": 10,
+                  "weight_coins": 60,
+                  "damage": "1d8",
+                  "qualities": [
+                    "melee"
+                  ],
+                  "missile_ranges": null,
+                  "material": "standard",
+                  "overrides_applied": []
+                },
+                "quantity": 1
+              }
+            ],
+            "rings": []
+          },
+          "carrying_treasure": false,
+          "conditions": [],
+          "stat_modifiers": [],
+          "spell_book": [],
+          "memorized_spells": []
+        }
+      },
+      "status": 422,
+      "response": {
+        "type": "about:blank",
+        "title": "Unprocessable Content",
+        "status": 422,
+        "detail": "expected a 'character' document, got kind 'adventure'",
+        "code": "content_invalid"
+      }
+    }
+  },
+  {
+    "name": "import_newer_character",
+    "operation": "import_character",
+    "summary": "Import a character from a newer osrlib",
+    "role": "referee",
+    "request": {
+      "method": "POST",
+      "path": "/v1/characters/import",
+      "body": {
+        "kind": "character",
+        "schema_version": 99,
+        "engine_version": "{meta.engine_version}",
+        "payload": "{aldric.character}"
+      }
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/characters/import",
+      "body": {
+        "kind": "character",
+        "schema_version": 99,
+        "engine_version": "2.5.0",
+        "payload": {
+          "id": null,
+          "name": "Aldric",
+          "class_id": "fighter",
+          "custom_class": null,
+          "race": "human",
+          "level": 1,
+          "xp": 0,
+          "scores": {
+            "str": 9,
+            "int": 9,
+            "wis": 12,
+            "dex": 15,
+            "con": 12,
+            "cha": 5
+          },
+          "alignment": "lawful",
+          "extra_languages": [],
+          "max_hp": 8,
+          "current_hp": 8,
+          "nonregen_damage": 0,
+          "inventory": {
+            "items": [],
+            "purse": {
+              "pp": 0,
+              "gp": 80,
+              "ep": 0,
+              "sp": 0,
+              "cp": 0
+            },
+            "valuables": [],
+            "worn_armour": {
+              "instance_type": "item",
+              "template": {
+                "item_type": "armour",
+                "id": "leather",
+                "name": "Leather",
+                "cost_gp": 20,
+                "weight_coins": 200,
+                "ac": 7,
+                "ac_ascending": 12,
+                "ac_bonus": null,
+                "category": "light",
+                "overrides_applied": []
+              },
+              "quantity": 1
+            },
+            "shield": null,
+            "wielded": [
+              {
+                "instance_type": "item",
+                "template": {
+                  "item_type": "weapon",
+                  "id": "sword",
+                  "name": "Sword",
+                  "cost_gp": 10,
+                  "weight_coins": 60,
+                  "damage": "1d8",
+                  "qualities": [
+                    "melee"
+                  ],
+                  "missile_ranges": null,
+                  "material": "standard",
+                  "overrides_applied": []
+                },
+                "quantity": 1
+              }
+            ],
+            "rings": []
+          },
+          "carrying_treasure": false,
+          "conditions": [],
+          "stat_modifiers": [],
+          "spell_book": [],
+          "memorized_spells": []
+        }
+      },
+      "status": 409,
+      "response": {
+        "type": "about:blank",
+        "title": "Conflict",
+        "status": 409,
+        "detail": "document schema_version 99 is newer than the supported 4",
+        "code": "version_unsupported"
+      }
+    }
+  },
+  {
+    "name": "deleted_character",
+    "operation": "get_character",
+    "summary": "Read a character that was deleted",
+    "request": {
+      "method": "GET",
+      "path": "/v1/characters/{import_aldric.id}"
+    },
+    "recorded": {
+      "method": "GET",
+      "path": "/v1/characters/chr_GDORUalU6lT9Snyvsgv4jg",
+      "status": 404,
+      "response": {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No character has the id 'chr_GDORUalU6lT9Snyvsgv4jg'.",
+        "code": "not_found",
+        "resource": "character",
+        "id": "chr_GDORUalU6lT9Snyvsgv4jg"
+      }
+    }
+  },
+  {
+    "name": "delete_deleted_character",
+    "operation": "delete_character",
+    "summary": "Delete a character that was already deleted",
+    "request": {
+      "method": "DELETE",
+      "path": "/v1/characters/{import_aldric.id}"
+    },
+    "recorded": {
+      "method": "DELETE",
+      "path": "/v1/characters/chr_GDORUalU6lT9Snyvsgv4jg",
+      "status": 404,
+      "response": {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No character has the id 'chr_GDORUalU6lT9Snyvsgv4jg'.",
+        "code": "not_found",
+        "resource": "character",
+        "id": "chr_GDORUalU6lT9Snyvsgv4jg"
+      }
+    }
+  },
+  {
+    "name": "upload_unknown_monster",
+    "operation": "upload_adventure",
+    "summary": "Upload an adventure with a monster osrlib doesn't have",
+    "request": {
+      "method": "POST",
+      "path": "/v1/adventures",
+      "body": {
+        "kind": "adventure",
+        "schema_version": 4,
+        "engine_version": "2.4.0",
+        "payload": {
+          "name": "The Old Well",
+          "description": "Something is living at the bottom of the village well.",
+          "hooks": [
+            "The miller pays 50 gp to whoever clears the well."
+          ],
+          "town": {
+            "name": "Millbrook",
+            "description": "A village of forty houses beside a mill pond."
+          },
+          "dungeons": [
+            {
+              "id": "well",
+              "name": "The Old Well",
+              "levels": [
+                {
+                  "number": 1,
+                  "width": 2,
+                  "height": 1,
+                  "entrance": [
+                    0,
+                    0
+                  ],
+                  "edges": {
+                    "1,0:west": {
+                      "kind": "open"
+                    }
+                  },
+                  "areas": [
+                    {
+                      "id": "cistern",
+                      "name": "Cistern",
+                      "description": "A flooded chamber. Two giant rats nest on a ledge.",
+                      "cells": [
+                        [
+                          1,
+                          0
+                        ]
+                      ],
+                      "encounter": {
+                        "monsters": [
+                          {
+                            "template_id": "rat_giant",
+                            "count_fixed": 2
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/adventures",
+      "body": {
+        "kind": "adventure",
+        "schema_version": 4,
+        "engine_version": "2.4.0",
+        "payload": {
+          "name": "The Old Well",
+          "description": "Something is living at the bottom of the village well.",
+          "hooks": [
+            "The miller pays 50 gp to whoever clears the well."
+          ],
+          "town": {
+            "name": "Millbrook",
+            "description": "A village of forty houses beside a mill pond."
+          },
+          "dungeons": [
+            {
+              "id": "well",
+              "name": "The Old Well",
+              "levels": [
+                {
+                  "number": 1,
+                  "width": 2,
+                  "height": 1,
+                  "entrance": [
+                    0,
+                    0
+                  ],
+                  "edges": {
+                    "1,0:west": {
+                      "kind": "open"
+                    }
+                  },
+                  "areas": [
+                    {
+                      "id": "cistern",
+                      "name": "Cistern",
+                      "description": "A flooded chamber. Two giant rats nest on a ledge.",
+                      "cells": [
+                        [
+                          1,
+                          0
+                        ]
+                      ],
+                      "encounter": {
+                        "monsters": [
+                          {
+                            "template_id": "rat_giant",
+                            "count_fixed": 2
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "status": 422,
+      "response": {
+        "type": "about:blank",
+        "title": "Unprocessable Content",
+        "status": 422,
+        "detail": "adventure validation failed:\nwell level 1: area 'cistern' references unknown monster 'rat_giant'",
+        "code": "content_invalid"
+      }
+    }
+  },
+  {
+    "name": "upload_newer_adventure",
+    "operation": "upload_adventure",
+    "summary": "Upload an adventure from a newer osrlib",
+    "request": {
+      "method": "POST",
+      "path": "/v1/adventures",
+      "body": {
+        "kind": "adventure",
+        "schema_version": 99,
+        "engine_version": "{meta.engine_version}",
+        "payload": {}
+      }
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/adventures",
+      "body": {
+        "kind": "adventure",
+        "schema_version": 99,
+        "engine_version": "2.5.0",
+        "payload": {}
+      },
+      "status": 409,
+      "response": {
+        "type": "about:blank",
+        "title": "Conflict",
+        "status": 409,
+        "detail": "document schema_version 99 is newer than the supported 4",
+        "code": "version_unsupported"
+      }
+    }
+  },
+  {
+    "name": "deleted_adventure",
+    "operation": "get_adventure",
+    "summary": "Read an adventure that was deleted",
+    "request": {
+      "method": "GET",
+      "path": "/v1/adventures/{upload_old_well.id}"
+    },
+    "recorded": {
+      "method": "GET",
+      "path": "/v1/adventures/adv_F3Jyn0BaxxCi0eT6BITMzA",
+      "status": 404,
+      "response": {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No adventure has the id 'adv_F3Jyn0BaxxCi0eT6BITMzA'.",
+        "code": "not_found",
+        "resource": "adventure",
+        "id": "adv_F3Jyn0BaxxCi0eT6BITMzA"
+      }
+    }
+  },
+  {
+    "name": "delete_builtin_adventure",
+    "operation": "delete_adventure",
+    "summary": "Delete a built-in adventure",
+    "request": {
+      "method": "DELETE",
+      "path": "/v1/adventures/builtin-barrow"
+    },
+    "recorded": {
+      "method": "DELETE",
+      "path": "/v1/adventures/builtin-barrow",
+      "status": 403,
+      "response": {
+        "type": "about:blank",
+        "title": "Forbidden",
+        "status": 403,
+        "detail": "The adventure 'builtin-barrow' comes with the server.",
+        "code": "adventure_read_only"
+      }
+    }
+  },
+  {
+    "name": "delete_deleted_adventure",
+    "operation": "delete_adventure",
+    "summary": "Delete an adventure that was already deleted",
+    "request": {
+      "method": "DELETE",
+      "path": "/v1/adventures/{upload_old_well.id}"
+    },
+    "recorded": {
+      "method": "DELETE",
+      "path": "/v1/adventures/adv_F3Jyn0BaxxCi0eT6BITMzA",
+      "status": 404,
+      "response": {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No adventure has the id 'adv_F3Jyn0BaxxCi0eT6BITMzA'.",
+        "code": "not_found",
+        "resource": "adventure",
+        "id": "adv_F3Jyn0BaxxCi0eT6BITMzA"
+      }
+    }
+  },
+  {
+    "name": "player_adventure_document",
+    "operation": "get_adventure_document",
+    "summary": "Read an adventure document with a player key",
+    "request": {
+      "method": "GET",
+      "path": "/v1/adventures/builtin-barrow/document"
+    },
+    "recorded": {
+      "method": "GET",
+      "path": "/v1/adventures/builtin-barrow/document",
+      "status": 403,
+      "response": {
+        "type": "about:blank",
+        "title": "Forbidden",
+        "status": 403,
+        "detail": "This request needs an API key with the referee role.",
+        "code": "referee_required"
+      }
+    }
+  },
+  {
+    "name": "deleted_adventure_document",
+    "operation": "get_adventure_document",
+    "summary": "Read the document of an adventure that was deleted",
+    "role": "referee",
+    "request": {
+      "method": "GET",
+      "path": "/v1/adventures/{upload_old_well.id}/document"
+    },
+    "recorded": {
+      "method": "GET",
+      "path": "/v1/adventures/adv_F3Jyn0BaxxCi0eT6BITMzA/document",
+      "status": 404,
+      "response": {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No adventure has the id 'adv_F3Jyn0BaxxCi0eT6BITMzA'.",
+        "code": "not_found",
+        "resource": "adventure",
+        "id": "adv_F3Jyn0BaxxCi0eT6BITMzA"
+      }
+    }
+  },
+  {
+    "name": "empty_party",
+    "operation": "create_session",
+    "summary": "Start a session with no characters",
+    "request": {
+      "method": "POST",
+      "path": "/v1/sessions",
+      "body": {
+        "adventure_id": "builtin-barrow",
+        "character_ids": []
+      }
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/sessions",
+      "body": {
+        "adventure_id": "builtin-barrow",
+        "character_ids": []
+      },
+      "status": 422,
+      "response": {
+        "type": "about:blank",
+        "title": "Unprocessable Content",
+        "status": 422,
+        "detail": "The characters can't form a party. List should have at least 1 item after validation, not 0",
+        "code": "party_invalid"
+      }
+    }
+  },
+  {
+    "name": "party_document_not_a_party",
+    "operation": "create_session",
+    "summary": "Start a session from a document that isn't a party",
+    "role": "referee",
+    "request": {
+      "method": "POST",
+      "path": "/v1/sessions",
+      "body": {
+        "adventure_id": "builtin-barrow",
+        "party_document": {
+          "kind": "character",
+          "schema_version": "{meta.schema_version}",
+          "engine_version": "{meta.engine_version}",
+          "payload": "{aldric.character}"
+        }
+      }
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/sessions",
+      "body": {
+        "adventure_id": "builtin-barrow",
+        "party_document": {
+          "kind": "character",
+          "schema_version": 4,
+          "engine_version": "2.5.0",
+          "payload": {
+            "id": null,
+            "name": "Aldric",
+            "class_id": "fighter",
+            "custom_class": null,
+            "race": "human",
+            "level": 1,
+            "xp": 0,
+            "scores": {
+              "str": 9,
+              "int": 9,
+              "wis": 12,
+              "dex": 15,
+              "con": 12,
+              "cha": 5
+            },
+            "alignment": "lawful",
+            "extra_languages": [],
+            "max_hp": 8,
+            "current_hp": 8,
+            "nonregen_damage": 0,
+            "inventory": {
+              "items": [],
+              "purse": {
+                "pp": 0,
+                "gp": 80,
+                "ep": 0,
+                "sp": 0,
+                "cp": 0
+              },
+              "valuables": [],
+              "worn_armour": {
+                "instance_type": "item",
+                "template": {
+                  "item_type": "armour",
+                  "id": "leather",
+                  "name": "Leather",
+                  "cost_gp": 20,
+                  "weight_coins": 200,
+                  "ac": 7,
+                  "ac_ascending": 12,
+                  "ac_bonus": null,
+                  "category": "light",
+                  "overrides_applied": []
+                },
+                "quantity": 1
+              },
+              "shield": null,
+              "wielded": [
+                {
+                  "instance_type": "item",
+                  "template": {
+                    "item_type": "weapon",
+                    "id": "sword",
+                    "name": "Sword",
+                    "cost_gp": 10,
+                    "weight_coins": 60,
+                    "damage": "1d8",
+                    "qualities": [
+                      "melee"
+                    ],
+                    "missile_ranges": null,
+                    "material": "standard",
+                    "overrides_applied": []
+                  },
+                  "quantity": 1
+                }
+              ],
+              "rings": []
+            },
+            "carrying_treasure": false,
+            "conditions": [],
+            "stat_modifiers": [],
+            "spell_book": [],
+            "memorized_spells": []
+          }
+        }
+      },
+      "status": 422,
+      "response": {
+        "type": "about:blank",
+        "title": "Unprocessable Content",
+        "status": 422,
+        "detail": "expected a 'party' document, got kind 'character'",
+        "code": "content_invalid"
+      }
+    }
+  },
+  {
+    "name": "player_session_seed",
+    "operation": "create_session",
+    "summary": "Choose a seed with a player key",
+    "request": {
+      "method": "POST",
+      "path": "/v1/sessions",
+      "body": {
+        "adventure_id": "builtin-barrow",
+        "character_ids": [
+          "{fighter_from_roll.id}"
+        ],
+        "seed": 20261120
+      }
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/sessions",
+      "body": {
+        "adventure_id": "builtin-barrow",
+        "character_ids": [
+          "chr_JtwoF62CRDfnfr_3ZZFtHQ"
+        ],
+        "seed": 20261120
+      },
+      "status": 403,
+      "response": {
+        "type": "about:blank",
+        "title": "Forbidden",
+        "status": 403,
+        "detail": "Only an API key with the referee role can choose a seed.",
+        "code": "referee_required"
+      }
+    }
+  },
+  {
+    "name": "session_with_deleted_character",
+    "operation": "create_session",
+    "summary": "Start a session with a character that was deleted",
+    "request": {
+      "method": "POST",
+      "path": "/v1/sessions",
+      "body": {
+        "adventure_id": "builtin-barrow",
+        "character_ids": [
+          "{import_aldric.id}"
+        ]
+      }
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/sessions",
+      "body": {
+        "adventure_id": "builtin-barrow",
+        "character_ids": [
+          "chr_GDORUalU6lT9Snyvsgv4jg"
+        ]
+      },
+      "status": 404,
+      "response": {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No character has the id 'chr_GDORUalU6lT9Snyvsgv4jg'.",
+        "code": "not_found",
+        "resource": "character",
+        "id": "chr_GDORUalU6lT9Snyvsgv4jg"
+      }
+    }
+  },
+  {
+    "name": "deleted_session",
+    "operation": "get_session",
+    "summary": "Read a session that was deleted",
+    "request": {
+      "method": "GET",
+      "path": "/v1/sessions/{restore.id}"
+    },
+    "recorded": {
+      "method": "GET",
+      "path": "/v1/sessions/ses_EiMZhcD4NxGDVEAAt89Obg",
+      "status": 404,
+      "response": {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No session has the id 'ses_EiMZhcD4NxGDVEAAt89Obg'.",
+        "code": "not_found",
+        "resource": "session",
+        "id": "ses_EiMZhcD4NxGDVEAAt89Obg"
+      }
+    }
+  },
+  {
+    "name": "rename_deleted_session",
+    "operation": "rename_session",
+    "summary": "Rename a session that was deleted",
+    "request": {
+      "method": "PATCH",
+      "path": "/v1/sessions/{restore.id}",
+      "body": {
+        "name": "Aldric, third try"
+      }
+    },
+    "recorded": {
+      "method": "PATCH",
+      "path": "/v1/sessions/ses_EiMZhcD4NxGDVEAAt89Obg",
+      "body": {
+        "name": "Aldric, third try"
+      },
+      "status": 404,
+      "response": {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No session has the id 'ses_EiMZhcD4NxGDVEAAt89Obg'.",
+        "code": "not_found",
+        "resource": "session",
+        "id": "ses_EiMZhcD4NxGDVEAAt89Obg"
+      }
+    }
+  },
+  {
+    "name": "delete_deleted_session",
+    "operation": "delete_session",
+    "summary": "Delete a session that was already deleted",
+    "request": {
+      "method": "DELETE",
+      "path": "/v1/sessions/{restore.id}"
+    },
+    "recorded": {
+      "method": "DELETE",
+      "path": "/v1/sessions/ses_EiMZhcD4NxGDVEAAt89Obg",
+      "status": 404,
+      "response": {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No session has the id 'ses_EiMZhcD4NxGDVEAAt89Obg'.",
+        "code": "not_found",
+        "resource": "session",
+        "id": "ses_EiMZhcD4NxGDVEAAt89Obg"
+      }
+    }
+  },
+  {
+    "name": "commands_of_deleted_session",
+    "operation": "list_session_commands",
+    "summary": "List the commands of a session that was deleted",
+    "request": {
+      "method": "GET",
+      "path": "/v1/sessions/{restore.id}/commands"
+    },
+    "recorded": {
+      "method": "GET",
+      "path": "/v1/sessions/ses_EiMZhcD4NxGDVEAAt89Obg/commands",
+      "status": 404,
+      "response": {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No session has the id 'ses_EiMZhcD4NxGDVEAAt89Obg'.",
+        "code": "not_found",
+        "resource": "session",
+        "id": "ses_EiMZhcD4NxGDVEAAt89Obg"
+      }
+    }
+  },
+  {
+    "name": "player_referee_command",
+    "operation": "send_command",
+    "summary": "Send a referee command with a player key",
+    "request": {
+      "method": "POST",
+      "path": "/v1/sessions/{create_session.id}/commands",
+      "body": {
+        "command_type": "grant_coins",
+        "character_id": "{view.party.0.id}",
+        "coins": {
+          "gp": 100
+        }
+      }
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/sessions/ses_3fZEebbFSeyAyMEUBwt2PA/commands",
+      "body": {
+        "command_type": "grant_coins",
+        "character_id": "character-0001",
+        "coins": {
+          "gp": 100
+        }
+      },
+      "status": 403,
+      "response": {
+        "type": "about:blank",
+        "title": "Forbidden",
+        "status": 403,
+        "detail": "Only an API key with the referee role can send 'grant_coins'.",
+        "code": "referee_command",
+        "command_type": "grant_coins"
+      }
+    }
+  },
+  {
+    "name": "player_command_source",
+    "operation": "send_command",
+    "summary": "Send a command with a source from a player key",
+    "request": {
+      "method": "POST",
+      "path": "/v1/sessions/{create_session.id}/commands",
+      "body": {
+        "command_type": "move_party",
+        "direction": "east",
+        "source": "referee"
+      }
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/sessions/ses_3fZEebbFSeyAyMEUBwt2PA/commands",
+      "body": {
+        "command_type": "move_party",
+        "direction": "east",
+        "source": "referee"
+      },
+      "status": 403,
+      "response": {
+        "type": "about:blank",
+        "title": "Forbidden",
+        "status": 403,
+        "detail": "Only an API key with the referee role can set a command's source.",
+        "code": "referee_required"
+      }
+    }
+  },
+  {
+    "name": "command_to_deleted_session",
+    "operation": "send_command",
+    "summary": "Send a command to a session that was deleted",
+    "request": {
+      "method": "POST",
+      "path": "/v1/sessions/{restore.id}/commands",
+      "body": {
+        "command_type": "move_party",
+        "direction": "east"
+      }
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/sessions/ses_EiMZhcD4NxGDVEAAt89Obg/commands",
+      "body": {
+        "command_type": "move_party",
+        "direction": "east"
+      },
+      "status": 404,
+      "response": {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No session has the id 'ses_EiMZhcD4NxGDVEAAt89Obg'.",
+        "code": "not_found",
+        "resource": "session",
+        "id": "ses_EiMZhcD4NxGDVEAAt89Obg"
+      }
+    }
+  },
+  {
+    "name": "view_of_deleted_session",
+    "operation": "get_player_view",
+    "summary": "Read the view of a session that was deleted",
+    "request": {
+      "method": "GET",
+      "path": "/v1/sessions/{restore.id}/view"
+    },
+    "recorded": {
+      "method": "GET",
+      "path": "/v1/sessions/ses_EiMZhcD4NxGDVEAAt89Obg/view",
+      "status": 404,
+      "response": {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No session has the id 'ses_EiMZhcD4NxGDVEAAt89Obg'.",
+        "code": "not_found",
+        "resource": "session",
+        "id": "ses_EiMZhcD4NxGDVEAAt89Obg"
+      }
+    }
+  },
+  {
+    "name": "player_referee_view",
+    "operation": "get_referee_view",
+    "summary": "Read the referee view with a player key",
+    "request": {
+      "method": "GET",
+      "path": "/v1/sessions/{create_session.id}/referee-view"
+    },
+    "recorded": {
+      "method": "GET",
+      "path": "/v1/sessions/ses_3fZEebbFSeyAyMEUBwt2PA/referee-view",
+      "status": 403,
+      "response": {
+        "type": "about:blank",
+        "title": "Forbidden",
+        "status": 403,
+        "detail": "This request needs an API key with the referee role.",
+        "code": "referee_required"
+      }
+    }
+  },
+  {
+    "name": "referee_view_of_deleted_session",
+    "operation": "get_referee_view",
+    "summary": "Read the referee view of a session that was deleted",
+    "role": "referee",
+    "request": {
+      "method": "GET",
+      "path": "/v1/sessions/{restore.id}/referee-view"
+    },
+    "recorded": {
+      "method": "GET",
+      "path": "/v1/sessions/ses_EiMZhcD4NxGDVEAAt89Obg/referee-view",
+      "status": 404,
+      "response": {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No session has the id 'ses_EiMZhcD4NxGDVEAAt89Obg'.",
+        "code": "not_found",
+        "resource": "session",
+        "id": "ses_EiMZhcD4NxGDVEAAt89Obg"
+      }
+    }
+  },
+  {
+    "name": "player_referee_events",
+    "operation": "list_events",
+    "summary": "Read the referee events with a player key",
+    "request": {
+      "method": "GET",
+      "path": "/v1/sessions/{create_session.id}/events",
+      "query": {
+        "visibility": "referee"
+      }
+    },
+    "recorded": {
+      "method": "GET",
+      "path": "/v1/sessions/ses_3fZEebbFSeyAyMEUBwt2PA/events",
+      "query": {
+        "visibility": "referee"
+      },
+      "status": 403,
+      "response": {
+        "type": "about:blank",
+        "title": "Forbidden",
+        "status": 403,
+        "detail": "Only an API key with the referee role can read referee events.",
+        "code": "referee_required"
+      }
+    }
+  },
+  {
+    "name": "events_of_deleted_session",
+    "operation": "list_events",
+    "summary": "Read the events of a session that was deleted",
+    "request": {
+      "method": "GET",
+      "path": "/v1/sessions/{restore.id}/events"
+    },
+    "recorded": {
+      "method": "GET",
+      "path": "/v1/sessions/ses_EiMZhcD4NxGDVEAAt89Obg/events",
+      "status": 404,
+      "response": {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No session has the id 'ses_EiMZhcD4NxGDVEAAt89Obg'.",
+        "code": "not_found",
+        "resource": "session",
+        "id": "ses_EiMZhcD4NxGDVEAAt89Obg"
+      }
+    }
+  },
+  {
+    "name": "save_deleted_session",
+    "operation": "save_session",
+    "summary": "Save a session that was deleted",
+    "request": {
+      "method": "POST",
+      "path": "/v1/sessions/{restore.id}/saves",
+      "body": {
+        "label": "Too late"
+      }
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/sessions/ses_EiMZhcD4NxGDVEAAt89Obg/saves",
+      "body": {
+        "label": "Too late"
+      },
+      "status": 404,
+      "response": {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No session has the id 'ses_EiMZhcD4NxGDVEAAt89Obg'.",
+        "code": "not_found",
+        "resource": "session",
+        "id": "ses_EiMZhcD4NxGDVEAAt89Obg"
+      }
+    }
+  },
+  {
+    "name": "player_save_import",
+    "operation": "import_save",
+    "summary": "Import a save with a player key",
+    "request": {
+      "method": "POST",
+      "path": "/v1/saves/import",
+      "body": "{save_document}"
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/saves/import",
+      "body": {
+        "kind": "save",
+        "schema_version": 4,
+        "engine_version": "2.5.0",
+        "payload": {
+          "master_seed": 4127730658136791,
+          "ruleset": {
+            "hp_reroll_at_first_level": false,
+            "encumbrance": "basic",
+            "variable_weapon_damage": true,
+            "individual_initiative": false,
+            "thac0_arithmetic": false,
+            "weapon_reload": false,
+            "hd5_counts_as_magical": false,
+            "magic_item_death_save": true,
+            "xp_award_timing": "on_return",
+            "deprivation_penalties": false,
+            "aoe_friendly_fire": true,
+            "formation_width_limit": true,
+            "failed_trap_removal_springs": true
+          },
+          "party": {
+            "members": [
+              {
+                "id": "character-0001",
+                "name": "Aldric",
+                "class_id": "fighter",
+                "custom_class": null,
+                "race": "human",
+                "level": 1,
+                "xp": 0,
+                "scores": {
+                  "str": 9,
+                  "int": 9,
+                  "wis": 12,
+                  "dex": 15,
+                  "con": 12,
+                  "cha": 5
+                },
+                "alignment": "lawful",
+                "extra_languages": [],
+                "max_hp": 8,
+                "current_hp": 8,
+                "nonregen_damage": 0,
+                "inventory": {
+                  "items": [],
+                  "purse": {
+                    "pp": 0,
+                    "gp": 80,
+                    "ep": 0,
+                    "sp": 0,
+                    "cp": 0
+                  },
+                  "valuables": [],
+                  "worn_armour": {
+                    "instance_type": "item",
+                    "template": {
+                      "item_type": "armour",
+                      "id": "leather",
+                      "name": "Leather",
+                      "cost_gp": 20,
+                      "weight_coins": 200,
+                      "ac": 7,
+                      "ac_ascending": 12,
+                      "ac_bonus": null,
+                      "category": "light",
+                      "overrides_applied": []
+                    },
+                    "quantity": 1
+                  },
+                  "shield": null,
+                  "wielded": [
+                    {
+                      "instance_type": "item",
+                      "template": {
+                        "item_type": "weapon",
+                        "id": "sword",
+                        "name": "Sword",
+                        "cost_gp": 10,
+                        "weight_coins": 60,
+                        "damage": "1d8",
+                        "qualities": [
+                          "melee"
+                        ],
+                        "missile_ranges": null,
+                        "material": "standard",
+                        "overrides_applied": []
+                      },
+                      "quantity": 1
+                    }
+                  ],
+                  "rings": []
+                },
+                "carrying_treasure": false,
+                "conditions": [],
+                "stat_modifiers": [],
+                "spell_book": [],
+                "memorized_spells": []
+              }
+            ]
+          },
+          "adventure": {
+            "name": "The Barrow of the Forgotten King",
+            "description": "A plundered barrow outside town, and the idol the temple wants back.",
+            "hooks": [
+              "The temple pays 200 gp for the Jade Idol's return."
+            ],
+            "party": null,
+            "town": {
+              "name": "Threshold",
+              "description": "A walled market town at the edge of the moors.",
+              "services": [
+                "equipment",
+                "temple healing",
+                "treasure buyers"
+              ],
+              "travel_turns": {
+                "barrow": 2
+              },
+              "healing_prices": {}
+            },
+            "dungeons": [
+              {
+                "id": "barrow",
+                "name": "The Barrow",
+                "levels": [
+                  {
+                    "number": 1,
+                    "width": 5,
+                    "height": 1,
+                    "edges": {
+                      "1,0:west": {
+                        "kind": "open",
+                        "door": null
+                      },
+                      "2,0:west": {
+                        "kind": "open",
+                        "door": null
+                      },
+                      "3,0:west": {
+                        "kind": "open",
+                        "door": null
+                      },
+                      "4,0:west": {
+                        "kind": "open",
+                        "door": null
+                      }
+                    },
+                    "areas": [
+                      {
+                        "id": "guard_room",
+                        "name": "Guard room",
+                        "description": "Broken spears and gnawed bones litter the flagstones.",
+                        "cells": [
+                          [
+                            2,
+                            0
+                          ],
+                          [
+                            3,
+                            0
+                          ]
+                        ],
+                        "encounter": {
+                          "monsters": [
+                            {
+                              "template_id": "goblin",
+                              "count_dice": null,
+                              "count_fixed": 2
+                            }
+                          ],
+                          "alignment": null,
+                          "aware": false,
+                          "stance": null,
+                          "hoard": true
+                        },
+                        "features": [],
+                        "trap": null,
+                        "treasure": null
+                      },
+                      {
+                        "id": "shrine",
+                        "name": "Shrine of the Barrow King",
+                        "description": "A toppled altar; something green glints beneath it.",
+                        "cells": [
+                          [
+                            4,
+                            0
+                          ]
+                        ],
+                        "encounter": null,
+                        "features": [
+                          {
+                            "id": "idol_shrine",
+                            "kind": "treasure_cache",
+                            "description": "The idol rests in a hollow under the altar stone.",
+                            "cell": [
+                              4,
+                              0
+                            ],
+                            "item_ids": [
+                              "jade-idol"
+                            ],
+                            "magic_item_ids": [],
+                            "coins": {
+                              "pp": 0,
+                              "gp": 50,
+                              "ep": 0,
+                              "sp": 0,
+                              "cp": 0
+                            },
+                            "valuables": [],
+                            "trap": null
+                          }
+                        ],
+                        "trap": null,
+                        "treasure": null
+                      }
+                    ],
+                    "features": [],
+                    "transitions": [
+                      {
+                        "kind": "stairs_down",
+                        "position": [
+                          4,
+                          0
+                        ],
+                        "side": null,
+                        "to_dungeon_id": "barrow",
+                        "to_level_number": 2,
+                        "to_position": [
+                          0,
+                          0
+                        ],
+                        "to_facing": "east",
+                        "requires": null
+                      }
+                    ],
+                    "wandering": {
+                      "chance_in_six": 0,
+                      "interval_turns": 2,
+                      "table": null
+                    },
+                    "entrance": [
+                      0,
+                      0
+                    ],
+                    "guidance": "Grave goods, not treasure: the barrow king was buried, not hoarded. Keep the goblins squalid and the shrine quiet."
+                  },
+                  {
+                    "number": 2,
+                    "width": 3,
+                    "height": 1,
+                    "edges": {
+                      "1,0:west": {
+                        "kind": "open",
+                        "door": null
+                      },
+                      "2,0:west": {
+                        "kind": "open",
+                        "door": null
+                      }
+                    },
+                    "areas": [
+                      {
+                        "id": "vault",
+                        "name": "Looted vault",
+                        "description": "Empty niches, but one flagstone sits proud of the floor.",
+                        "cells": [
+                          [
+                            2,
+                            0
+                          ]
+                        ],
+                        "encounter": null,
+                        "features": [],
+                        "trap": null,
+                        "treasure": {
+                          "letters": [],
+                          "unguarded": true
+                        }
+                      }
+                    ],
+                    "features": [],
+                    "transitions": [
+                      {
+                        "kind": "stairs_up",
+                        "position": [
+                          0,
+                          0
+                        ],
+                        "side": null,
+                        "to_dungeon_id": "barrow",
+                        "to_level_number": 1,
+                        "to_position": [
+                          4,
+                          0
+                        ],
+                        "to_facing": "west",
+                        "requires": null
+                      }
+                    ],
+                    "wandering": {
+                      "chance_in_six": 6,
+                      "interval_turns": 1,
+                      "table": {
+                        "id": "barrow_rivals",
+                        "label": "Barrow halls",
+                        "min_level": 2,
+                        "max_level": null,
+                        "rows": [
+                          {
+                            "roll": 1,
+                            "name": "Basic Adventurers",
+                            "entry": {
+                              "kind": "npc_party",
+                              "party_kind": "basic"
+                            },
+                            "count_dice": null,
+                            "count_fixed": 2
+                          },
+                          {
+                            "roll": 2,
+                            "name": "Basic Adventurers",
+                            "entry": {
+                              "kind": "npc_party",
+                              "party_kind": "basic"
+                            },
+                            "count_dice": null,
+                            "count_fixed": 2
+                          },
+                          {
+                            "roll": 3,
+                            "name": "Basic Adventurers",
+                            "entry": {
+                              "kind": "npc_party",
+                              "party_kind": "basic"
+                            },
+                            "count_dice": null,
+                            "count_fixed": 2
+                          },
+                          {
+                            "roll": 4,
+                            "name": "Basic Adventurers",
+                            "entry": {
+                              "kind": "npc_party",
+                              "party_kind": "basic"
+                            },
+                            "count_dice": null,
+                            "count_fixed": 2
+                          },
+                          {
+                            "roll": 5,
+                            "name": "Basic Adventurers",
+                            "entry": {
+                              "kind": "npc_party",
+                              "party_kind": "basic"
+                            },
+                            "count_dice": null,
+                            "count_fixed": 2
+                          },
+                          {
+                            "roll": 6,
+                            "name": "Basic Adventurers",
+                            "entry": {
+                              "kind": "npc_party",
+                              "party_kind": "basic"
+                            },
+                            "count_dice": null,
+                            "count_fixed": 2
+                          },
+                          {
+                            "roll": 7,
+                            "name": "Basic Adventurers",
+                            "entry": {
+                              "kind": "npc_party",
+                              "party_kind": "basic"
+                            },
+                            "count_dice": null,
+                            "count_fixed": 2
+                          },
+                          {
+                            "roll": 8,
+                            "name": "Basic Adventurers",
+                            "entry": {
+                              "kind": "npc_party",
+                              "party_kind": "basic"
+                            },
+                            "count_dice": null,
+                            "count_fixed": 2
+                          },
+                          {
+                            "roll": 9,
+                            "name": "Basic Adventurers",
+                            "entry": {
+                              "kind": "npc_party",
+                              "party_kind": "basic"
+                            },
+                            "count_dice": null,
+                            "count_fixed": 2
+                          },
+                          {
+                            "roll": 10,
+                            "name": "Basic Adventurers",
+                            "entry": {
+                              "kind": "npc_party",
+                              "party_kind": "basic"
+                            },
+                            "count_dice": null,
+                            "count_fixed": 2
+                          },
+                          {
+                            "roll": 11,
+                            "name": "Basic Adventurers",
+                            "entry": {
+                              "kind": "npc_party",
+                              "party_kind": "basic"
+                            },
+                            "count_dice": null,
+                            "count_fixed": 2
+                          },
+                          {
+                            "roll": 12,
+                            "name": "Basic Adventurers",
+                            "entry": {
+                              "kind": "npc_party",
+                              "party_kind": "basic"
+                            },
+                            "count_dice": null,
+                            "count_fixed": 2
+                          },
+                          {
+                            "roll": 13,
+                            "name": "Basic Adventurers",
+                            "entry": {
+                              "kind": "npc_party",
+                              "party_kind": "basic"
+                            },
+                            "count_dice": null,
+                            "count_fixed": 2
+                          },
+                          {
+                            "roll": 14,
+                            "name": "Basic Adventurers",
+                            "entry": {
+                              "kind": "npc_party",
+                              "party_kind": "basic"
+                            },
+                            "count_dice": null,
+                            "count_fixed": 2
+                          },
+                          {
+                            "roll": 15,
+                            "name": "Basic Adventurers",
+                            "entry": {
+                              "kind": "npc_party",
+                              "party_kind": "basic"
+                            },
+                            "count_dice": null,
+                            "count_fixed": 2
+                          },
+                          {
+                            "roll": 16,
+                            "name": "Basic Adventurers",
+                            "entry": {
+                              "kind": "npc_party",
+                              "party_kind": "basic"
+                            },
+                            "count_dice": null,
+                            "count_fixed": 2
+                          },
+                          {
+                            "roll": 17,
+                            "name": "Basic Adventurers",
+                            "entry": {
+                              "kind": "npc_party",
+                              "party_kind": "basic"
+                            },
+                            "count_dice": null,
+                            "count_fixed": 2
+                          },
+                          {
+                            "roll": 18,
+                            "name": "Basic Adventurers",
+                            "entry": {
+                              "kind": "npc_party",
+                              "party_kind": "basic"
+                            },
+                            "count_dice": null,
+                            "count_fixed": 2
+                          },
+                          {
+                            "roll": 19,
+                            "name": "Basic Adventurers",
+                            "entry": {
+                              "kind": "npc_party",
+                              "party_kind": "basic"
+                            },
+                            "count_dice": null,
+                            "count_fixed": 2
+                          },
+                          {
+                            "roll": 20,
+                            "name": "Basic Adventurers",
+                            "entry": {
+                              "kind": "npc_party",
+                              "party_kind": "basic"
+                            },
+                            "count_dice": null,
+                            "count_fixed": 2
+                          }
+                        ],
+                        "overrides_applied": []
+                      }
+                    },
+                    "entrance": null,
+                    "guidance": "Somebody else is always down here first. Rivals are rude, not evil."
+                  }
+                ]
+              }
+            ],
+            "monsters": [],
+            "items": [
+              {
+                "item_type": "gear",
+                "id": "jade-idol",
+                "name": "Jade Idol of the Barrow King",
+                "cost_gp": 0,
+                "lot_size": 1,
+                "capacity_coins": null,
+                "combat": null,
+                "params": {},
+                "overrides_applied": []
+              }
+            ],
+            "spells": [],
+            "triggers": [],
+            "quests": [
+              {
+                "id": "the-idol",
+                "name": "The Jade Idol",
+                "activation": {
+                  "pattern": {
+                    "pattern_type": "dungeon_entered",
+                    "dungeon_id": "barrow"
+                  },
+                  "conditions": []
+                },
+                "objectives": [
+                  {
+                    "id": "recover-idol",
+                    "name": "Recover the idol",
+                    "when": {
+                      "pattern": {
+                        "pattern_type": "item_acquired",
+                        "item_id": "jade-idol"
+                      },
+                      "conditions": []
+                    },
+                    "hidden": false,
+                    "reveal_when": null,
+                    "narrative": {
+                      "refusal": "",
+                      "success": "",
+                      "fired": "",
+                      "offer": "",
+                      "progress": "The idol comes up out of the hollow, cold as well-water.",
+                      "completion": "",
+                      "journal": "",
+                      "guidance": "",
+                      "speaker": ""
+                    }
+                  },
+                  {
+                    "id": "return-home",
+                    "name": "Bring it home",
+                    "when": {
+                      "pattern": {
+                        "pattern_type": "town_entered"
+                      },
+                      "conditions": [
+                        {
+                          "condition_type": "has_item",
+                          "item_id": "jade-idol",
+                          "consumes": false
+                        }
+                      ]
+                    },
+                    "hidden": false,
+                    "reveal_when": null,
+                    "narrative": {
+                      "refusal": "",
+                      "success": "",
+                      "fired": "",
+                      "offer": "",
+                      "progress": "Threshold's gate shuts behind you with the idol inside it.",
+                      "completion": "",
+                      "journal": "",
+                      "guidance": "",
+                      "speaker": ""
+                    }
+                  }
+                ],
+                "rewards": [
+                  {
+                    "command_type": "grant_coins",
+                    "source": null,
+                    "character_id": "@first",
+                    "coins": {
+                      "pp": 0,
+                      "gp": 200,
+                      "ep": 0,
+                      "sp": 0,
+                      "cp": 0
+                    }
+                  },
+                  {
+                    "command_type": "award_xp",
+                    "source": null,
+                    "character_id": "@party",
+                    "amount": 1200
+                  },
+                  {
+                    "command_type": "set_flag",
+                    "source": null,
+                    "key": "quest.idol",
+                    "value": "recovered"
+                  }
+                ],
+                "completion": "all",
+                "concludes_adventure": true,
+                "narrative": {
+                  "refusal": "",
+                  "success": "",
+                  "fired": "",
+                  "offer": "The temple wants the Jade Idol off the barrow king's altar and back on its own.",
+                  "progress": "",
+                  "completion": "The almoner counts out the reward without looking up. The idol is home.",
+                  "journal": "",
+                  "guidance": "",
+                  "speaker": "the temple almoner"
+                }
+              }
+            ]
+          },
+          "mode": "exploring",
+          "clock_rounds": 120,
+          "allocator": {
+            "counters": {
+              "character": 1
+            }
+          },
+          "ledger": {
+            "effects": []
+          },
+          "dungeon_state": {
+            "location": {
+              "kind": "dungeon",
+              "dungeon_id": "barrow",
+              "level_number": 1,
+              "position": [
+                1,
+                0
+              ],
+              "facing": "east"
+            },
+            "explored": {
+              "barrow:1": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            "seen": {},
+            "doors": {},
+            "sprung_traps": [],
+            "removed_traps": [],
+            "found_traps": [],
+            "found_tricks": [],
+            "emptied_caches": [],
+            "piles": {},
+            "generated_caches": {},
+            "generated_treasure_areas": [],
+            "generated_lair_hoards": [],
+            "resolved_encounters": [],
+            "listen_attempts": {},
+            "search_attempts": {},
+            "inspect_attempts": {},
+            "removal_attempts": {},
+            "lock_failures": {}
+          },
+          "monsters": [],
+          "npcs": [],
+          "flags": {},
+          "fired_triggers": [],
+          "journal": [
+            {
+              "text": "The temple wants the Jade Idol off the barrow king's altar and back on its own.",
+              "rounds": 120
+            }
+          ],
+          "quests": {
+            "the-idol": {
+              "status": "active",
+              "objectives": {
+                "recover-idol": {
+                  "revealed": true,
+                  "complete": false
+                },
+                "return-home": {
+                  "revealed": true,
+                  "complete": false
+                }
+              }
+            }
+          },
+          "listener_state": {
+            "osrlib.interpreter": {}
+          },
+          "death_records": {},
+          "defeated_monsters": [],
+          "deprivation": {},
+          "treasure_snapshot_cp": 8000,
+          "exploration": {
+            "odometer_thirds": 30,
+            "turns_since_rest": 0,
+            "wandering_counter": 0,
+            "noise_since_check": false,
+            "sleep_count": 0,
+            "last_prepared_sleep": {},
+            "alerted_areas": [],
+            "heard_areas": [],
+            "provisions_day": 0
+          },
+          "encounter": null,
+          "battle": null,
+          "rng_streams": {
+            "effects": {
+              "state": 147623425399663528788509090899898280633,
+              "inc": 12319089799272244131355521236223853385
+            }
+          },
+          "command_log": [
+            {
+              "command_type": "enter_dungeon",
+              "source": null,
+              "dungeon_id": "barrow"
+            },
+            {
+              "command_type": "activate_quest",
+              "source": "quest:the-idol",
+              "quest_id": "the-idol"
+            },
+            {
+              "command_type": "move_party",
+              "source": null,
+              "direction": "east"
+            }
+          ],
+          "event_log": [
+            {
+              "code": "exploration.location.entered",
+              "visibility": "player",
+              "event_type": "location_entered",
+              "location_kind": "dungeon",
+              "location_id": "barrow",
+              "level_number": 1,
+              "dungeon_id": null,
+              "narrative": null,
+              "via": "entrance",
+              "transition_ref": null
+            },
+            {
+              "code": "session.quest.activated",
+              "visibility": "player",
+              "event_type": "quest_activated",
+              "quest_id": "the-idol",
+              "name": "The Jade Idol",
+              "narrative": "The temple wants the Jade Idol off the barrow king's altar and back on its own."
+            },
+            {
+              "code": "exploration.party.moved",
+              "visibility": "player",
+              "event_type": "party_moved",
+              "x": 1,
+              "y": 0,
+              "facing": "east",
+              "narrative": null
+            }
+          ]
+        }
+      },
+      "status": 403,
+      "response": {
+        "type": "about:blank",
+        "title": "Forbidden",
+        "status": 403,
+        "detail": "This request needs an API key with the referee role.",
+        "code": "referee_required"
+      }
+    }
+  },
+  {
+    "name": "import_not_a_save",
+    "operation": "import_save",
+    "summary": "Import a document that isn't a save",
+    "role": "referee",
+    "request": {
+      "method": "POST",
+      "path": "/v1/saves/import",
+      "body": {
+        "kind": "character",
+        "schema_version": "{meta.schema_version}",
+        "engine_version": "{meta.engine_version}",
+        "payload": "{aldric.character}"
+      }
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/saves/import",
+      "body": {
+        "kind": "character",
+        "schema_version": 4,
+        "engine_version": "2.5.0",
+        "payload": {
+          "id": null,
+          "name": "Aldric",
+          "class_id": "fighter",
+          "custom_class": null,
+          "race": "human",
+          "level": 1,
+          "xp": 0,
+          "scores": {
+            "str": 9,
+            "int": 9,
+            "wis": 12,
+            "dex": 15,
+            "con": 12,
+            "cha": 5
+          },
+          "alignment": "lawful",
+          "extra_languages": [],
+          "max_hp": 8,
+          "current_hp": 8,
+          "nonregen_damage": 0,
+          "inventory": {
+            "items": [],
+            "purse": {
+              "pp": 0,
+              "gp": 80,
+              "ep": 0,
+              "sp": 0,
+              "cp": 0
+            },
+            "valuables": [],
+            "worn_armour": {
+              "instance_type": "item",
+              "template": {
+                "item_type": "armour",
+                "id": "leather",
+                "name": "Leather",
+                "cost_gp": 20,
+                "weight_coins": 200,
+                "ac": 7,
+                "ac_ascending": 12,
+                "ac_bonus": null,
+                "category": "light",
+                "overrides_applied": []
+              },
+              "quantity": 1
+            },
+            "shield": null,
+            "wielded": [
+              {
+                "instance_type": "item",
+                "template": {
+                  "item_type": "weapon",
+                  "id": "sword",
+                  "name": "Sword",
+                  "cost_gp": 10,
+                  "weight_coins": 60,
+                  "damage": "1d8",
+                  "qualities": [
+                    "melee"
+                  ],
+                  "missile_ranges": null,
+                  "material": "standard",
+                  "overrides_applied": []
+                },
+                "quantity": 1
+              }
+            ],
+            "rings": []
+          },
+          "carrying_treasure": false,
+          "conditions": [],
+          "stat_modifiers": [],
+          "spell_book": [],
+          "memorized_spells": []
+        }
+      },
+      "status": 422,
+      "response": {
+        "type": "about:blank",
+        "title": "Unprocessable Content",
+        "status": 422,
+        "detail": "expected a 'save' document, got kind 'character'",
+        "code": "content_invalid"
+      }
+    }
+  },
+  {
+    "name": "import_newer_save",
+    "operation": "import_save",
+    "summary": "Import a save from a newer osrlib",
+    "role": "referee",
+    "request": {
+      "method": "POST",
+      "path": "/v1/saves/import",
+      "body": {
+        "kind": "save",
+        "schema_version": 99,
+        "engine_version": "{meta.engine_version}",
+        "payload": {}
+      }
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/saves/import",
+      "body": {
+        "kind": "save",
+        "schema_version": 99,
+        "engine_version": "2.5.0",
+        "payload": {}
+      },
+      "status": 409,
+      "response": {
+        "type": "about:blank",
+        "title": "Conflict",
+        "status": 409,
+        "detail": "document schema_version 99 is newer than the supported 4",
+        "code": "version_unsupported"
+      }
+    }
+  },
+  {
+    "name": "deleted_save",
+    "operation": "get_save",
+    "summary": "Read a save that was deleted",
+    "request": {
+      "method": "GET",
+      "path": "/v1/saves/{import_save.id}"
+    },
+    "recorded": {
+      "method": "GET",
+      "path": "/v1/saves/sav_ihCc_biiXJUb4n1if2y16A",
+      "status": 404,
+      "response": {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No save has the id 'sav_ihCc_biiXJUb4n1if2y16A'.",
+        "code": "not_found",
+        "resource": "save",
+        "id": "sav_ihCc_biiXJUb4n1if2y16A"
+      }
+    }
+  },
+  {
+    "name": "relabel_deleted_save",
+    "operation": "relabel_save",
+    "summary": "Relabel a save that was deleted",
+    "request": {
+      "method": "PATCH",
+      "path": "/v1/saves/{import_save.id}",
+      "body": {
+        "label": "Gone"
+      }
+    },
+    "recorded": {
+      "method": "PATCH",
+      "path": "/v1/saves/sav_ihCc_biiXJUb4n1if2y16A",
+      "body": {
+        "label": "Gone"
+      },
+      "status": 404,
+      "response": {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No save has the id 'sav_ihCc_biiXJUb4n1if2y16A'.",
+        "code": "not_found",
+        "resource": "save",
+        "id": "sav_ihCc_biiXJUb4n1if2y16A"
+      }
+    }
+  },
+  {
+    "name": "delete_deleted_save",
+    "operation": "delete_save",
+    "summary": "Delete a save that was already deleted",
+    "request": {
+      "method": "DELETE",
+      "path": "/v1/saves/{import_save.id}"
+    },
+    "recorded": {
+      "method": "DELETE",
+      "path": "/v1/saves/sav_ihCc_biiXJUb4n1if2y16A",
+      "status": 404,
+      "response": {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No save has the id 'sav_ihCc_biiXJUb4n1if2y16A'.",
+        "code": "not_found",
+        "resource": "save",
+        "id": "sav_ihCc_biiXJUb4n1if2y16A"
+      }
+    }
+  },
+  {
+    "name": "restore_deleted_save",
+    "operation": "restore_save",
+    "summary": "Restore a save that was deleted",
+    "request": {
+      "method": "POST",
+      "path": "/v1/saves/{import_save.id}/restore",
+      "body": {}
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/saves/sav_ihCc_biiXJUb4n1if2y16A/restore",
+      "body": {},
+      "status": 404,
+      "response": {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No save has the id 'sav_ihCc_biiXJUb4n1if2y16A'.",
+        "code": "not_found",
+        "resource": "save",
+        "id": "sav_ihCc_biiXJUb4n1if2y16A"
+      }
+    }
+  },
+  {
+    "name": "player_save_document",
+    "operation": "get_save_document",
+    "summary": "Read a save document with a player key",
+    "request": {
+      "method": "GET",
+      "path": "/v1/saves/{save.id}/document"
+    },
+    "recorded": {
+      "method": "GET",
+      "path": "/v1/saves/sav_QcXxpTLMu9nqJK1Lxcr7lA/document",
+      "status": 403,
+      "response": {
+        "type": "about:blank",
+        "title": "Forbidden",
+        "status": 403,
+        "detail": "This request needs an API key with the referee role.",
+        "code": "referee_required"
+      }
+    }
+  },
+  {
+    "name": "deleted_save_document",
+    "operation": "get_save_document",
+    "summary": "Read the document of a save that was deleted",
+    "role": "referee",
+    "request": {
+      "method": "GET",
+      "path": "/v1/saves/{import_save.id}/document"
+    },
+    "recorded": {
+      "method": "GET",
+      "path": "/v1/saves/sav_ihCc_biiXJUb4n1if2y16A/document",
+      "status": 404,
+      "response": {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No save has the id 'sav_ihCc_biiXJUb4n1if2y16A'.",
+        "code": "not_found",
+        "resource": "save",
+        "id": "sav_ihCc_biiXJUb4n1if2y16A"
+      }
     }
   }
 ]
