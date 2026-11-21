@@ -19,7 +19,7 @@ from osrlib.persistence import load_game, save_game
 from bxapi.adventures import builtin_adventures
 from bxapi.db import Database
 from bxapi.errors import ApiError
-from bxapi.session_manager import SessionManager
+from bxapi.session_manager import MAX_PARTY_SIZE, SessionManager
 
 CLIENT = "game"
 BARROW = builtin_adventures()["builtin-barrow"].adventure
@@ -231,6 +231,7 @@ def test_a_command_that_loses_the_race_leaves_no_trace(path: str, databases: Cal
         with pytest.raises(ApiError) as caught:
             loser.execute(CLIENT, session_id, AddJournalEntry(text="loser"))
         assert caught.value.status == 409 and caught.value.code == "session_busy"
+        assert caught.value.extras == {"revision": 1}
         assert loser.loaded() == [], "the losing process kept its copy"
         for manager in (loser, winner):
             journal = manager.read(CLIENT, session_id, lambda game: [entry.text for entry in game.journal])
@@ -312,7 +313,7 @@ def test_a_restored_session_plays_on_like_a_loaded_one(databases: Callable[[], D
     played.execute(ENTER)
     document = save_game(played)
     row = manager.restore(CLIENT, name="Again", adventure_id=None, game=load_game(document))
-    assert (row.revision, row.name, row.adventure_id, row.mode) == (0, "Again", "", "exploring")
+    assert (row.revision, row.name, row.adventure_id, row.mode) == (0, "Again", None, "exploring")
     expected = load_game(document)
     expected.register_listener(Interpreter(expected))
     for command in (EAST, WEST):
@@ -329,3 +330,71 @@ def test_two_members_with_the_same_id_are_party_invalid(databases: Callable[[], 
         )
     assert (caught.value.status, caught.value.code) == (422, "party_invalid")
     assert manager.loaded() == []
+
+
+def test_a_party_larger_than_the_limit_is_party_invalid(databases: Callable[[], Database]) -> None:
+    manager = SessionManager(databases(), cache_size=4)
+    member = party().members[0]
+    crowd = Party(members=[member.model_copy() for _ in range(MAX_PARTY_SIZE + 1)])
+    with pytest.raises(ApiError) as caught:
+        manager.start(
+            CLIENT, name=None, adventure_id="builtin-barrow", adventure=BARROW, party=crowd, seed=1, ruleset=None
+        )
+    assert (caught.value.status, caught.value.code) == (422, "party_invalid")
+
+
+def test_a_request_that_waits_too_long_for_the_lock_does_nothing(databases: Callable[[], Database]) -> None:
+    db = databases()
+    manager = SessionManager(db, cache_size=4, lock_timeout=0.05)
+    session_id = start(manager, 81)
+    manager.execute(CLIENT, session_id, ENTER)
+    before = db.get_session_with_document(CLIENT, session_id)
+    entered, release = threading.Event(), threading.Event()
+
+    def hold(_: GameSession) -> None:
+        entered.set()
+        release.wait(5)
+
+    holder = threading.Thread(target=manager.read, args=(CLIENT, session_id, hold))
+    holder.start()
+    called: list[str] = []
+    try:
+        assert entered.wait(5)
+        for attempt in (
+            lambda: manager.execute(CLIENT, session_id, EAST),
+            lambda: manager.read(CLIENT, session_id, lambda game: called.append("read")),
+        ):
+            with pytest.raises(ApiError) as caught:
+                attempt()
+            assert (caught.value.status, caught.value.code, caught.value.extras) == (
+                409,
+                "session_busy",
+                {"revision": 1},
+            )
+    finally:
+        release.set()
+        holder.join(5)
+    assert called == []
+    assert db.get_session_with_document(CLIENT, session_id) == before
+    expected = oracle(81)
+    expected.execute(ENTER)
+    assert outcome(manager.execute(CLIENT, session_id, EAST).result) == outcome(expected.execute(EAST))
+
+
+def test_updated_at_is_the_time_of_the_last_accepted_command(databases: Callable[[], Database]) -> None:
+    db = databases()
+    times = iter(["2031-01-01T00:00:01Z", "2031-01-01T00:00:02Z"])
+    manager = SessionManager(db, cache_size=4, now=lambda: next(times))
+    session_id = start(manager, 91)
+    created = db.get_session(CLIENT, session_id)
+    assert created is not None and created.updated_at == created.created_at
+    manager.execute(CLIENT, session_id, ENTER)
+    first = db.get_session(CLIENT, session_id)
+    assert first is not None and first.updated_at == "2031-01-01T00:00:01Z"
+    manager.execute(CLIENT, session_id, NORTH)
+    refused = db.get_session(CLIENT, session_id)
+    assert refused is not None and refused.updated_at == "2031-01-01T00:00:01Z"
+    manager.execute(CLIENT, session_id, EAST)
+    second = db.get_session(CLIENT, session_id)
+    assert second is not None and second.updated_at == "2031-01-01T00:00:02Z"
+    assert second.created_at == created.created_at

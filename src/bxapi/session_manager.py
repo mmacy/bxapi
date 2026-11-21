@@ -12,45 +12,66 @@ a copy of what the database has:
 
 - Each session has a lock. A request holds it while it executes a command or reads the session,
   so one session runs one request at a time, and requests for separate sessions run in parallel.
+  A request waits at most [`LOCK_TIMEOUT_SECONDS`][bxapi.session_manager.LOCK_TIMEOUT_SECONDS]
+  for the lock, and then gets 409 `session_busy` without having done anything.
 - Before a request uses a loaded copy, the manager compares the copy's revision with the
   revision in the database. When they differ, another server process changed the session, and
   the manager loads it again.
 - After the session accepts a command, the manager writes the save document, the mode, the
   clock, and the new revision with a compare-and-swap: the write happens only if the database
-  still has the revision the command started from. When it doesn't, another process won the
-  race, so the manager throws the loaded copy away and the request gets 409 `session_busy`.
+  still has the revision the command started from. When it doesn't, another process wrote first,
+  so the manager drops its loaded copy and the request gets 409 `session_busy`.
 - The manager registers osrlib's `Interpreter` on every session it creates, restores, or loads,
   so the adventure's triggers and quests run, and a loaded session plays on as the original
   would have.
 """
 
+import logging
 import threading
 from collections import OrderedDict
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 
 from osrlib.core.ruleset import Ruleset
-from osrlib.crawl.adventure import Adventure
+from osrlib.crawl.adventure import Adventure, validate_adventure
 from osrlib.crawl.commands import Command, CommandResult, SessionMode
 from osrlib.crawl.interpreter import Interpreter
 from osrlib.crawl.party import Party
 from osrlib.crawl.session import GameSession
+from osrlib.data import load_equipment, load_monsters
+from osrlib.errors import OsrlibError
 from osrlib.persistence import load_game, save_game
 
 from bxapi.db import Database, SessionRow, utc_now
-from bxapi.errors import conflict, invalid, not_found
+from bxapi.errors import ApiError, conflict, invalid, not_found
 
-__all__ = ["UNKNOWN_ADVENTURE_ID", "Executed", "SessionManager"]
+__all__ = [
+    "LOCK_TIMEOUT_SECONDS",
+    "MAX_PARTY_SIZE",
+    "Executed",
+    "SessionManager",
+    "load_stored_save",
+    "validate_loaded_adventure",
+]
 
-UNKNOWN_ADVENTURE_ID = ""
-"""The value the `adventure_id` column has for a session whose adventure the server can't identify.
+LOCK_TIMEOUT_SECONDS = 5.0
+"""How long a request waits for a session's lock before it gets 409 `session_busy`.
 
-A session restored from an imported save is one. Session info reports the value as `null`."""
+Each waiting request occupies one of the server's worker threads, so the limit keeps a slow session from
+taking every thread and stalling requests for other sessions and other clients."""
+
+MAX_PARTY_SIZE = 20
+"""The most members a new session's party may have.
+
+It's a limit of the server, not a rule of the game. Every accepted command writes the whole party in the save
+document, so a very large party makes each command slow for the server's other clients too."""
+
+_log = logging.getLogger("bxapi")
 
 type _Key = tuple[str, str]
-"""A client name and a session id. Keying by both keeps one client's requests away from another
-client's loaded sessions, even for an id the other client sent."""
+"""A client name and a session id. The cache key includes the client, so a request finds only its
+client's sessions."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,9 +95,9 @@ class _Loaded:
 class _Slot:
     """The lock of one session, and its loaded copy while it's in the cache.
 
-    A slot lives while the session is in the cache or a request is using it. `users` counts the
-    requests that hold the lock or wait for it, so a request that comes in while the session is
-    evicted still queues on the same lock.
+    `users` counts the requests that hold the lock or wait for it. The manager removes a slot when
+    the session leaves the cache and `users` is 0, so a request that comes in while the session is
+    evicted still queues on the same lock as the request using it.
     """
 
     __slots__ = ("loaded", "lock", "users")
@@ -87,6 +108,52 @@ class _Slot:
         self.loaded: _Loaded | None = None
 
 
+def validate_loaded_adventure(game: GameSession) -> None:
+    """Run osrlib's checks on the adventure in a loaded save, the checks `GameSession.new` runs on a new game.
+
+    osrlib's `load_game` doesn't check the references the adventure makes, so a save whose adventure names an
+    unknown monster loads, and fails only when play reaches that monster.
+
+    Args:
+        game: A session from `load_game`.
+
+    Raises:
+        osrlib.errors.ContentValidationError: If the adventure refers to a monster, an item, an area, or a
+            quest that doesn't exist.
+    """
+    validate_adventure(game.adventure, load_monsters(), load_equipment())
+
+
+def _unreadable(resource: str, resource_id: str, error: OsrlibError) -> ApiError:
+    # osrlib's message can quote the stored document, which can contain what only the referee may see, so the
+    # message goes to the log and never to the caller.
+    _log.error("osrlib can't load the stored %s %s: %s", resource, resource_id, error)
+    return ApiError(500, "session_unreadable", f"The server can't load this {resource}'s stored state.")
+
+
+def load_stored_save(save_id: str, document: Mapping[str, object]) -> GameSession:
+    """Load a stored save document to restore it, and check its adventure.
+
+    Args:
+        save_id: The save's id, for the log.
+        document: The save's stored document.
+
+    Returns:
+        The loaded session, with no listeners registered.
+
+    Raises:
+        ApiError: With status 500 and the code `session_unreadable`, if the installed osrlib can't load the
+            document or refuses its adventure. The response contains nothing from osrlib's message, and the
+            server logs the message with the save's id.
+    """
+    try:
+        game = load_game(document)
+        validate_loaded_adventure(game)
+    except OsrlibError as error:
+        raise _unreadable("save", save_id, error) from error
+    return game
+
+
 class SessionManager:
     """The server's running sessions, each loaded at most once and used by one request at a time.
 
@@ -95,6 +162,9 @@ class SessionManager:
         cache_size: The most sessions to keep loaded. When a request loads one more, the manager
             drops the session used longest ago. A request that's using a dropped session finishes
             with its copy, and the next request loads the session from the database again.
+        lock_timeout: How long a request waits for a session's lock, in seconds.
+        now: The function that returns the current time for `updated_at`, in the format of
+            [`utc_now`][bxapi.db.utc_now].
 
     Examples:
         ```python
@@ -133,9 +203,18 @@ class SessionManager:
         ```
     """
 
-    def __init__(self, db: Database, *, cache_size: int) -> None:
+    def __init__(
+        self,
+        db: Database,
+        *,
+        cache_size: int,
+        lock_timeout: float = LOCK_TIMEOUT_SECONDS,
+        now: Callable[[], str] = utc_now,
+    ) -> None:
         self._db = db
         self._cache_size = cache_size
+        self._lock_timeout = lock_timeout
+        self._now = now
         # The mutex guards `_slots`, `_cache`, and each slot's `users` and `loaded`. A request never
         # waits for a session's lock while it holds the mutex, so the two can't deadlock.
         self._mutex = threading.Lock()
@@ -171,12 +250,15 @@ class SessionManager:
             The stored session.
 
         Raises:
-            ApiError: With status 422 and the code `party_invalid`, if two members of the party
-                end up with the same id. osrlib keeps an id a member already has, so two copies of
-                one imported character, or an imported character whose id matches one osrlib
-                assigns, would collide. Every command names a member by id.
+            ApiError: With status 422 and the code `party_invalid`, if the party has more than
+                [`MAX_PARTY_SIZE`][bxapi.session_manager.MAX_PARTY_SIZE] members, or if two
+                members end up with the same id. osrlib keeps an id a member already has, so two
+                copies of one character with an id, or a character whose id matches one osrlib
+                assigns, would collide, and a command identifies a party member by id.
             osrlib.errors.ContentValidationError: If `GameSession.new` refuses the adventure.
         """
+        if len(party.members) > MAX_PARTY_SIZE:
+            raise invalid("party_invalid", f"A party on this server has at most {MAX_PARTY_SIZE} members.")
         game = GameSession.new(party, adventure, seed=seed, ruleset=ruleset)
         member_ids = [member.id for member in game.party.members]
         if len(set(member_ids)) != len(member_ids):
@@ -189,9 +271,8 @@ class SessionManager:
         Args:
             client: The client the new session belongs to.
             name: The session's name, or `None` for the adventure's name.
-            adventure_id: The id of the adventure the save plays, or `None` when the server can't
-                tell. The session stores [`UNKNOWN_ADVENTURE_ID`][bxapi.session_manager.UNKNOWN_ADVENTURE_ID]
-                for `None`.
+            adventure_id: The id of the adventure the save's session played, or `None` when the
+                server doesn't know it, as for an imported save.
             game: The loaded session, with no listeners registered.
 
         Returns:
@@ -204,7 +285,7 @@ class SessionManager:
         row = self._db.insert_session(
             client,
             name=name if name is not None else game.adventure.name,
-            adventure_id=adventure_id if adventure_id is not None else UNKNOWN_ADVENTURE_ID,
+            adventure_id=adventure_id,
             adventure_name=game.adventure.name,
             mode=game.mode.value,
             clock_rounds=game.clock.rounds,
@@ -238,7 +319,10 @@ class SessionManager:
             ApiError: With status 404 and the code `not_found`, if the client has no session with
                 that id. With status 409 and the code `revision_conflict`, if `expected_revision`
                 isn't the session's revision. With status 409 and the code `session_busy`, if
-                another server process wrote the session while this one executed the command.
+                another request held the session's lock for longer than the lock timeout, or if
+                another server process wrote the session after this request read it and before
+                this request wrote it. With status 500 and the code `session_unreadable`, if
+                osrlib can't load the stored session.
         """
         key = (client, session_id)
         with self._locked(key) as slot:
@@ -264,7 +348,7 @@ class SessionManager:
                     mode=game.mode.value,
                     clock_rounds=game.clock.rounds,
                     revision=revision,
-                    updated_at=utc_now(),
+                    updated_at=self._now(),
                 )
             except BaseException:
                 # osrlib may have applied part of the command before the exception, and the
@@ -273,12 +357,10 @@ class SessionManager:
                 raise
             if not written:
                 self._drop(key, slot)
-                if self._db.get_session_revision(client, session_id) is None:
-                    raise not_found("session", session_id)
-                raise conflict(
-                    "session_busy",
-                    "Another server process changed the session while this one executed the command. The command "
-                    "had no effect. Send it again.",
+                raise self._busy(
+                    key,
+                    "Another server process wrote the session after this request read it and before this request "
+                    "wrote it, so the command had no effect.",
                 )
             self._remember(key, slot, _Loaded(game, revision))
             return Executed(result=result, mode=game.mode, revision=revision)
@@ -299,7 +381,9 @@ class SessionManager:
 
         Raises:
             ApiError: With status 404 and the code `not_found`, if the client has no session with
-                that id.
+                that id. With status 409 and the code `session_busy`, if another request held the
+                session's lock for longer than the lock timeout. With status 500 and the code
+                `session_unreadable`, if osrlib can't load the stored session.
         """
         key = (client, session_id)
         with self._locked(key) as slot:
@@ -335,13 +419,35 @@ class SessionManager:
                 slot = self._slots[key] = _Slot()
             slot.users += 1
         try:
-            with slot.lock:
+            if not slot.lock.acquire(timeout=self._lock_timeout):
+                raise self._busy(
+                    key,
+                    f"Another request used the session for more than {self._lock_timeout:g} seconds, so this "
+                    "request did nothing.",
+                )
+            try:
                 yield slot
+            finally:
+                slot.lock.release()
         finally:
             with self._mutex:
                 slot.users -= 1
                 if slot.users == 0 and slot.loaded is None:
                     del self._slots[key]
+
+    def _busy(self, key: _Key, cause: str) -> ApiError:
+        """Return the 409 `session_busy` for a session, with its revision, or the 404 if it no longer exists."""
+        client, session_id = key
+        revision = self._db.get_session_revision(client, session_id)
+        if revision is None:
+            return not_found("session", session_id)
+        return conflict(
+            "session_busy",
+            f"{cause} The session is at revision {revision}. If you sent expected_revision, read the session "
+            "before you decide what to do: when the revision has changed, the same request gets "
+            "revision_conflict. If you didn't, send the request again.",
+            revision=revision,
+        )
 
     def _current(self, key: _Key, slot: _Slot) -> _Loaded:
         """Return the session as the database has it now. The caller holds the slot's lock."""
@@ -357,7 +463,11 @@ class SessionManager:
         if row is None:
             self._drop(key, slot)
             raise not_found("session", session_id)
-        game = load_game(row.document)
+        try:
+            game = load_game(row.document)
+        except OsrlibError as error:
+            self._drop(key, slot)
+            raise _unreadable("session", session_id, error) from error
         _attach_listeners(game)
         loaded = _Loaded(game, row.revision)
         self._remember(key, slot, loaded)

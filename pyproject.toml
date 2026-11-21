@@ -64,6 +64,7 @@ known-first-party = ["bxapi"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+xfail_strict = true
 
 [tool.pyright]
 include = ["src", "tests"]

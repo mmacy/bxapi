@@ -1,3 +1,8 @@
+import copy
+import json
+import logging
+import sqlite3
+import threading
 from collections.abc import Callable, Iterable
 from typing import Any
 
@@ -10,17 +15,22 @@ from osrlib.core.clock import GameClock
 from osrlib.core.events import Event, Visibility
 from osrlib.core.rng import RngStreams
 from osrlib.core.ruleset import Ruleset
-from osrlib.crawl.commands import ALL_COMMAND_CLASSES, SessionMode, parse_command
+from osrlib.crawl.adventure import Adventure, TownSpec
+from osrlib.crawl.commands import ALL_COMMAND_CLASSES, SessionMode, SetFlag, parse_command
+from osrlib.crawl.dungeon import AreaSpec, DungeonSpec, Edge, EdgeKind, LevelSpec, WanderingSpec
 from osrlib.crawl.interpreter import Interpreter
 from osrlib.crawl.party import Party
 from osrlib.crawl.session import GameSession
+from osrlib.crawl.triggers import AreaEnteredPattern, TriggerSpec
 from osrlib.messages import format_message
+from osrlib.persistence import load_game
 from osrlib.versioning import SCHEMA_VERSION, engine_version
 
-from bxapi.adventures import builtin_adventures
+from bxapi.adventures import adventure_document, builtin_adventures
 from bxapi.app import create_app
 from bxapi.commands import command_kind
 from bxapi.db import Database
+from bxapi.session_manager import MAX_PARTY_SIZE, SessionManager
 from bxapi.settings import Settings
 
 from .conftest import REFEREE_KEY, bearer
@@ -68,6 +78,12 @@ def database(client: TestClient) -> Database:
     return client.app.state.db
 
 
+def manager(client: TestClient) -> SessionManager:
+    """Return the session manager of a test client's application."""
+    assert isinstance(client.app, FastAPI)
+    return client.app.state.sessions
+
+
 def store_characters(referee: TestClient) -> list[str]:
     """Import the test characters through the API with a referee key, and return their ids, Ash first."""
     imported = [ok(referee.post("/v1/characters/import", json=made.to_document()), 201) for made in roll_characters()]
@@ -83,10 +99,25 @@ def create_characters(client: TestClient) -> list[str]:
 class Oracle:
     """An osrlib session that plays the game the server plays, with the outcomes the API returns."""
 
-    def __init__(self, members: list[Character], *, seed: int = SEED, ruleset: Ruleset | None = None) -> None:
-        self.game = GameSession.new(Party(members=members), BARROW, seed=seed, ruleset=ruleset)
+    def __init__(
+        self,
+        members: list[Character],
+        *,
+        seed: int = SEED,
+        ruleset: Ruleset | None = None,
+        adventure: Adventure = BARROW,
+    ) -> None:
+        self.game = GameSession.new(Party(members=members), adventure, seed=seed, ruleset=ruleset)
         self.game.register_listener(Interpreter(self.game))
         self.revision = 0
+
+    @classmethod
+    def loaded(cls, document: dict[str, Any]) -> Oracle:
+        """Return an oracle that continues from a save document with one `Interpreter`, as a restored session does."""
+        oracle = cls(roll_characters())
+        oracle.game = load_game(copy.deepcopy(document))
+        oracle.game.register_listener(Interpreter(oracle.game))
+        return oracle
 
     def execute(self, command: dict[str, Any], visibility: Visibility = Visibility.PLAYER) -> dict[str, Any]:
         parsed = parse_command(command)
@@ -564,3 +595,176 @@ def test_a_request_without_a_key_is_401(keyed_settings: Settings, make_client: C
     anonymous = make_client(keyed_settings)
     problem(anonymous.get("/v1/sessions"), 401, "unauthorized")
     problem(anonymous.post("/v1/sessions/ses_x/commands", json=ENTER), 401, "unauthorized")
+
+
+# Review fixes
+
+
+def test_a_party_has_at_most_twenty_members(referee: TestClient) -> None:
+    ash, _ = store_characters(referee)
+    too_many = {"adventure_id": BARROW_ID, "character_ids": [ash] * (MAX_PARTY_SIZE + 1)}
+    problem(referee.post("/v1/sessions", json=too_many), 422, "validation_error")
+    character = roll_characters()[0]
+    document = {"adventure_id": BARROW_ID, "party_document": party_to_document([character] * (MAX_PARTY_SIZE + 1))}
+    problem(referee.post("/v1/sessions", json=document), 422, "party_invalid")
+    assert ok(referee.get("/v1/sessions"))["total"] == 0
+    largest = ok(referee.post("/v1/sessions", json={"adventure_id": BARROW_ID, "character_ids": [ash] * 20}), 201)
+    assert len(ok(referee.get(f"/v1/sessions/{largest['id']}/view"))["party"]) == MAX_PARTY_SIZE
+
+
+def test_only_a_referee_sets_a_command_source(player: TestClient, referee: TestClient) -> None:
+    session = start(referee)
+    before = state(player, session["id"])
+    forged = player.post(f"/v1/sessions/{session['id']}/commands", json=ENTER | {"source": "quest:the-idol"})
+    problem(forged, 403, "referee_required")
+    assert state(player, session["id"]) == before
+    assert send(referee, session["id"], ENTER | {"source": "dm-screen"})["accepted"]
+    logged = ok(referee.get(f"/v1/sessions/{session['id']}/referee-view"))["command_log"]
+    assert [entry["source"] for entry in logged if entry["command_type"] == "enter_dungeon"] == ["dm-screen"]
+
+
+def test_a_stored_session_osrlib_cannot_load_is_unreadable_without_details(
+    player: TestClient, referee: TestClient, keyed_settings: Settings, caplog: pytest.LogCaptureFixture
+) -> None:
+    session = start(referee)
+    send(referee, session["id"], ENTER)
+    document = ok(referee.post(f"/v1/sessions/{session['id']}/saves"), 201)
+    stored = ok(referee.get(f"/v1/saves/{document['id']}/document"))
+    stored["payload"]["mode"] = "SECRET-TRAP-AT-3,4"
+    with sqlite3.connect(keyed_settings.database) as connection:
+        connection.execute(
+            "UPDATE sessions SET document = ?, revision = revision + 1 WHERE id = ?",
+            (json.dumps(stored), session["id"]),
+        )
+    session_id = session["id"]
+    with caplog.at_level(logging.ERROR, logger="bxapi"):
+        responses = [
+            player.get(f"/v1/sessions/{session_id}/view"),
+            player.get(f"/v1/sessions/{session_id}/events"),
+            player.post(f"/v1/sessions/{session_id}/commands", json=EAST),
+            referee.get(f"/v1/sessions/{session_id}/referee-view"),
+        ]
+    for response in responses:
+        found = problem(response, 500, "session_unreadable")
+        assert found["detail"] == "The server can't load this session's stored state."
+        assert "SECRET" not in response.text
+    assert session_id in caplog.text and "SECRET-TRAP-AT-3,4" in caplog.text
+    assert ok(player.get(f"/v1/sessions/{session_id}"))["revision"] == 2
+
+
+def test_session_busy_has_the_revision_when_a_request_waits_too_long(
+    keyed_settings: Settings, make_client: Callable[..., TestClient]
+) -> None:
+    client = make_client(keyed_settings, REFEREE_KEY)
+    assert isinstance(client.app, FastAPI)
+    client.app.state.sessions = SessionManager(client.app.state.db, cache_size=4, lock_timeout=0.05)
+    session = start(client)
+    send(client, session["id"], ENTER)
+    entered, release = threading.Event(), threading.Event()
+
+    def hold(_: GameSession) -> None:
+        entered.set()
+        release.wait(5)
+
+    holder = threading.Thread(target=manager(client).read, args=("game", session["id"], hold))
+    holder.start()
+    try:
+        assert entered.wait(5)
+        busy = problem(client.post(f"/v1/sessions/{session['id']}/commands", json=EAST), 409, "session_busy")
+        assert busy["revision"] == 1
+        problem(client.get(f"/v1/sessions/{session['id']}/view"), 409, "session_busy")
+    finally:
+        release.set()
+        holder.join(5)
+    assert ok(client.get(f"/v1/sessions/{session['id']}"))["revision"] == 1
+    assert send(client, session["id"], EAST)["revision"] == 2
+
+
+def test_the_openapi_document_names_the_bodies_and_the_errors(client: TestClient) -> None:
+    paths = ok(client.get("/openapi.json"))["paths"]
+    save_body = paths["/v1/sessions/{session_id}/saves"]["post"]["requestBody"]
+    restore_body = paths["/v1/saves/{save_id}/restore"]["post"]["requestBody"]
+    assert save_body["content"]["application/json"]["schema"] == {"$ref": "#/components/schemas/CreateSaveRequest"}
+    assert restore_body["content"]["application/json"]["schema"] == {"$ref": "#/components/schemas/RestoreSaveRequest"}
+    assert not save_body.get("required") and not restore_body.get("required")
+    for path, method in (
+        ("/v1/sessions/{session_id}/commands", "post"),
+        ("/v1/sessions/{session_id}/view", "get"),
+        ("/v1/sessions/{session_id}/referee-view", "get"),
+        ("/v1/sessions/{session_id}/events", "get"),
+        ("/v1/saves/{save_id}/restore", "post"),
+    ):
+        assert "500" in paths[path][method]["responses"], path
+    assert "409" in paths["/v1/sessions/{session_id}/view"]["get"]["responses"]
+
+
+LOOP_DUNGEON = "loop"
+HALL_TRIGGER = "trig-hall"
+
+
+def repeating_adventure() -> Adventure:
+    """Return an adventure whose one trigger fires each time the party enters the hall, east of the entrance."""
+    level = LevelSpec(
+        number=1,
+        width=2,
+        height=1,
+        entrance=(0, 0),
+        wandering=WanderingSpec(chance_in_six=0),
+        edges={"1,0:west": Edge(kind=EdgeKind.OPEN)},
+        areas=(AreaSpec(id="hall", name="Hall", description="An empty hall.", cells=((1, 0),)),),
+    )
+    trigger = TriggerSpec(
+        id=HALL_TRIGGER,
+        when=AreaEnteredPattern(dungeon_id=LOOP_DUNGEON, level_number=1, area_id="hall"),
+        repeatable=True,
+        consequences=(SetFlag(key="hall-entered", value=True),),
+    )
+    return Adventure(
+        name="The Loop",
+        town=TownSpec(name="Loopton", travel_turns={LOOP_DUNGEON: 1}),
+        dungeons=(DungeonSpec(id=LOOP_DUNGEON, name="The Loop", levels=(level,)),),
+        triggers=(trigger,),
+    )
+
+
+def firings(outcome: dict[str, Any]) -> int:
+    return sum(1 for event in outcome["events"] if event["event_type"] == "trigger_fired")
+
+
+def check_loop(client: TestClient, session_id: str, oracle: Oracle, *, evict: Callable[[], object]) -> None:
+    """Walk in and out of the hall, and check that the trigger fires once each time, as with one `Interpreter`."""
+    for _ in range(3):
+        for command, fired in ((EAST, 1), (WEST, 0)):
+            evict()
+            outcome = send(client, session_id, command, visibility="referee")
+            assert outcome == oracle.execute(command, Visibility.REFEREE)
+            assert firings(outcome) == fired
+            assert manager(client).read("game", session_id, lambda game: len(game.listeners)) == 1
+
+
+def test_the_interpreter_runs_once_after_a_reload_a_restore_and_an_import(
+    keyed_settings: Settings, make_client: Callable[..., TestClient]
+) -> None:
+    client = make_client(keyed_settings.model_copy(update={"session_cache_size": 1}), REFEREE_KEY)
+    loop = repeating_adventure()
+    uploaded = ok(client.post("/v1/adventures", json=adventure_document(loop)), 201)
+    session = start(client, adventure_id=uploaded["id"])
+    other = start(client, adventure_id=uploaded["id"], seed=SEED + 1)
+    oracle = Oracle(roll_characters(), adventure=loop)
+    enter = {"command_type": "enter_dungeon", "dungeon_id": LOOP_DUNGEON}
+    assert send(client, session["id"], enter) == oracle.execute(enter)
+
+    def evict() -> None:
+        ok(client.get(f"/v1/sessions/{other['id']}/view"))
+        assert manager(client).loaded() == [("game", other["id"])]
+
+    check_loop(client, session["id"], oracle, evict=evict)
+
+    created = ok(client.post(f"/v1/sessions/{session['id']}/saves"), 201)
+    document = ok(client.get(f"/v1/saves/{created['id']}/document"))
+    restored = ok(client.post(f"/v1/saves/{created['id']}/restore"), 201)
+    check_loop(client, restored["id"], Oracle.loaded(document), evict=evict)
+
+    imported = ok(client.post("/v1/saves/import", json=document), 201)
+    from_import = ok(client.post(f"/v1/saves/{imported['id']}/restore"), 201)
+    check_loop(client, from_import["id"], Oracle.loaded(document), evict=evict)
