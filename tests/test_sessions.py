@@ -33,7 +33,7 @@ from bxapi.db import Database
 from bxapi.session_manager import MAX_PARTY_SIZE, SessionManager, session_busy, session_unreadable
 from bxapi.settings import Settings
 
-from .conftest import REFEREE_KEY, bearer
+from .conftest import REFEREE_KEY, bearer, problem_without_id
 
 BARROW_ID = "builtin-barrow"
 BARROW = builtin_adventures()[BARROW_ID].adventure
@@ -676,9 +676,8 @@ def test_a_stored_session_osrlib_cannot_load_is_unreadable_without_details(
             referee.get(f"/v1/sessions/{session_id}/referee-view"),
         ]
     for response in responses:
-        assert problem(response, 500, "session_unreadable") == session_unreadable("session").problem().model_dump(
-            mode="json"
-        )
+        problem(response, 500, "session_unreadable")
+        assert problem_without_id(response) == session_unreadable("session").problem().model_dump(mode="json")
         assert "SECRET" not in response.text
     assert session_id in caplog.text and "SECRET-TRAP-AT-3,4" in caplog.text
     assert ok(player.get(f"/v1/sessions/{session_id}"))["revision"] == 2
@@ -703,6 +702,7 @@ def test_session_busy_has_the_revision_when_a_request_waits_too_long(
     try:
         assert entered.wait(5)
         busy = problem(client.post(f"/v1/sessions/{session['id']}/commands", json=EAST), 409, "session_busy")
+        assert busy.pop("request_id").startswith("req_")
         assert busy == session_busy(1, waited_seconds=0.05).problem().model_dump(mode="json")
         problem(client.get(f"/v1/sessions/{session['id']}/view"), 409, "session_busy")
     finally:

@@ -75,6 +75,7 @@ curl -s -X POST http://127.0.0.1:8640/v1/characters -H "Authorization: Bearer $K
   "status": 422,
   "detail": "The starting gold doesn't cover the purchases.",
   "code": "character_invalid",
+  "request_id": "req_gyzKc4EYvuWllhUQkYLvWQ",
   "rejections": [
     {"code": "items.purchase.insufficient_funds", "params": {"item": "plate_mail", "cost_gp": 600}}
   ]
@@ -616,7 +617,7 @@ HTTP/1.1 409 Conflict
 ...
 content-type: application/problem+json
 
-{"type":"about:blank","title":"Conflict","status":409,"detail":"The session is at revision 1, not 0. Read the view and decide whether to send the command again.","code":"revision_conflict","revision":1}
+{"type":"about:blank","title":"Conflict","status":409,"detail":"The session is at revision 1, not 0. Read the view and decide whether to send the command again.","code":"revision_conflict","request_id":"req_p7XWyfcbC8hFgnPx37l7rA","revision":1}
 ```
 
 The session is at revision 1, so the server ran nothing. When you get a `revision_conflict` after a retry and nobody else sends commands to the session, the server applied the first request. Read the view to see the result. For what to do in other cases, see [Errors](errors.md#revision_conflict).

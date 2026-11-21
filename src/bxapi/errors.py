@@ -11,10 +11,14 @@ a person:
   "status": 404,
   "detail": "No session has the id 'ses_x'.",
   "code": "not_found",
+  "request_id": "req_Zk3uY0mWq1x8Jr5cTt2aLw",
   "resource": "session",
   "id": "ses_x"
 }
 ```
+
+`request_id` is the id the server gave the request, which the `X-Request-Id` response header has
+too. The server logs it with the request, so whoever runs the server can find the request.
 
 An endpoint raises [`ApiError`][bxapi.errors.ApiError], or calls one of the functions here
 that build one, and [`install_error_handlers`][bxapi.errors.install_error_handlers] turns the
@@ -40,6 +44,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic.config import JsonDict
 from pydantic.json_schema import SkipJsonSchema
 from starlette.exceptions import HTTPException as StarletteHTTPException
+
+from bxapi.request_ids import REQUEST_ID_HEADER, request_id_of
 
 __all__ = [
     "INTERNAL_ERROR",
@@ -149,8 +155,8 @@ class FieldError(BaseModel):
 class Problem(BaseModel):
     """The body of an error response.
 
-    Every problem document has `type`, `title`, `status`, `detail`, and `code`. The server
-    leaves out the other members, except the ones that the document's code adds:
+    Every problem document has `type`, `title`, `status`, `detail`, `code`, and `request_id`. The
+    server leaves out the other members, except the ones that the document's code adds:
 
     - `validation_error` adds `errors` and `error_count`.
     - `not_found` adds `resource` and `id`.
@@ -175,6 +181,9 @@ class Problem(BaseModel):
     code: str
     """A fixed snake_case name for the error, like `"not_found"`. It doesn't change between
     releases, so a client can branch on it."""
+    request_id: str | SkipJsonSchema[None] = _optional()
+    """The id of the request, which the `X-Request-Id` response header has too. The server logs
+    it with the request. Include it when you report the error to whoever runs the server."""
     errors: list[FieldError] | SkipJsonSchema[None] = _optional()
     """`validation_error` only: the first 20 parts of the request that failed validation."""
     error_count: int | SkipJsonSchema[None] = _optional()
@@ -391,16 +400,23 @@ def request_timeout(timeout_seconds: float) -> ApiError:
     )
 
 
-def problem_response(problem: Problem, headers: dict[str, str] | None = None) -> JSONResponse:
+def problem_response(
+    problem: Problem, headers: dict[str, str] | None = None, *, request_id: str | None = None
+) -> JSONResponse:
     """Return the HTTP response for a problem document.
 
     Args:
         problem: The problem to send.
         headers: Extra response headers.
+        request_id: The request's id, from [`request_id_of`][bxapi.request_ids.request_id_of].
+            The response has it as the problem's `request_id` and in the `X-Request-Id` header.
 
     Returns:
         A response with the problem's status and the `application/problem+json` media type.
     """
+    if request_id is not None:
+        problem = problem.model_copy(update={"request_id": request_id})
+        headers = {**(headers or {}), REQUEST_ID_HEADER: request_id}
     return JSONResponse(
         status_code=problem.status,
         content=problem.model_dump(mode="json"),
@@ -486,28 +502,32 @@ def install_error_handlers(app: FastAPI) -> None:
       detail about the cause.
 
     Every `detail` is at most [`MAX_DETAIL_LENGTH`][bxapi.errors.MAX_DETAIL_LENGTH] characters,
-    because an osrlib message can repeat a large part of the document the caller sent.
+    because an osrlib message can repeat a large part of the document the caller sent. Every
+    response has the request's id, as the problem's `request_id` and in the `X-Request-Id` header.
 
     Args:
         app: The application to register the handlers on.
     """
 
+    def respond(request: Request, error: ApiError) -> JSONResponse:
+        return problem_response(error.problem(), error.headers, request_id=request_id_of(request.scope))
+
     @app.exception_handler(ApiError)
     def _api_error(request: Request, error: ApiError) -> JSONResponse:
-        return problem_response(error.problem(), error.headers)
+        return respond(request, error)
 
     @app.exception_handler(RequestValidationError)
     def _request_validation_error(request: Request, error: RequestValidationError) -> JSONResponse:
-        return problem_response(validation_error(error.errors()).problem())
+        return respond(request, validation_error(error.errors()))
 
     @app.exception_handler(ContentValidationError)
     def _content_validation_error(request: Request, error: ContentValidationError) -> JSONResponse:
-        return problem_response(ApiError(422, "content_invalid", str(error)).problem())
+        return respond(request, ApiError(422, "content_invalid", str(error)))
 
     @app.exception_handler(SaveVersionError)
     @app.exception_handler(ReplayVersionError)
     def _version_error(request: Request, error: Exception) -> JSONResponse:
-        return problem_response(ApiError(409, "version_unsupported", str(error)).problem())
+        return respond(request, ApiError(409, "version_unsupported", str(error)))
 
     @app.exception_handler(sqlite3.OperationalError)
     def _database_error(request: Request, error: sqlite3.OperationalError) -> JSONResponse:
@@ -516,18 +536,20 @@ def install_error_handlers(app: FastAPI) -> None:
         code = getattr(error, "sqlite_errorcode", None)
         if code is None or code & 0xFF not in _BUSY_CODES:
             raise error
-        busy = database_busy()
-        return problem_response(busy.problem(), busy.headers)
+        return respond(request, database_busy())
 
     @app.exception_handler(StarletteHTTPException)
     def _http_exception(request: Request, error: StarletteHTTPException) -> JSONResponse:
         phrase = HTTPStatus(error.status_code).phrase
         code = phrase.lower().replace(" ", "_").replace("-", "_")
         detail = error.detail if isinstance(error.detail, str) else phrase
-        problem = Problem(title=phrase, status=error.status_code, detail=detail, code=code)
-        return problem_response(problem, dict(error.headers) if error.headers else None)
+        headers = dict(error.headers) if error.headers else None
+        return respond(request, ApiError(error.status_code, code, detail, headers=headers))
 
     @app.exception_handler(Exception)
     def _unexpected(request: Request, error: Exception) -> JSONResponse:
-        _log.exception("unhandled error on %s %s", request.method, request.url.path, exc_info=error)
-        return problem_response(internal_error().problem())
+        request_id = request_id_of(request.scope)
+        _log.exception(
+            "unhandled error on %s %s, request %s", request.method, request.url.path, request_id, exc_info=error
+        )
+        return respond(request, internal_error())

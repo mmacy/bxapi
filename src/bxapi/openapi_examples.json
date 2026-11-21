@@ -2776,7 +2776,7 @@
       "path": "/v1/ability-rolls",
       "status": 201,
       "response": {
-        "id": "rol_8zQBiQpW63CsOYK2dxMYRw",
+        "id": "rol_FQ8KFkQs3uxUFdpP-fiMJA",
         "scores": {
           "str": 9,
           "int": 9,
@@ -2795,7 +2795,7 @@
           "thief"
         ],
         "used": false,
-        "created_at": "2026-11-21T06:51:24Z"
+        "created_at": "2026-11-21T08:23:57Z"
       }
     }
   },
@@ -2819,7 +2819,7 @@
       },
       "status": 201,
       "response": {
-        "id": "rol_0wwUlQDMjHsRa3F6Qpmv6Q",
+        "id": "rol_zX454pNIOhVdE4qGehACFg",
         "scores": {
           "str": 4,
           "int": 10,
@@ -2838,7 +2838,7 @@
           "thief"
         ],
         "used": false,
-        "created_at": "2026-11-21T06:51:24Z"
+        "created_at": "2026-11-21T08:23:57Z"
       }
     }
   },
@@ -2852,10 +2852,10 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/ability-rolls/rol_8zQBiQpW63CsOYK2dxMYRw",
+      "path": "/v1/ability-rolls/rol_FQ8KFkQs3uxUFdpP-fiMJA",
       "status": 200,
       "response": {
-        "id": "rol_8zQBiQpW63CsOYK2dxMYRw",
+        "id": "rol_FQ8KFkQs3uxUFdpP-fiMJA",
         "scores": {
           "str": 9,
           "int": 9,
@@ -2874,7 +2874,7 @@
           "thief"
         ],
         "used": false,
-        "created_at": "2026-11-21T06:51:24Z"
+        "created_at": "2026-11-21T08:23:57Z"
       }
     }
   },
@@ -2899,7 +2899,7 @@
         "name": "Wren",
         "class_id": "magic_user",
         "alignment": "neutral",
-        "ability_roll_id": "rol_8zQBiQpW63CsOYK2dxMYRw"
+        "ability_roll_id": "rol_FQ8KFkQs3uxUFdpP-fiMJA"
       },
       "status": 422,
       "response": {
@@ -2908,6 +2908,7 @@
         "status": 422,
         "detail": "The starting spells don't fit the class's first spell book.",
         "code": "character_invalid",
+        "request_id": "req_ONXvOu_OIeYgr3fO4nDU0Q",
         "rejections": [
           {
             "code": "magic.book.capacity_mismatch",
@@ -2954,7 +2955,7 @@
         "name": "Aldric",
         "class_id": "fighter",
         "alignment": "lawful",
-        "ability_roll_id": "rol_8zQBiQpW63CsOYK2dxMYRw",
+        "ability_roll_id": "rol_FQ8KFkQs3uxUFdpP-fiMJA",
         "purchases": [
           {
             "item_id": "sword"
@@ -2970,11 +2971,11 @@
       },
       "status": 201,
       "response": {
-        "id": "chr_JtwoF62CRDfnfr_3ZZFtHQ",
+        "id": "chr_MuDEWf0F28Li-IxB5QnWaQ",
         "name": "Aldric",
         "class_id": "fighter",
         "level": 1,
-        "created_at": "2026-11-21T06:51:24Z",
+        "created_at": "2026-11-21T08:23:57Z",
         "character": {
           "id": null,
           "name": "Aldric",
@@ -3102,15 +3103,16 @@
         "name": "Aldric",
         "class_id": "fighter",
         "alignment": "lawful",
-        "ability_roll_id": "rol_8zQBiQpW63CsOYK2dxMYRw"
+        "ability_roll_id": "rol_FQ8KFkQs3uxUFdpP-fiMJA"
       },
       "status": 409,
       "response": {
         "type": "about:blank",
         "title": "Conflict",
         "status": 409,
-        "detail": "A character was already created from the ability roll 'rol_8zQBiQpW63CsOYK2dxMYRw'.",
-        "code": "ability_roll_used"
+        "detail": "A character was already created from the ability roll 'rol_FQ8KFkQs3uxUFdpP-fiMJA'.",
+        "code": "ability_roll_used",
+        "request_id": "req_txxDIjTtWh22ZiAGMMfpHw"
       }
     }
   },
@@ -3129,12 +3131,12 @@
       "response": {
         "items": [
           {
-            "id": "chr_JtwoF62CRDfnfr_3ZZFtHQ",
+            "id": "chr_MuDEWf0F28Li-IxB5QnWaQ",
             "name": "Aldric",
             "class_id": "fighter",
             "level": 1,
             "max_hp": 8,
-            "created_at": "2026-11-21T06:51:24Z"
+            "created_at": "2026-11-21T08:23:57Z"
           }
         ],
         "total": 1,
@@ -3153,14 +3155,14 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/characters/chr_JtwoF62CRDfnfr_3ZZFtHQ",
+      "path": "/v1/characters/chr_MuDEWf0F28Li-IxB5QnWaQ",
       "status": 200,
       "response": {
-        "id": "chr_JtwoF62CRDfnfr_3ZZFtHQ",
+        "id": "chr_MuDEWf0F28Li-IxB5QnWaQ",
         "name": "Aldric",
         "class_id": "fighter",
         "level": 1,
-        "created_at": "2026-11-21T06:51:24Z",
+        "created_at": "2026-11-21T08:23:57Z",
         "character": {
           "id": null,
           "name": "Aldric",
@@ -3368,11 +3370,11 @@
       },
       "status": 201,
       "response": {
-        "id": "chr_GDORUalU6lT9Snyvsgv4jg",
+        "id": "chr_xGgrbvkmG9VHUyWr5IYS2Q",
         "name": "Aldric",
         "class_id": "fighter",
         "level": 1,
-        "created_at": "2026-11-21T06:51:24Z",
+        "created_at": "2026-11-21T08:23:57Z",
         "character": {
           "id": null,
           "name": "Aldric",
@@ -4558,9 +4560,9 @@
             "name": "The Old Well"
           }
         ],
-        "id": "adv_F3Jyn0BaxxCi0eT6BITMzA",
+        "id": "adv_n0xEiYQmLaXj_FjiSZRzzA",
         "builtin": false,
-        "created_at": "2026-11-21T06:51:24Z"
+        "created_at": "2026-11-21T08:23:57Z"
       }
     }
   },
@@ -4584,12 +4586,12 @@
       "body": {
         "adventure_id": "builtin-barrow",
         "character_ids": [
-          "chr_JtwoF62CRDfnfr_3ZZFtHQ"
+          "chr_MuDEWf0F28Li-IxB5QnWaQ"
         ]
       },
       "status": 201,
       "response": {
-        "id": "ses_3fZEebbFSeyAyMEUBwt2PA",
+        "id": "ses_I_SRfTiFSqrdAFeL5dSf0w",
         "name": "The Barrow of the Forgotten King",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
@@ -4603,8 +4605,8 @@
         },
         "schema_version": 4,
         "engine_version": "2.5.0",
-        "created_at": "2026-11-21T06:51:24Z",
-        "updated_at": "2026-11-21T06:51:24Z"
+        "created_at": "2026-11-21T08:23:57Z",
+        "updated_at": "2026-11-21T08:23:57Z"
       }
     }
   },
@@ -4623,7 +4625,7 @@
       "response": {
         "items": [
           {
-            "id": "ses_3fZEebbFSeyAyMEUBwt2PA",
+            "id": "ses_I_SRfTiFSqrdAFeL5dSf0w",
             "name": "The Barrow of the Forgotten King",
             "adventure_id": "builtin-barrow",
             "adventure_name": "The Barrow of the Forgotten King",
@@ -4637,8 +4639,8 @@
             },
             "schema_version": 4,
             "engine_version": "2.5.0",
-            "created_at": "2026-11-21T06:51:24Z",
-            "updated_at": "2026-11-21T06:51:24Z"
+            "created_at": "2026-11-21T08:23:57Z",
+            "updated_at": "2026-11-21T08:23:57Z"
           }
         ],
         "total": 1,
@@ -4657,10 +4659,10 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_3fZEebbFSeyAyMEUBwt2PA",
+      "path": "/v1/sessions/ses_I_SRfTiFSqrdAFeL5dSf0w",
       "status": 200,
       "response": {
-        "id": "ses_3fZEebbFSeyAyMEUBwt2PA",
+        "id": "ses_I_SRfTiFSqrdAFeL5dSf0w",
         "name": "The Barrow of the Forgotten King",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
@@ -4674,8 +4676,8 @@
         },
         "schema_version": 4,
         "engine_version": "2.5.0",
-        "created_at": "2026-11-21T06:51:24Z",
-        "updated_at": "2026-11-21T06:51:24Z"
+        "created_at": "2026-11-21T08:23:57Z",
+        "updated_at": "2026-11-21T08:23:57Z"
       }
     }
   },
@@ -4692,13 +4694,13 @@
     },
     "recorded": {
       "method": "PATCH",
-      "path": "/v1/sessions/ses_3fZEebbFSeyAyMEUBwt2PA",
+      "path": "/v1/sessions/ses_I_SRfTiFSqrdAFeL5dSf0w",
       "body": {
         "name": "Aldric's first delve"
       },
       "status": 200,
       "response": {
-        "id": "ses_3fZEebbFSeyAyMEUBwt2PA",
+        "id": "ses_I_SRfTiFSqrdAFeL5dSf0w",
         "name": "Aldric's first delve",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
@@ -4712,8 +4714,8 @@
         },
         "schema_version": 4,
         "engine_version": "2.5.0",
-        "created_at": "2026-11-21T06:51:24Z",
-        "updated_at": "2026-11-21T06:51:24Z"
+        "created_at": "2026-11-21T08:23:57Z",
+        "updated_at": "2026-11-21T08:23:57Z"
       }
     }
   },
@@ -4727,7 +4729,7 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_3fZEebbFSeyAyMEUBwt2PA/commands",
+      "path": "/v1/sessions/ses_I_SRfTiFSqrdAFeL5dSf0w/commands",
       "status": 200,
       "response": {
         "mode": "town",
@@ -4810,7 +4812,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_3fZEebbFSeyAyMEUBwt2PA/commands",
+      "path": "/v1/sessions/ses_I_SRfTiFSqrdAFeL5dSf0w/commands",
       "query": {
         "expected_revision": 0
       },
@@ -4871,7 +4873,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_3fZEebbFSeyAyMEUBwt2PA/commands",
+      "path": "/v1/sessions/ses_I_SRfTiFSqrdAFeL5dSf0w/commands",
       "query": {
         "expected_revision": 1
       },
@@ -4915,7 +4917,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_3fZEebbFSeyAyMEUBwt2PA/commands",
+      "path": "/v1/sessions/ses_I_SRfTiFSqrdAFeL5dSf0w/commands",
       "query": {
         "expected_revision": 1
       },
@@ -4964,7 +4966,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_3fZEebbFSeyAyMEUBwt2PA/commands",
+      "path": "/v1/sessions/ses_I_SRfTiFSqrdAFeL5dSf0w/commands",
       "query": {
         "expected_revision": 1
       },
@@ -4979,6 +4981,7 @@
         "status": 409,
         "detail": "The session is at revision 2, not 1. Read the view and decide whether to send the command again.",
         "code": "revision_conflict",
+        "request_id": "req_CmBHmSVYOt11_un4kepFNA",
         "revision": 2
       }
     }
@@ -4993,7 +4996,7 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_3fZEebbFSeyAyMEUBwt2PA/view",
+      "path": "/v1/sessions/ses_I_SRfTiFSqrdAFeL5dSf0w/view",
       "status": 200,
       "response": {
         "adventure_name": "The Barrow of the Forgotten King",
@@ -5226,7 +5229,7 @@
     "role": "referee",
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_3fZEebbFSeyAyMEUBwt2PA/referee-view",
+      "path": "/v1/sessions/ses_I_SRfTiFSqrdAFeL5dSf0w/referee-view",
       "status": 200,
       "response": {
         "ruleset": {
@@ -6025,7 +6028,7 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_3fZEebbFSeyAyMEUBwt2PA/events",
+      "path": "/v1/sessions/ses_I_SRfTiFSqrdAFeL5dSf0w/events",
       "status": 200,
       "response": {
         "events": [
@@ -6082,14 +6085,14 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_3fZEebbFSeyAyMEUBwt2PA/saves",
+      "path": "/v1/sessions/ses_I_SRfTiFSqrdAFeL5dSf0w/saves",
       "body": {
         "label": "Inside the barrow"
       },
       "status": 201,
       "response": {
-        "id": "sav_QcXxpTLMu9nqJK1Lxcr7lA",
-        "session_id": "ses_3fZEebbFSeyAyMEUBwt2PA",
+        "id": "sav_ckn42TVUBZGb19H5OeSjPw",
+        "session_id": "ses_I_SRfTiFSqrdAFeL5dSf0w",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
         "label": "Inside the barrow",
@@ -6099,7 +6102,7 @@
           "turns": 2,
           "days": 0
         },
-        "created_at": "2026-11-21T06:51:24Z"
+        "created_at": "2026-11-21T08:23:57Z"
       }
     }
   },
@@ -6118,14 +6121,14 @@
       "method": "GET",
       "path": "/v1/saves",
       "query": {
-        "session_id": "ses_3fZEebbFSeyAyMEUBwt2PA"
+        "session_id": "ses_I_SRfTiFSqrdAFeL5dSf0w"
       },
       "status": 200,
       "response": {
         "items": [
           {
-            "id": "sav_QcXxpTLMu9nqJK1Lxcr7lA",
-            "session_id": "ses_3fZEebbFSeyAyMEUBwt2PA",
+            "id": "sav_ckn42TVUBZGb19H5OeSjPw",
+            "session_id": "ses_I_SRfTiFSqrdAFeL5dSf0w",
             "adventure_id": "builtin-barrow",
             "adventure_name": "The Barrow of the Forgotten King",
             "label": "Inside the barrow",
@@ -6135,7 +6138,7 @@
               "turns": 2,
               "days": 0
             },
-            "created_at": "2026-11-21T06:51:24Z"
+            "created_at": "2026-11-21T08:23:57Z"
           }
         ],
         "total": 1,
@@ -6154,11 +6157,11 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/saves/sav_QcXxpTLMu9nqJK1Lxcr7lA",
+      "path": "/v1/saves/sav_ckn42TVUBZGb19H5OeSjPw",
       "status": 200,
       "response": {
-        "id": "sav_QcXxpTLMu9nqJK1Lxcr7lA",
-        "session_id": "ses_3fZEebbFSeyAyMEUBwt2PA",
+        "id": "sav_ckn42TVUBZGb19H5OeSjPw",
+        "session_id": "ses_I_SRfTiFSqrdAFeL5dSf0w",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
         "label": "Inside the barrow",
@@ -6168,7 +6171,7 @@
           "turns": 2,
           "days": 0
         },
-        "created_at": "2026-11-21T06:51:24Z"
+        "created_at": "2026-11-21T08:23:57Z"
       }
     }
   },
@@ -6185,14 +6188,14 @@
     },
     "recorded": {
       "method": "PATCH",
-      "path": "/v1/saves/sav_QcXxpTLMu9nqJK1Lxcr7lA",
+      "path": "/v1/saves/sav_ckn42TVUBZGb19H5OeSjPw",
       "body": {
         "label": "Past the first door"
       },
       "status": 200,
       "response": {
-        "id": "sav_QcXxpTLMu9nqJK1Lxcr7lA",
-        "session_id": "ses_3fZEebbFSeyAyMEUBwt2PA",
+        "id": "sav_ckn42TVUBZGb19H5OeSjPw",
+        "session_id": "ses_I_SRfTiFSqrdAFeL5dSf0w",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
         "label": "Past the first door",
@@ -6202,7 +6205,7 @@
           "turns": 2,
           "days": 0
         },
-        "created_at": "2026-11-21T06:51:24Z"
+        "created_at": "2026-11-21T08:23:57Z"
       }
     }
   },
@@ -6217,7 +6220,7 @@
     "role": "referee",
     "recorded": {
       "method": "GET",
-      "path": "/v1/saves/sav_QcXxpTLMu9nqJK1Lxcr7lA/document",
+      "path": "/v1/saves/sav_ckn42TVUBZGb19H5OeSjPw/document",
       "status": 200,
       "response": {
         "kind": "save",
@@ -7830,7 +7833,7 @@
       },
       "status": 201,
       "response": {
-        "id": "sav_ihCc_biiXJUb4n1if2y16A",
+        "id": "sav_NBmvjkpEQdKvptQ0iAh0Fw",
         "session_id": null,
         "adventure_id": null,
         "adventure_name": "The Barrow of the Forgotten King",
@@ -7841,7 +7844,7 @@
           "turns": 2,
           "days": 0
         },
-        "created_at": "2026-11-21T06:51:24Z"
+        "created_at": "2026-11-21T08:23:57Z"
       }
     }
   },
@@ -7858,13 +7861,13 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/saves/sav_QcXxpTLMu9nqJK1Lxcr7lA/restore",
+      "path": "/v1/saves/sav_ckn42TVUBZGb19H5OeSjPw/restore",
       "body": {
         "name": "Aldric, second try"
       },
       "status": 201,
       "response": {
-        "id": "ses_EiMZhcD4NxGDVEAAt89Obg",
+        "id": "ses_Tm__9n1Oe2OIcWICY6QSLg",
         "name": "Aldric, second try",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
@@ -7878,8 +7881,8 @@
         },
         "schema_version": 4,
         "engine_version": "2.5.0",
-        "created_at": "2026-11-21T06:51:24Z",
-        "updated_at": "2026-11-21T06:51:24Z"
+        "created_at": "2026-11-21T08:23:57Z",
+        "updated_at": "2026-11-21T08:23:57Z"
       }
     }
   },
@@ -7893,7 +7896,7 @@
     },
     "recorded": {
       "method": "DELETE",
-      "path": "/v1/saves/sav_ihCc_biiXJUb4n1if2y16A",
+      "path": "/v1/saves/sav_NBmvjkpEQdKvptQ0iAh0Fw",
       "status": 204,
       "response": null
     }
@@ -7908,7 +7911,7 @@
     },
     "recorded": {
       "method": "DELETE",
-      "path": "/v1/sessions/ses_EiMZhcD4NxGDVEAAt89Obg",
+      "path": "/v1/sessions/ses_Tm__9n1Oe2OIcWICY6QSLg",
       "status": 204,
       "response": null
     }
@@ -7923,7 +7926,7 @@
     },
     "recorded": {
       "method": "DELETE",
-      "path": "/v1/adventures/adv_F3Jyn0BaxxCi0eT6BITMzA",
+      "path": "/v1/adventures/adv_n0xEiYQmLaXj_FjiSZRzzA",
       "status": 204,
       "response": null
     }
@@ -7938,7 +7941,7 @@
     },
     "recorded": {
       "method": "DELETE",
-      "path": "/v1/characters/chr_GDORUalU6lT9Snyvsgv4jg",
+      "path": "/v1/characters/chr_xGgrbvkmG9VHUyWr5IYS2Q",
       "status": 204,
       "response": null
     }
@@ -7961,6 +7964,7 @@
         "status": 404,
         "detail": "No class has the id 'paladin'.",
         "code": "not_found",
+        "request_id": "req_arzsUA2bpqbjv8YU09859A",
         "resource": "class",
         "id": "paladin"
       }
@@ -7984,6 +7988,7 @@
         "status": 404,
         "detail": "No monster has the id 'tarrasque'.",
         "code": "not_found",
+        "request_id": "req_-b4vTVFDh2AUUrrJkjx7VA",
         "resource": "monster",
         "id": "tarrasque"
       }
@@ -8013,6 +8018,7 @@
         "status": 404,
         "detail": "No class has the id 'paladin'.",
         "code": "not_found",
+        "request_id": "req_E1gWT0fmYSR32mwls_uPPA",
         "resource": "class",
         "id": "paladin"
       }
@@ -8036,6 +8042,7 @@
         "status": 404,
         "detail": "No spell has the id 'wish'.",
         "code": "not_found",
+        "request_id": "req_vLHTUSY4nCZ6hGBfQCGATQ",
         "resource": "spell",
         "id": "wish"
       }
@@ -8059,6 +8066,7 @@
         "status": 404,
         "detail": "No equipment item has the id 'musket'.",
         "code": "not_found",
+        "request_id": "req_ENmHL2kIvuYlHvA_eNrOxQ",
         "resource": "equipment item",
         "id": "musket"
       }
@@ -8082,6 +8090,7 @@
         "status": 404,
         "detail": "No magic item has the id 'vorpal_sword'.",
         "code": "not_found",
+        "request_id": "req_-I-o25UTrd9FJFWyoeatmg",
         "resource": "magic item",
         "id": "vorpal_sword"
       }
@@ -8105,6 +8114,7 @@
         "status": 404,
         "detail": "No table has the id 'weather'.",
         "code": "not_found",
+        "request_id": "req_vPeux-1guL7ygkexGqdy4w",
         "resource": "table",
         "id": "weather"
       }
@@ -8128,6 +8138,7 @@
         "status": 404,
         "detail": "No command has the id 'teleport'.",
         "code": "not_found",
+        "request_id": "req_NeEWlhfH2AUetR7xfRNkmA",
         "resource": "command",
         "id": "teleport"
       }
@@ -8156,7 +8167,8 @@
         "title": "Unprocessable Content",
         "status": 422,
         "detail": "die size must be one of [2, 3, 4, 6, 8, 10, 12, 20, 100]: '3d7'",
-        "code": "content_invalid"
+        "code": "content_invalid",
+        "request_id": "req_UsVCSv6HZ_N432V7IHMGOQ"
       }
     }
   },
@@ -8185,7 +8197,8 @@
         "title": "Unprocessable Content",
         "status": 422,
         "detail": "unknown treasure type 'Z'",
-        "code": "content_invalid"
+        "code": "content_invalid",
+        "request_id": "req_y47YrWhayva6_GcLI7VusQ"
       }
     }
   },
@@ -8214,7 +8227,8 @@
         "title": "Unprocessable Content",
         "status": 422,
         "detail": "unknown monster id 'tarrasque'",
-        "code": "content_invalid"
+        "code": "content_invalid",
+        "request_id": "req_pAj74pUh8CaU_Up0qmFfTg"
       }
     }
   },
@@ -8252,6 +8266,7 @@
         "status": 422,
         "detail": "The purchases don't include 'sword'.",
         "code": "character_invalid",
+        "request_id": "req_mbPV-NM09gaM_QuRJzInRw",
         "id": "sword",
         "field": "equip_item_ids",
         "index": 0
@@ -8281,7 +8296,8 @@
         "title": "Forbidden",
         "status": 403,
         "detail": "Only an API key with the referee role can choose a seed.",
-        "code": "referee_required"
+        "code": "referee_required",
+        "request_id": "req_hwJThdrRIl0ZUjJhSBlkSw"
       }
     }
   },
@@ -8303,6 +8319,7 @@
         "status": 404,
         "detail": "No ability roll has the id 'rol_5mJq0nY2bXr8TzW4cH1eKd'.",
         "code": "not_found",
+        "request_id": "req_VBqabvr1SKjY7PcdcnbLEQ",
         "resource": "ability roll",
         "id": "rol_5mJq0nY2bXr8TzW4cH1eKd"
       }
@@ -8337,7 +8354,8 @@
         "title": "Forbidden",
         "status": 403,
         "detail": "Only an API key with the referee role can choose a seed.",
-        "code": "referee_required"
+        "code": "referee_required",
+        "request_id": "req_vf0WJ8dcn_6tCUIMq2GMHg"
       }
     }
   },
@@ -8371,6 +8389,7 @@
         "status": 404,
         "detail": "No ability roll has the id 'rol_5mJq0nY2bXr8TzW4cH1eKd'.",
         "code": "not_found",
+        "request_id": "req_8tJX5OZKIEdEfrKr_JasOA",
         "resource": "ability roll",
         "id": "rol_5mJq0nY2bXr8TzW4cH1eKd"
       }
@@ -8480,7 +8499,8 @@
         "title": "Forbidden",
         "status": 403,
         "detail": "This request needs an API key with the referee role.",
-        "code": "referee_required"
+        "code": "referee_required",
+        "request_id": "req_oGOSNgo_z35zpV_iAY333w"
       }
     }
   },
@@ -8589,7 +8609,8 @@
         "title": "Unprocessable Content",
         "status": 422,
         "detail": "expected a 'character' document, got kind 'adventure'",
-        "code": "content_invalid"
+        "code": "content_invalid",
+        "request_id": "req_18yIyj-RgMhooxVJA6qnBA"
       }
     }
   },
@@ -8698,7 +8719,8 @@
         "title": "Conflict",
         "status": 409,
         "detail": "document schema_version 99 is newer than the supported 4",
-        "code": "version_unsupported"
+        "code": "version_unsupported",
+        "request_id": "req_oohHQoEV0wn7f3w8pAnAvA"
       }
     }
   },
@@ -8712,16 +8734,17 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/characters/chr_GDORUalU6lT9Snyvsgv4jg",
+      "path": "/v1/characters/chr_xGgrbvkmG9VHUyWr5IYS2Q",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No character has the id 'chr_GDORUalU6lT9Snyvsgv4jg'.",
+        "detail": "No character has the id 'chr_xGgrbvkmG9VHUyWr5IYS2Q'.",
         "code": "not_found",
+        "request_id": "req_m2khO_RAlKEv_HfrpzEtew",
         "resource": "character",
-        "id": "chr_GDORUalU6lT9Snyvsgv4jg"
+        "id": "chr_xGgrbvkmG9VHUyWr5IYS2Q"
       }
     }
   },
@@ -8735,16 +8758,17 @@
     },
     "recorded": {
       "method": "DELETE",
-      "path": "/v1/characters/chr_GDORUalU6lT9Snyvsgv4jg",
+      "path": "/v1/characters/chr_xGgrbvkmG9VHUyWr5IYS2Q",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No character has the id 'chr_GDORUalU6lT9Snyvsgv4jg'.",
+        "detail": "No character has the id 'chr_xGgrbvkmG9VHUyWr5IYS2Q'.",
         "code": "not_found",
+        "request_id": "req_et3VfzPcOdu76MPDqW-7lg",
         "resource": "character",
-        "id": "chr_GDORUalU6lT9Snyvsgv4jg"
+        "id": "chr_xGgrbvkmG9VHUyWr5IYS2Q"
       }
     }
   },
@@ -8883,7 +8907,8 @@
         "title": "Unprocessable Content",
         "status": 422,
         "detail": "adventure validation failed:\nwell level 1: area 'cistern' references unknown monster 'rat_giant'",
-        "code": "content_invalid"
+        "code": "content_invalid",
+        "request_id": "req_R4EnSbRsGYffNzjGiyOFTg"
       }
     }
   },
@@ -8916,7 +8941,8 @@
         "title": "Conflict",
         "status": 409,
         "detail": "document schema_version 99 is newer than the supported 4",
-        "code": "version_unsupported"
+        "code": "version_unsupported",
+        "request_id": "req_ywl8GtpjFuXCw07dfqSxzg"
       }
     }
   },
@@ -8930,16 +8956,17 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/adventures/adv_F3Jyn0BaxxCi0eT6BITMzA",
+      "path": "/v1/adventures/adv_n0xEiYQmLaXj_FjiSZRzzA",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No adventure has the id 'adv_F3Jyn0BaxxCi0eT6BITMzA'.",
+        "detail": "No adventure has the id 'adv_n0xEiYQmLaXj_FjiSZRzzA'.",
         "code": "not_found",
+        "request_id": "req_irt68ro8kEe9IUh72OBXvg",
         "resource": "adventure",
-        "id": "adv_F3Jyn0BaxxCi0eT6BITMzA"
+        "id": "adv_n0xEiYQmLaXj_FjiSZRzzA"
       }
     }
   },
@@ -8960,7 +8987,8 @@
         "title": "Forbidden",
         "status": 403,
         "detail": "The adventure 'builtin-barrow' comes with the server.",
-        "code": "adventure_read_only"
+        "code": "adventure_read_only",
+        "request_id": "req_Z5e_qM7Tk2JQZVT_HbW8HA"
       }
     }
   },
@@ -8974,16 +9002,17 @@
     },
     "recorded": {
       "method": "DELETE",
-      "path": "/v1/adventures/adv_F3Jyn0BaxxCi0eT6BITMzA",
+      "path": "/v1/adventures/adv_n0xEiYQmLaXj_FjiSZRzzA",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No adventure has the id 'adv_F3Jyn0BaxxCi0eT6BITMzA'.",
+        "detail": "No adventure has the id 'adv_n0xEiYQmLaXj_FjiSZRzzA'.",
         "code": "not_found",
+        "request_id": "req_ZY-6U9xUPsiquHKElcul5g",
         "resource": "adventure",
-        "id": "adv_F3Jyn0BaxxCi0eT6BITMzA"
+        "id": "adv_n0xEiYQmLaXj_FjiSZRzzA"
       }
     }
   },
@@ -9004,7 +9033,8 @@
         "title": "Forbidden",
         "status": 403,
         "detail": "This request needs an API key with the referee role.",
-        "code": "referee_required"
+        "code": "referee_required",
+        "request_id": "req_qljENlwI2qRQwLe18LqF6Q"
       }
     }
   },
@@ -9019,16 +9049,17 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/adventures/adv_F3Jyn0BaxxCi0eT6BITMzA/document",
+      "path": "/v1/adventures/adv_n0xEiYQmLaXj_FjiSZRzzA/document",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No adventure has the id 'adv_F3Jyn0BaxxCi0eT6BITMzA'.",
+        "detail": "No adventure has the id 'adv_n0xEiYQmLaXj_FjiSZRzzA'.",
         "code": "not_found",
+        "request_id": "req_OLhSjD4dfGwcsy06lscbAA",
         "resource": "adventure",
-        "id": "adv_F3Jyn0BaxxCi0eT6BITMzA"
+        "id": "adv_n0xEiYQmLaXj_FjiSZRzzA"
       }
     }
   },
@@ -9057,7 +9088,8 @@
         "title": "Unprocessable Content",
         "status": 422,
         "detail": "The characters can't form a party. List should have at least 1 item after validation, not 0",
-        "code": "party_invalid"
+        "code": "party_invalid",
+        "request_id": "req_kXUIiDyJZb4ytKZqB7Ub5Q"
       }
     }
   },
@@ -9172,7 +9204,8 @@
         "title": "Unprocessable Content",
         "status": 422,
         "detail": "expected a 'party' document, got kind 'character'",
-        "code": "content_invalid"
+        "code": "content_invalid",
+        "request_id": "req_z-i8CGAWYAlzBPDGIeQQuw"
       }
     }
   },
@@ -9197,7 +9230,7 @@
       "body": {
         "adventure_id": "builtin-barrow",
         "character_ids": [
-          "chr_JtwoF62CRDfnfr_3ZZFtHQ"
+          "chr_MuDEWf0F28Li-IxB5QnWaQ"
         ],
         "seed": 20261120
       },
@@ -9207,7 +9240,8 @@
         "title": "Forbidden",
         "status": 403,
         "detail": "Only an API key with the referee role can choose a seed.",
-        "code": "referee_required"
+        "code": "referee_required",
+        "request_id": "req_XjLUFxe9SHl2CT9CQIK8-g"
       }
     }
   },
@@ -9231,7 +9265,7 @@
       "body": {
         "adventure_id": "builtin-barrow",
         "character_ids": [
-          "chr_GDORUalU6lT9Snyvsgv4jg"
+          "chr_xGgrbvkmG9VHUyWr5IYS2Q"
         ]
       },
       "status": 404,
@@ -9239,10 +9273,11 @@
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No character has the id 'chr_GDORUalU6lT9Snyvsgv4jg'.",
+        "detail": "No character has the id 'chr_xGgrbvkmG9VHUyWr5IYS2Q'.",
         "code": "not_found",
+        "request_id": "req_4lSTnDbb9_eXuDgvQVpflg",
         "resource": "character",
-        "id": "chr_GDORUalU6lT9Snyvsgv4jg"
+        "id": "chr_xGgrbvkmG9VHUyWr5IYS2Q"
       }
     }
   },
@@ -9256,16 +9291,17 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_EiMZhcD4NxGDVEAAt89Obg",
+      "path": "/v1/sessions/ses_Tm__9n1Oe2OIcWICY6QSLg",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No session has the id 'ses_EiMZhcD4NxGDVEAAt89Obg'.",
+        "detail": "No session has the id 'ses_Tm__9n1Oe2OIcWICY6QSLg'.",
         "code": "not_found",
+        "request_id": "req_TUVj9J3B6IZQ6a1YqFRMvQ",
         "resource": "session",
-        "id": "ses_EiMZhcD4NxGDVEAAt89Obg"
+        "id": "ses_Tm__9n1Oe2OIcWICY6QSLg"
       }
     }
   },
@@ -9282,7 +9318,7 @@
     },
     "recorded": {
       "method": "PATCH",
-      "path": "/v1/sessions/ses_EiMZhcD4NxGDVEAAt89Obg",
+      "path": "/v1/sessions/ses_Tm__9n1Oe2OIcWICY6QSLg",
       "body": {
         "name": "Aldric, third try"
       },
@@ -9291,10 +9327,11 @@
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No session has the id 'ses_EiMZhcD4NxGDVEAAt89Obg'.",
+        "detail": "No session has the id 'ses_Tm__9n1Oe2OIcWICY6QSLg'.",
         "code": "not_found",
+        "request_id": "req_Dpm4ScBhL4RfVt_avXy7gw",
         "resource": "session",
-        "id": "ses_EiMZhcD4NxGDVEAAt89Obg"
+        "id": "ses_Tm__9n1Oe2OIcWICY6QSLg"
       }
     }
   },
@@ -9308,16 +9345,17 @@
     },
     "recorded": {
       "method": "DELETE",
-      "path": "/v1/sessions/ses_EiMZhcD4NxGDVEAAt89Obg",
+      "path": "/v1/sessions/ses_Tm__9n1Oe2OIcWICY6QSLg",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No session has the id 'ses_EiMZhcD4NxGDVEAAt89Obg'.",
+        "detail": "No session has the id 'ses_Tm__9n1Oe2OIcWICY6QSLg'.",
         "code": "not_found",
+        "request_id": "req__lHk23EFOWGj7SEI0pRM8Q",
         "resource": "session",
-        "id": "ses_EiMZhcD4NxGDVEAAt89Obg"
+        "id": "ses_Tm__9n1Oe2OIcWICY6QSLg"
       }
     }
   },
@@ -9331,16 +9369,17 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_EiMZhcD4NxGDVEAAt89Obg/commands",
+      "path": "/v1/sessions/ses_Tm__9n1Oe2OIcWICY6QSLg/commands",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No session has the id 'ses_EiMZhcD4NxGDVEAAt89Obg'.",
+        "detail": "No session has the id 'ses_Tm__9n1Oe2OIcWICY6QSLg'.",
         "code": "not_found",
+        "request_id": "req_uvR8FaopOuu86bnvgXN6cA",
         "resource": "session",
-        "id": "ses_EiMZhcD4NxGDVEAAt89Obg"
+        "id": "ses_Tm__9n1Oe2OIcWICY6QSLg"
       }
     }
   },
@@ -9361,7 +9400,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_3fZEebbFSeyAyMEUBwt2PA/commands",
+      "path": "/v1/sessions/ses_I_SRfTiFSqrdAFeL5dSf0w/commands",
       "body": {
         "command_type": "grant_coins",
         "character_id": "character-0001",
@@ -9376,6 +9415,7 @@
         "status": 403,
         "detail": "Only an API key with the referee role can send 'grant_coins'.",
         "code": "referee_command",
+        "request_id": "req_b0jd8aO0biJ0OGqQxp8MRw",
         "command_type": "grant_coins"
       }
     }
@@ -9395,7 +9435,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_3fZEebbFSeyAyMEUBwt2PA/commands",
+      "path": "/v1/sessions/ses_I_SRfTiFSqrdAFeL5dSf0w/commands",
       "body": {
         "command_type": "move_party",
         "direction": "east",
@@ -9407,7 +9447,8 @@
         "title": "Forbidden",
         "status": 403,
         "detail": "Only an API key with the referee role can set a command's source.",
-        "code": "referee_required"
+        "code": "referee_required",
+        "request_id": "req_XbE7jESkITTcbAYcvH3qmQ"
       }
     }
   },
@@ -9425,7 +9466,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_EiMZhcD4NxGDVEAAt89Obg/commands",
+      "path": "/v1/sessions/ses_Tm__9n1Oe2OIcWICY6QSLg/commands",
       "body": {
         "command_type": "move_party",
         "direction": "east"
@@ -9435,10 +9476,11 @@
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No session has the id 'ses_EiMZhcD4NxGDVEAAt89Obg'.",
+        "detail": "No session has the id 'ses_Tm__9n1Oe2OIcWICY6QSLg'.",
         "code": "not_found",
+        "request_id": "req_Kbmki7GcuchP2ewvsDfNzA",
         "resource": "session",
-        "id": "ses_EiMZhcD4NxGDVEAAt89Obg"
+        "id": "ses_Tm__9n1Oe2OIcWICY6QSLg"
       }
     }
   },
@@ -9452,16 +9494,17 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_EiMZhcD4NxGDVEAAt89Obg/view",
+      "path": "/v1/sessions/ses_Tm__9n1Oe2OIcWICY6QSLg/view",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No session has the id 'ses_EiMZhcD4NxGDVEAAt89Obg'.",
+        "detail": "No session has the id 'ses_Tm__9n1Oe2OIcWICY6QSLg'.",
         "code": "not_found",
+        "request_id": "req_O84REczzNLn4AW81P08vcA",
         "resource": "session",
-        "id": "ses_EiMZhcD4NxGDVEAAt89Obg"
+        "id": "ses_Tm__9n1Oe2OIcWICY6QSLg"
       }
     }
   },
@@ -9475,14 +9518,15 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_3fZEebbFSeyAyMEUBwt2PA/referee-view",
+      "path": "/v1/sessions/ses_I_SRfTiFSqrdAFeL5dSf0w/referee-view",
       "status": 403,
       "response": {
         "type": "about:blank",
         "title": "Forbidden",
         "status": 403,
         "detail": "This request needs an API key with the referee role.",
-        "code": "referee_required"
+        "code": "referee_required",
+        "request_id": "req_w9sD-HJWb9ifS9iK7-HckQ"
       }
     }
   },
@@ -9497,16 +9541,17 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_EiMZhcD4NxGDVEAAt89Obg/referee-view",
+      "path": "/v1/sessions/ses_Tm__9n1Oe2OIcWICY6QSLg/referee-view",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No session has the id 'ses_EiMZhcD4NxGDVEAAt89Obg'.",
+        "detail": "No session has the id 'ses_Tm__9n1Oe2OIcWICY6QSLg'.",
         "code": "not_found",
+        "request_id": "req_AKkD23i4-do5SqOw0hyP4g",
         "resource": "session",
-        "id": "ses_EiMZhcD4NxGDVEAAt89Obg"
+        "id": "ses_Tm__9n1Oe2OIcWICY6QSLg"
       }
     }
   },
@@ -9523,7 +9568,7 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_3fZEebbFSeyAyMEUBwt2PA/events",
+      "path": "/v1/sessions/ses_I_SRfTiFSqrdAFeL5dSf0w/events",
       "query": {
         "visibility": "referee"
       },
@@ -9533,7 +9578,8 @@
         "title": "Forbidden",
         "status": 403,
         "detail": "Only an API key with the referee role can read referee events.",
-        "code": "referee_required"
+        "code": "referee_required",
+        "request_id": "req_RWvcKqlvyKG96aI2Aci1Cw"
       }
     }
   },
@@ -9547,16 +9593,17 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_EiMZhcD4NxGDVEAAt89Obg/events",
+      "path": "/v1/sessions/ses_Tm__9n1Oe2OIcWICY6QSLg/events",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No session has the id 'ses_EiMZhcD4NxGDVEAAt89Obg'.",
+        "detail": "No session has the id 'ses_Tm__9n1Oe2OIcWICY6QSLg'.",
         "code": "not_found",
+        "request_id": "req_cSJtwENq4XwOuhZ0ubW2kA",
         "resource": "session",
-        "id": "ses_EiMZhcD4NxGDVEAAt89Obg"
+        "id": "ses_Tm__9n1Oe2OIcWICY6QSLg"
       }
     }
   },
@@ -9573,7 +9620,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_EiMZhcD4NxGDVEAAt89Obg/saves",
+      "path": "/v1/sessions/ses_Tm__9n1Oe2OIcWICY6QSLg/saves",
       "body": {
         "label": "Too late"
       },
@@ -9582,10 +9629,11 @@
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No session has the id 'ses_EiMZhcD4NxGDVEAAt89Obg'.",
+        "detail": "No session has the id 'ses_Tm__9n1Oe2OIcWICY6QSLg'.",
         "code": "not_found",
+        "request_id": "req_07-VvCiXZ1sh3quklCqg4g",
         "resource": "session",
-        "id": "ses_EiMZhcD4NxGDVEAAt89Obg"
+        "id": "ses_Tm__9n1Oe2OIcWICY6QSLg"
       }
     }
   },
@@ -10404,7 +10452,8 @@
         "title": "Forbidden",
         "status": 403,
         "detail": "This request needs an API key with the referee role.",
-        "code": "referee_required"
+        "code": "referee_required",
+        "request_id": "req_xtP6MDdrN0iWatLO3ylhKQ"
       }
     }
   },
@@ -10513,7 +10562,8 @@
         "title": "Unprocessable Content",
         "status": 422,
         "detail": "expected a 'save' document, got kind 'character'",
-        "code": "content_invalid"
+        "code": "content_invalid",
+        "request_id": "req_PwwFh_a5hAlEvDD-zDKjSg"
       }
     }
   },
@@ -10547,7 +10597,8 @@
         "title": "Conflict",
         "status": 409,
         "detail": "document schema_version 99 is newer than the supported 4",
-        "code": "version_unsupported"
+        "code": "version_unsupported",
+        "request_id": "req_3YIypHBvn-CnCScRX8FN0Q"
       }
     }
   },
@@ -10561,16 +10612,17 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/saves/sav_ihCc_biiXJUb4n1if2y16A",
+      "path": "/v1/saves/sav_NBmvjkpEQdKvptQ0iAh0Fw",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No save has the id 'sav_ihCc_biiXJUb4n1if2y16A'.",
+        "detail": "No save has the id 'sav_NBmvjkpEQdKvptQ0iAh0Fw'.",
         "code": "not_found",
+        "request_id": "req_72m6JpupqE7D3vmUSlcwpQ",
         "resource": "save",
-        "id": "sav_ihCc_biiXJUb4n1if2y16A"
+        "id": "sav_NBmvjkpEQdKvptQ0iAh0Fw"
       }
     }
   },
@@ -10587,7 +10639,7 @@
     },
     "recorded": {
       "method": "PATCH",
-      "path": "/v1/saves/sav_ihCc_biiXJUb4n1if2y16A",
+      "path": "/v1/saves/sav_NBmvjkpEQdKvptQ0iAh0Fw",
       "body": {
         "label": "Gone"
       },
@@ -10596,10 +10648,11 @@
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No save has the id 'sav_ihCc_biiXJUb4n1if2y16A'.",
+        "detail": "No save has the id 'sav_NBmvjkpEQdKvptQ0iAh0Fw'.",
         "code": "not_found",
+        "request_id": "req_snTo7o0_AEoyIhYpJ2omjg",
         "resource": "save",
-        "id": "sav_ihCc_biiXJUb4n1if2y16A"
+        "id": "sav_NBmvjkpEQdKvptQ0iAh0Fw"
       }
     }
   },
@@ -10613,16 +10666,17 @@
     },
     "recorded": {
       "method": "DELETE",
-      "path": "/v1/saves/sav_ihCc_biiXJUb4n1if2y16A",
+      "path": "/v1/saves/sav_NBmvjkpEQdKvptQ0iAh0Fw",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No save has the id 'sav_ihCc_biiXJUb4n1if2y16A'.",
+        "detail": "No save has the id 'sav_NBmvjkpEQdKvptQ0iAh0Fw'.",
         "code": "not_found",
+        "request_id": "req_yVGwW4wbjyAP2JRbrCE1Vw",
         "resource": "save",
-        "id": "sav_ihCc_biiXJUb4n1if2y16A"
+        "id": "sav_NBmvjkpEQdKvptQ0iAh0Fw"
       }
     }
   },
@@ -10637,17 +10691,18 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/saves/sav_ihCc_biiXJUb4n1if2y16A/restore",
+      "path": "/v1/saves/sav_NBmvjkpEQdKvptQ0iAh0Fw/restore",
       "body": {},
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No save has the id 'sav_ihCc_biiXJUb4n1if2y16A'.",
+        "detail": "No save has the id 'sav_NBmvjkpEQdKvptQ0iAh0Fw'.",
         "code": "not_found",
+        "request_id": "req_JGmCntnNEfo848uuANU_uQ",
         "resource": "save",
-        "id": "sav_ihCc_biiXJUb4n1if2y16A"
+        "id": "sav_NBmvjkpEQdKvptQ0iAh0Fw"
       }
     }
   },
@@ -10661,14 +10716,15 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/saves/sav_QcXxpTLMu9nqJK1Lxcr7lA/document",
+      "path": "/v1/saves/sav_ckn42TVUBZGb19H5OeSjPw/document",
       "status": 403,
       "response": {
         "type": "about:blank",
         "title": "Forbidden",
         "status": 403,
         "detail": "This request needs an API key with the referee role.",
-        "code": "referee_required"
+        "code": "referee_required",
+        "request_id": "req_9Ub3ZUdLe5TxczD8qQL5kQ"
       }
     }
   },
@@ -10683,16 +10739,17 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/saves/sav_ihCc_biiXJUb4n1if2y16A/document",
+      "path": "/v1/saves/sav_NBmvjkpEQdKvptQ0iAh0Fw/document",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No save has the id 'sav_ihCc_biiXJUb4n1if2y16A'.",
+        "detail": "No save has the id 'sav_NBmvjkpEQdKvptQ0iAh0Fw'.",
         "code": "not_found",
+        "request_id": "req_euUjmUDlGBAXNO3qEdKN_w",
         "resource": "save",
-        "id": "sav_ihCc_biiXJUb4n1if2y16A"
+        "id": "sav_NBmvjkpEQdKvptQ0iAh0Fw"
       }
     }
   }

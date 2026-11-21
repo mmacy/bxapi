@@ -26,7 +26,14 @@ from fastapi.testclient import TestClient
 
 from bxapi.app import create_app
 from bxapi.openapi import _FixedSettings, build_openapi
-from bxapi.openapi_examples import EXAMPLES_FILE, error_codes, load_examples, shared_problems, trim
+from bxapi.openapi_examples import (
+    EXAMPLE_REQUEST_ID,
+    EXAMPLES_FILE,
+    error_codes,
+    load_examples,
+    shared_problems,
+    trim,
+)
 from bxapi.settings import ApiKey, Role
 
 SEED = 4127730658136791
@@ -35,7 +42,7 @@ SEED = 4127730658136791
 _KEYS = {Role.PLAYER: "my-game-player-key-0123", Role.REFEREE: "my-game-referee-key-0123"}
 
 _TEMPLATE = re.compile(r"\{([a-z0-9_]+)((?:\.[A-Za-z0-9_]+)*)\}")
-_ID = re.compile(r"\b(rol|chr|adv|ses|sav)_[A-Za-z0-9_-]{22}\b")
+_ID = re.compile(r"\b(rol|chr|adv|ses|sav|req)_[A-Za-z0-9_-]{22}\b")
 _TIME = re.compile(r"\b\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ\b")
 
 
@@ -172,11 +179,12 @@ def test_shared_example_names_differ_from_the_exchange_names() -> None:
 def test_the_shared_examples_are_what_the_server_returns() -> None:
     shared = {example.name: example.problem.model_dump(mode="json") for example in shared_problems()}
     settings = _settings()
-    key = {"Authorization": f"Bearer {_KEYS[Role.REFEREE]}"}
+    request_id = {"X-Request-Id": EXAMPLE_REQUEST_ID}
+    key = {**request_id, "Authorization": f"Bearer {_KEYS[Role.REFEREE]}"}
     json_body = {**key, "Content-Type": "application/json"}
     with TestClient(create_app(settings)) as client:
         sent = {
-            "unauthorized": client.get("/v1/meta"),
+            "unauthorized": client.get("/v1/meta", headers=request_id),
             "validation_error": client.post("/v1/dice/roll", json={}, headers=key),
             "bad_request": client.post("/v1/dice/roll", content=b'{"expression": "\xff1d6"}', headers=json_body),
             "content_too_large": client.post(
