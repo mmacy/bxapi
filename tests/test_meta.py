@@ -148,7 +148,7 @@ def test_openapi_documents_server_errors_and_body_limits(client: TestClient) -> 
             for status in ("401", "500", "503"):
                 assert responses[status]["content"] == problem, f"{method} {path} {status}"
             has_body = "requestBody" in operation
-            for status in ("408", "413"):
+            for status in ("400", "408", "413"):
                 assert (status in responses) == has_body, f"{method} {path} {status}"
     assert schema["info"]["license"] == {"name": "MIT", "identifier": "MIT"}
     assert "ValidationError" not in schema["components"]["schemas"]

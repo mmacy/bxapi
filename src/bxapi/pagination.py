@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from typing import Annotated
 
 from fastapi import Depends, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from bxapi.models import ApiModel
 
@@ -42,8 +42,22 @@ PageQuery = Annotated[PageParams, Depends(_page_params)]
 """Annotate an endpoint parameter with this type to read `limit` and `offset` from the query."""
 
 
+_PAGE_DESCRIPTION = (
+    "One page of a list, with the size of the whole list. To read the next page, send the same request with `offset` "
+    "increased by `limit`. You have read the whole list when `offset` plus `limit` is `total` or more."
+)
+
+
 class Page[Item](ApiModel):
-    """One page of a list, with the size of the whole list."""
+    """One page of a list, with the size of the whole list.
+
+    To read the next page, send the same request with `offset` increased by `limit`. You have read the whole list
+    when `offset` plus `limit` is `total` or more.
+    """
+
+    # pydantic gives each parametrized class, like `Page[SessionInfo]`, no docstring, so the schema sets the
+    # description itself.
+    model_config = ConfigDict(json_schema_extra={"description": _PAGE_DESCRIPTION})
 
     items: list[Item]
     """The items on this page, in the list's order."""

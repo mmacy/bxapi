@@ -5,6 +5,7 @@ from osrlib.core.dice import RollResult, roll
 from osrlib.core.rng import RngStreams, StreamName
 from pydantic import Field
 
+from bxapi.errors import VALIDATION_ERROR, problem_responses
 from bxapi.models import ApiModel, RequestModel
 from bxapi.seeds import Seed, seed_or_draw
 
@@ -44,15 +45,29 @@ class DiceRollResponse(ApiModel):
     """
 
 
-@router.post("/roll", summary="Roll a dice expression")
+@router.post(
+    "/roll",
+    summary="Roll a dice expression",
+    response_description="One result for each time the server rolled the expression, and the seed it used.",
+    responses=problem_responses(
+        {
+            422: [
+                VALIDATION_ERROR,
+                "`content_invalid`: osrlib can't read the expression, or the expression has a die size osrlib "
+                "doesn't use, like `3d7`. `detail` says which. Fix the expression.",
+            ]
+        }
+    ),
+)
 def roll_dice(body: DiceRollRequest) -> DiceRollResponse:
     """Roll a dice expression one or more times and return every die and every total.
 
-    osrlib's `roll` function does the rolling. With the same seed, `times` of 3 returns the first three results of
-    `times` of 5. The response includes the seed. Send the same body with that seed to get the same results again, or
-    leave `seed` out to get a new random seed.
+    osrlib's `roll` function does the rolling. Use `total` of each result as the roll's value. The response includes
+    the seed the server used. Send the same body with that seed to get the same results again, or leave `seed` out to
+    get a new random seed. With the same seed, `times` of 3 returns the first three results of `times` of 5.
 
-    A malformed expression, or one with a die size osrlib doesn't use, gets 422 `content_invalid`.
+    The roll doesn't belong to a game, and the server stores nothing. In a session, osrlib makes the rolls the rules
+    call for when you send a command, so you don't roll them here.
     """
     seed = seed_or_draw(body.seed)
     stream = RngStreams(master_seed=seed).get(StreamName.ADJUDICATION)

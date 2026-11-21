@@ -21,7 +21,7 @@ The contract below covers version 1 of the API. For how to work in the repositor
 - **Timestamps.** UTC, in RFC 3339 format with whole seconds, like `2026-11-20T22:01:05Z`.
 - **Lists.** A list endpoint takes `limit` (1 to 200, default 50) and `offset` (0 to 2^53 - 1, default 0), and returns `{"items": [...], "total": n, "limit": n, "offset": n}`. Stored resources are listed newest first.
 - **Documents.** osrlib wraps each serialized adventure, character, party, and save in an envelope with the keys `kind`, `schema_version`, `engine_version`, and `payload`. This specification calls the envelope a *document*. An endpoint that imports a document accepts the document as the whole request body.
-- **OpenAPI.** `GET /openapi.json` describes every endpoint. Each operation's `operationId` is a short snake_case name, like `roll_dice`, that doesn't change between releases. The interactive documentation is at `/docs` and `/redoc`. The three paths need no API key, so anyone who can reach the server can read the API's description. `BXAPI_DOCS_ENABLED=false` turns all three off.
+- **OpenAPI.** `GET /openapi.json` describes every endpoint. Each operation's `operationId` is a short snake_case name, like `roll_dice`, that doesn't change between releases. Each operation has request and response examples, which `tests/test_openapi_examples.py` checks against the server. The interactive documentation is at `/docs` and `/redoc`. The three paths need no API key, so anyone who can reach the server can read the API's description. `BXAPI_DOCS_ENABLED=false` turns all three off.
 - **Creation.** A request that creates a stored resource returns 201 and the resource. A delete returns 204 with no body.
 
 ### Authentication and roles
