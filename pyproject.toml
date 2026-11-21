@@ -34,7 +34,7 @@ build-backend = "uv_build"
 
 [tool.ruff]
 line-length = 120
-src = ["src", "tests"]
+src = ["src", "tests", "examples"]
 
 [tool.ruff.lint]
 select = [
@@ -67,6 +67,6 @@ testpaths = ["tests"]
 xfail_strict = true
 
 [tool.pyright]
-include = ["src", "tests"]
+include = ["src", "tests", "examples"]
 typeCheckingMode = "basic"
 pythonVersion = "3.14"
