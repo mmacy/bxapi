@@ -139,7 +139,7 @@ class DatabaseOpenError(Exception):
 
 def _create_private_file(path: str) -> None:
     # SQLite gives the -wal and -shm files the permissions of the database file, so creating the
-    # database file with mode 0600 keeps all three readable and writable only by their owner.
+    # database file with mode 0600 makes all three readable and writable only by their owner.
     try:
         descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
     except FileExistsError:
@@ -151,7 +151,7 @@ def fits_integer_column(value: int) -> bool:
     """Return whether an `INTEGER` column can store a value.
 
     Check an integer that comes from a client's document before you store it, like the clock of an
-    imported save, so that a value out of range is refused instead of failing the insert.
+    imported save, so that the server refuses a value out of range before the insert fails.
 
     Args:
         value: The integer to store.
@@ -207,8 +207,8 @@ class AbilityRollRow:
     scores: JsonObject
     """The scores, as the caller stored them."""
     seed: int
-    """The seed the scores were rolled from. Creating a character from the roll draws the rest of
-    the creation rolls from the same seed. Never return it to a client."""
+    """The seed the scores were rolled from. When the server creates a character from the roll, it
+    draws the rest of the creation rolls from the same seed. Never return it to a client."""
     used: bool
     """Whether a character was created from the roll."""
     created_at: str
@@ -264,14 +264,14 @@ class SessionRow:
     name: str
     """The session's name."""
     adventure_id: str | None
-    """The id of the adventure the session plays, or `None` when the server doesn't know it. The adventure may
-    have been deleted since the session started."""
+    """The id of the adventure the session plays, or `None` for a session restored from a save that has no
+    adventure id, like an imported save. The adventure may have been deleted since the session started."""
     adventure_name: str
     """The name of the adventure the session plays."""
     mode: str
     """The session's mode after its last accepted command."""
     revision: int
-    """How many command requests the session has accepted."""
+    """How many of the session's command requests osrlib has accepted."""
     clock_rounds: int
     """The game clock, in rounds."""
     schema_version: int
@@ -303,7 +303,7 @@ class SaveRow:
     adventure_id: str | None
     """The id of the adventure the save's session played, or `None` for an imported save."""
     adventure_name: str
-    """The name of the adventure the save plays."""
+    """The name of the adventure in the save."""
     label: str | None
     """The player's label for the save, or `None` if it has none."""
     mode: str
@@ -527,10 +527,10 @@ class Database:
         """Mark an unused ability roll used and store the character created from it, in one transaction.
 
         When two requests create a character from the same roll at once, only one of them
-        stores a character. If the insert fails, the roll stays unused. Both hold across threads
-        and across processes that share the file. Deleting the character later leaves the roll
-        used. Check the character's choices before you call it, so that a refused character
-        leaves the roll unused.
+        stores a character. If the insert fails, the roll stays unused. Both guarantees hold across
+        threads and across processes that share the file. Deleting the character later leaves the
+        roll used. Check the character's choices before you call this method, so that the roll
+        stays unused when osrlib refuses a choice.
 
         Args:
             client: The client the roll and the character belong to.
@@ -651,8 +651,8 @@ class Database:
         Args:
             client: The client the session belongs to.
             name: The session's name.
-            adventure_id: The id of the adventure the session plays, or `None` when the caller doesn't
-                know it.
+            adventure_id: The id of the adventure the session plays, or `None` for a session restored
+                from a save that has no adventure id.
             adventure_name: The name of the adventure the session plays.
             mode: The session's mode.
             clock_rounds: The game clock, in rounds.
@@ -742,8 +742,8 @@ class Database:
     ) -> bool:
         """Write a session's new state, if the session still has the expected revision.
 
-        The check and the write are one statement, so they're correct across threads and across
-        processes that share the file. When two writers start from the same revision, one gets
+        The check and the write are one statement, so no other thread, and no other process that
+        shares the file, can write the row between them. When two writers start from the same revision, one gets
         `True` and the other gets `False` and changes nothing. The method copies `schema_version`
         and `engine_version` from the document's keys into their columns.
 
@@ -804,7 +804,7 @@ class Database:
             client: The client the save belongs to.
             session_id: The session the save was made from, or `None` for an imported save.
             adventure_id: The id of the adventure the session played, or `None` for an imported save.
-            adventure_name: The name of the adventure the save plays.
+            adventure_name: The name of the adventure in the save.
             label: The player's label, or `None`.
             mode: The session's mode when the save was made.
             clock_rounds: The game clock when the save was made, in rounds.

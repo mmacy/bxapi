@@ -76,7 +76,7 @@ class ClassSummary(ApiModel):
     race: str
     """The race of the class's characters, as a lowercase identifier like `"human"` or `"dwarf"`."""
     prime_requisites: tuple[AbilityScore, ...]
-    """The ability scores that decide the class's XP bonus."""
+    """The ability scores that determine the class's XP bonus."""
     requirements: dict[AbilityScore, int]
     """The lowest score a character needs in each listed ability to take the class."""
     hit_die: int
@@ -100,7 +100,7 @@ class MonsterSummary(ApiModel):
     ac_ascending: int | None
     """The same armour class where higher is better. It's `null` when `ac` is."""
     xp: int
-    """The experience for defeating one, as the SRD prints it."""
+    """The experience for defeating one, as the Old-School Essentials System Reference Document (SRD) prints it."""
     alignment: AlignmentSpec
     """The alignments the monster may have, and the usual one when the monster has one."""
 
@@ -148,7 +148,7 @@ class MagicItemSummary(ApiModel):
 
 
 class CommandSummary(ApiModel):
-    """One command that a session accepts, as osrlib defines it."""
+    """One command you can send to a session, as osrlib defines it."""
 
     command_type: str
     """The `command_type` to send in a command request body, like `"move_party"`."""
@@ -166,13 +166,13 @@ class CommandDetail(CommandSummary):
 
     json_schema: dict[str, Any]
     """The JSON Schema of osrlib's command class, which pydantic generates. `command_type` is a property
-    of the schema but not in its `required` list, so a request body sets it."""
+    of the schema but isn't in its `required` list. Include it in every request body anyway."""
 
 
 class EquipmentItem(RootModel[ItemTemplate]):
     """One equipment template: `WeaponTemplate`, `ArmourTemplate`, `GearTemplate`, or `AmmunitionTemplate`.
 
-    `item_type` says which. The JSON is osrlib's model, unchanged.
+    The `item_type` field identifies the template. The JSON is osrlib's model, unchanged.
     """
 
 

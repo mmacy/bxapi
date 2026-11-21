@@ -171,7 +171,7 @@ def authenticate(
     Args:
         request: The request, which gives access to the server's settings.
         credentials: The bearer token from the `Authorization` header, if the request has one.
-            The parameter makes the OpenAPI document describe the bearer scheme.
+            With this parameter, FastAPI describes the bearer scheme in the OpenAPI document.
 
     Returns:
         The caller. When the server allows anonymous callers, it's a referee for the client

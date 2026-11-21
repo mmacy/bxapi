@@ -21,7 +21,7 @@ that build one, and [`install_error_handlers`][bxapi.errors.install_error_handle
 exception into the response. The same handlers convert a request that fails validation, an
 osrlib exception, a busy database, and any other exception.
 
-A command the rules refuse isn't an error. The command endpoint returns it with status 200
+A command that osrlib refuses isn't an error. The command endpoint responds with status 200
 and `accepted` set to `false`.
 """
 
@@ -126,8 +126,8 @@ class FieldError(BaseModel):
 class Problem(BaseModel):
     """The body of an error response.
 
-    Every problem document has `type`, `title`, `status`, `detail`, and `code`. Some codes add
-    members, and a document leaves out each member its code doesn't use:
+    Every problem document has `type`, `title`, `status`, `detail`, and `code`. The server
+    leaves out the other members, except the ones that the document's code adds:
 
     - `validation_error` adds `errors` and `error_count`.
     - `not_found` adds `resource` and `id`.
@@ -158,9 +158,9 @@ class Problem(BaseModel):
     """`validation_error` only: how many parts of the request failed validation, including any
     that `errors` leaves out."""
     resource: str | SkipJsonSchema[None] = _optional()
-    """`not_found` only: the kind of resource the request named, like `"session"`."""
+    """`not_found` only: the kind of resource the request asked for, like `"session"`."""
     id: str | SkipJsonSchema[None] = _optional()
-    """For `not_found`, the id the request named, or its first 128 characters followed by `...`.
+    """For `not_found`, the id in the request, or its first 128 characters followed by `...`.
     For `character_invalid`, the value of the entry that's wrong, like an item id."""
     revision: int | SkipJsonSchema[None] = _optional()
     """`revision_conflict` only: the session's current revision."""
@@ -185,8 +185,8 @@ class Problem(BaseModel):
 class ApiError(Exception):
     """An error the API reports to the caller as a problem document.
 
-    Raise it from an endpoint, or from code an endpoint calls, when the request can't be
-    carried out. The handler that
+    Raise it from an endpoint, or from code an endpoint calls, when the server can't carry out
+    the request. The handler that
     [`install_error_handlers`][bxapi.errors.install_error_handlers] registers sends it as a
     [`Problem`][bxapi.errors.Problem].
 
@@ -384,7 +384,7 @@ def install_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(sqlite3.OperationalError)
     def _database_error(request: Request, error: sqlite3.OperationalError) -> JSONResponse:
-        # The extended result codes, like SQLITE_BUSY_SNAPSHOT, keep the primary code in the low byte.
+        # The extended result codes, like SQLITE_BUSY_SNAPSHOT, have the primary code in the low byte.
         # An OperationalError that Python code raises, rather than SQLite, has no code.
         code = getattr(error, "sqlite_errorcode", None)
         if code is None or code & 0xFF not in _BUSY_CODES:
