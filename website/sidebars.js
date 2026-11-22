@@ -6,11 +6,7 @@ const sidebars = {
   guides: [
     { type: "doc", id: "README", label: "Get started" },
     "docs/play-a-game",
-    "docs/authentication",
-    "docs/errors",
-    "docs/reference-and-generators",
-    "docs/adventures",
-    "docs/referee",
+    "docs/client-guide",
     "docs/configuration",
     { type: "doc", id: "examples/README", label: "Example client" },
   ],

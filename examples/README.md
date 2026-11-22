@@ -1,39 +1,38 @@
 # Example client
 
-[`play_barrow.py`](play_barrow.py) is a Python script that sends requests to a running bxapi server. It plays the adventure that comes with bxapi, `builtin-barrow`, up to the end of the first battle, the party's first fight with monsters. It uses only the Python standard library, so once you've set up bxapi as the [README](../README.md#get-it-running) shows, you have everything the script needs.
+[`play_barrow.py`](play_barrow.py) is a command-line Python client that plays `builtin-barrow`, the built-in adventure, through its first monster battle. It uses only the Python standard library, so you need no extra packages once you have completed [Get it running](../README.md#get-it-running).
 
-The script creates a *party* of three characters: a fighter, a cleric, and a thief. It starts a *session*, one game in progress, of `builtin-barrow`, enters the dungeon, and sends commands until the first battle ends or it has sent 40 commands. It prints each command and each message that the server returns. Before every command, it reads the legal commands from `GET /v1/sessions/{session_id}/commands` and sends only a command from that list. It sends each command with `include=view`, so the response has the *player view*, everything the players may know about the game, which the script reads to pick a direction to walk and an action for each party member in battle.
+The script illustrates the core request loop of a bxapi client:
 
-The script sends every `POST` with an `Idempotency-Key` header. When a connection fails, or the server answers with an error that the same request can succeed after, the script sends the request again with the same key, up to four times. The server runs the request once and returns the first response to a retry. When the script gives up, it prints the error's code, its detail, and the request's id, which whoever runs the server can find in the log.
+- Creates a three-character party (`Brenna` the fighter, `Tomas` the cleric, and `Wren` the thief) with [`POST /v1/characters`](https://mmacy.github.io/bxapi/reference/endpoint/characters#operation-create_character), then starts a game session with [`POST /v1/sessions`](https://mmacy.github.io/bxapi/reference/endpoint/sessions#operation-create_session).
+- Before each action, fetches legal commands from [`GET /v1/sessions/{session_id}/commands`](https://mmacy.github.io/bxapi/reference/endpoint/sessions#operation-list_session_commands) and selects a command using the current `mode` and player view.
+- Sends each command to [`POST /v1/sessions/{session_id}/commands`](https://mmacy.github.io/bxapi/reference/endpoint/sessions#operation-send_command) with `include=view` so the response returns the updated player view in a single round-trip, then prints any rule `rejections` or event `messages`.
+- Attaches a UUID `Idempotency-Key` header to every `POST` and makes up to four attempts total (one initial request plus up to three retries) on dropped connections or a subset of transient codes (`session_busy`, `database_busy`, `request_timeout`, and `idempotency_key_in_progress`), waiting the seconds in `Retry-After` (or 1 second when absent) between attempts. On any other [problem document](https://mmacy.github.io/bxapi/reference/#errors) (including `rate_limited`), it prints `code`, `detail`, and `request_id` and exits.
 
-## Run it
+## Run the script
 
-In one terminal, from the repository's root, start a server:
+Reuse an existing local server if one is already listening on `http://127.0.0.1:8640`, or start a fresh anonymous server from the repository root first:
 
 ```sh
 BXAPI_ALLOW_ANONYMOUS=true uv run bxapi
 ```
 
-The server listens on `http://127.0.0.1:8640` by default. In a second terminal, from the repository's root, run the script with the server's URL:
+From a second terminal at the repository root, run the script against an anonymous server (the URL argument is optional and defaults to `http://127.0.0.1:8640`):
 
 ```sh
-uv run python examples/play_barrow.py http://127.0.0.1:8640
+uv run python examples/play_barrow.py
 ```
 
-The URL is optional and defaults to `http://127.0.0.1:8640`. To set up API keys, see [Authentication](../docs/authentication.md). For a server that asks for a key, pass a key with the player role:
+If your running server requires an API key (for example, the keyed server from [Play a game](../docs/play-a-game.md#start-a-server-with-a-player-key) or [Configure and deploy](../docs/configuration.md#generate-and-configure-api-keys)), pass `--api-key`:
 
 ```sh
 uv run python examples/play_barrow.py http://127.0.0.1:8640 --api-key player-key-0123456789
 ```
 
-To change the limit of 40 commands, pass `--max-commands`:
+By default, the script stops after 40 commands if the first battle hasn't ended. Pass `--max-commands` to change that cap:
 
 ```sh
-uv run python examples/play_barrow.py http://127.0.0.1:8640 --max-commands 10
+uv run python examples/play_barrow.py --max-commands 10
 ```
 
-The dice are random, so each run prints different messages. The output ends with a line like `The battle is over. The session is in mode exploring.` When the party loses, the line ends with the mode `game_over` instead.
-
-## Next steps
-
-- [Play a game](../docs/play-a-game.md): the same game, one request at a time.
+Because dice rolls are random, each run prints different combat messages. The script stops when the first battle ends (`mode` returns to `exploring`) or monsters defeat the party (`mode` becomes `game_over`). To run the same game loop manually one request at a time, follow [Play a game](../docs/play-a-game.md).
