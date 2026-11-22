@@ -28,6 +28,8 @@ from functools import cache
 from importlib import resources
 from typing import Any
 
+from fastapi.routing import APIRoute
+
 from bxapi.auth import misdirected_request, unauthorized
 from bxapi.db import BUSY_TIMEOUT_SECONDS
 from bxapi.errors import (
@@ -42,7 +44,9 @@ from bxapi.errors import (
     validation_error,
 )
 from bxapi.idempotency import key_in_progress, key_interrupted, key_reused
+from bxapi.json_body import SMALL_BODY_BYTES, body_limit
 from bxapi.rate_limit import rate_limited
+from bxapi.routers import V1_ROUTERS
 from bxapi.session_manager import LOCK_TIMEOUT_SECONDS, session_busy, session_unreadable
 from bxapi.settings import Settings
 
@@ -103,8 +107,8 @@ def shared_problems() -> tuple[SharedProblem, ...]:
     [`EXAMPLE_REQUEST_ID`][bxapi.openapi_examples.EXAMPLE_REQUEST_ID].
 
     Returns:
-        One example for each error code, except `session_unreadable`, which has one for a
-        session and one for a save.
+        Shared problem examples covering every error code, with operation-specific variants for
+        65,536-byte body limits, query-parameter validation errors, and unreadable save documents.
 
     Examples:
         ```python
@@ -119,6 +123,23 @@ def shared_problems() -> tuple[SharedProblem, ...]:
     per_minute: int = Settings.model_fields["rate_limit_per_minute"].default
     max_client_bytes: int = Settings.model_fields["max_client_bytes"].default
     missing = {"type": "missing", "loc": ("body", "expression"), "msg": "Field required"}
+    bad_limit = {
+        "type": "greater_than_equal",
+        "loc": ("query", "limit"),
+        "msg": "Input should be greater than or equal to 1",
+    }
+    small_body_operations = tuple(
+        route.name
+        for router in V1_ROUTERS
+        for route in router.routes
+        if isinstance(route, APIRoute) and body_limit(route.endpoint) is not None
+    )
+    get_operations = tuple(
+        route.name
+        for router in V1_ROUTERS
+        for route in router.routes
+        if isinstance(route, APIRoute) and "GET" in (route.methods or ())
+    )
 
     def shared(name: str, summary: str, description: str, error: ApiError, *operations: str) -> SharedProblem:
         problem = error.problem().model_copy(update={"request_id": EXAMPLE_REQUEST_ID})
@@ -128,88 +149,101 @@ def shared_problems() -> tuple[SharedProblem, ...]:
         shared(
             "unauthorized",
             "Send no API key",
-            "The response to a request under `/v1` with no API key, or with a key the server doesn't have.",
+            "The response to a request under `/v1` with no API key, or with an unknown API key.",
             unauthorized(),
         ),
         shared(
             "misdirected_request",
-            "Call a server that asks for no key by another host name",
-            "The response to a request under `/v1` whose `Host` header isn't `localhost`, `127.0.0.1`, or `[::1]`, "
-            "from a server that asks for no API key.",
+            "Call an anonymous server by another host name",
+            "The response to a request under `/v1` whose `Host` header isn't `localhost`, `127.0.0.1`, or `[::1]` "
+            "when the server runs without API keys.",
             misdirected_request(),
         ),
         shared(
             "rate_limited",
-            "Send requests faster than the limit",
-            f"The response to a request from a client that sent more than {per_minute} requests in a minute, the "
-            "server's default limit.",
+            "Exceed the request rate limit",
+            f"The response when a client exceeds {per_minute} requests per minute, the server's default limit.",
             rate_limited(per_minute, 1),
         ),
         shared(
             "bad_request",
             "Send a body that isn't UTF-8",
-            "The response to a request with a body the server can't decode. FastAPI writes the `detail`.",
+            "The response to a request body the server can't decode.",
             # FastAPI raises this error itself, and the server's handler only converts it.
             ApiError(400, "bad_request", "There was an error parsing the body"),
         ),
         shared(
             "request_timeout",
             "Send a body too slowly",
-            f"The response when a body takes more than {timeout_seconds:g} seconds to arrive, the server's default "
-            "limit.",
+            f"The response when a request body takes more than {timeout_seconds:g} seconds to arrive, the server's "
+            "default limit.",
             request_timeout(timeout_seconds),
         ),
         shared(
+            "small_body_too_large",
+            "Send a body over 65,536 bytes",
+            f"The response to a body larger than {SMALL_BODY_BYTES:,} bytes on an operation that takes no document.",
+            content_too_large(SMALL_BODY_BYTES, for_document=False),
+            *small_body_operations,
+        ),
+        shared(
             "content_too_large",
-            "Send a body that's too large",
-            f"The response to a body larger than {max_bytes} bytes, the server's default limit.",
+            "Send a document body over the limit",
+            f"The response to a document body larger than {max_bytes:,} bytes, the server's default "
+            "`BXAPI_MAX_BODY_BYTES` limit.",
             content_too_large(max_bytes),
         ),
         shared(
             "unsupported_media_type",
-            "Send a body that isn't declared as JSON",
-            "The response to a request with a body and the header `Content-Type: text/plain`.",
+            "Send a body without a JSON Content-Type",
+            "The response to a request with a non-empty body and `Content-Type: text/plain`.",
             unsupported_media_type(),
+        ),
+        shared(
+            "query_validation_error",
+            "Pass an out-of-range query parameter",
+            "The response to `?limit=0`. Each entry in `errors` locates one invalid parameter via `loc`.",
+            validation_error([bad_limit]),
+            *get_operations,
         ),
         shared(
             "validation_error",
             "Leave out a required field",
-            "The response to `POST /v1/dice/roll` with the body `{}`. Each entry in `errors` is one part of the "
-            "request that failed validation, and `loc` is the path to it.",
+            "The response to `POST /v1/dice/roll` with `{}`. Each entry in `errors` locates one invalid field via "
+            "`loc`.",
             validation_error([missing]),
         ),
         shared(
             "idempotency_key_in_progress",
-            "Retry while the first request runs",
-            "The response to a second request with an `Idempotency-Key` while the first request with that key is "
-            "still running.",
+            "Retry while the first request is still running",
+            "The response to a duplicate `Idempotency-Key` while the initial request is still executing.",
             key_in_progress(),
         ),
         shared(
             "idempotency_key_interrupted",
-            "Retry a request the server didn't finish",
-            "The response to a request with an `Idempotency-Key` whose first request the server failed or stopped "
-            "in the middle of.",
+            "Retry a request interrupted by a server failure",
+            "The response when the initial request for this `Idempotency-Key` failed or stopped without recording an "
+            "outcome.",
             key_interrupted(),
         ),
         shared(
             "idempotency_key_reused",
-            "Send a key again with another request",
-            "The response to a request with an `Idempotency-Key` that your client already sent with a different body.",
+            "Reuse an idempotency key with a different request",
+            "The response when your client sends an `Idempotency-Key` already bound to a different request body, "
+            "path, query, method, or role.",
             key_reused(),
         ),
         shared(
             "session_busy",
-            "Wait too long for the session",
-            f"The response when another request uses the session for more than {LOCK_TIMEOUT_SECONDS:g} seconds. "
-            "`revision` is the session's revision.",
+            "Wait too long for the session lock",
+            f"The response when another request holds the session lock for more than {LOCK_TIMEOUT_SECONDS:g} "
+            "seconds. `revision` reports the session's current revision.",
             session_busy(3, waited_seconds=LOCK_TIMEOUT_SECONDS),
         ),
         shared(
             "internal_error",
-            "Hit a bug in the server",
-            "The response to a request that raises an exception the server doesn't expect. Every such request gets "
-            "the same document.",
+            "Hit an unexpected server error",
+            "The response when an unhandled exception occurs. Report `request_id` to the server's operator.",
             internal_error(),
         ),
         shared(
@@ -227,15 +261,15 @@ def shared_problems() -> tuple[SharedProblem, ...]:
         ),
         shared(
             "storage_full",
-            "Store more than the server allows one client",
-            f"The response to a request that would store a document, from a client for which the server already "
-            f"stores {max_client_bytes} bytes or more, the server's default limit.",
+            "Exceed the client storage quota",
+            f"The response when your client already stores at least {max_client_bytes:,} bytes, the server's default "
+            "`BXAPI_MAX_CLIENT_BYTES` limit.",
             storage_full(max_client_bytes + 20_480, max_client_bytes),
         ),
         shared(
             "database_busy",
-            "Wait too long for the database",
-            f"The response when another process holds the database's write lock for more than "
+            "Wait too long for the SQLite write lock",
+            f"The response when another process holds the database write lock for more than "
             f"{BUSY_TIMEOUT_SECONDS:g} seconds.",
             database_busy(),
         ),
@@ -354,14 +388,14 @@ def _request_line(recorded: dict[str, Any]) -> str:
 def add_examples(schema: dict[str, Any]) -> None:
     """Add the recorded examples, and then the shared error examples, to an OpenAPI document.
 
-    Each request body becomes an example of its operation's request body, and each response body
-    an example of the response with its status. A request and its response have the same example
-    name, so a tool that pairs them can. Then each error code that an operation lists, and that no
-    recorded example of the operation shows, gets its example from
-    [`shared_problems`][bxapi.openapi_examples.shared_problems].
+    Each request body becomes an example on its operation's request body (successful 2xx exchanges
+    first so client generators and UIs default to a valid request), and each response body becomes
+    an example on the response for its status. Matching example names allow tools to pair requests
+    with responses. Any error code listed on an operation without a recorded example receives its
+    example from [`shared_problems`][bxapi.openapi_examples.shared_problems].
 
     Args:
-        schema: The OpenAPI document, which the function changes.
+        schema: The OpenAPI document to update in place.
     """
     operations = {
         operation["operationId"]: operation
@@ -369,22 +403,34 @@ def add_examples(schema: dict[str, Any]) -> None:
         for operation in path.values()
         if isinstance(operation, dict) and "operationId" in operation
     }
-    for exchange in load_examples():
-        operation = operations[exchange["operation"]]
+    exchanges = load_examples()
+    ordered_for_requests = (
+        *[exchange for exchange in exchanges if exchange["recorded"]["status"] < 300],
+        *[exchange for exchange in exchanges if exchange["recorded"]["status"] >= 300],
+    )
+    for exchange in ordered_for_requests:
         recorded = exchange["recorded"]
+        if "body" not in recorded:
+            continue
+        operation = operations[exchange["operation"]]
         line = _request_line(recorded)
         if exchange.get("role") == "referee":
             line += ", with a referee key"
-        if "body" in recorded:
-            content = operation["requestBody"]["content"]
-            media = next(iter(content.values()))
-            media.setdefault("examples", {})[exchange["name"]] = {
-                "summary": exchange["summary"],
-                "description": line,
-                "value": recorded["body"],
-            }
+        content = operation["requestBody"]["content"]
+        media = next(iter(content.values()))
+        media.setdefault("examples", {})[exchange["name"]] = {
+            "summary": exchange["summary"],
+            "description": line,
+            "value": recorded["body"],
+        }
+    for exchange in exchanges:
+        operation = operations[exchange["operation"]]
+        recorded = exchange["recorded"]
         if recorded.get("response") is None:
             continue
+        line = _request_line(recorded)
+        if exchange.get("role") == "referee":
+            line += ", with a referee key"
         response = operation["responses"][str(recorded["status"])]
         media = next(iter(response["content"].values()))
         description = " ".join(

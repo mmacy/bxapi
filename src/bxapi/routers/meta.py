@@ -15,54 +15,55 @@ router = APIRouter(tags=["meta"])
 
 
 class Health(ApiModel):
-    """The body of the health check."""
+    """Liveness response body returned by `GET /health`."""
 
     status: str = "ok"
     """Always `"ok"`."""
 
 
 class Storage(ApiModel):
-    """How many bytes of documents the server stores for a client, and the most it stores.
+    """Stored document byte usage and quota for your client application.
 
-    The count is the bytes of the client's characters, ability rolls, adventures, sessions, and
-    saves, and of the responses the server stores for its idempotency keys.
+    Counts the stored JSON bytes of your client's ability rolls, characters, adventures, sessions,
+    saves, and 24-hour idempotency replay responses.
     """
 
     used_bytes: int
-    """The bytes the server stores for the client now. Deleting a session, a save, an adventure,
-    or a character lowers it."""
+    """Bytes currently stored for your client. Deleting sessions, saves, adventures, or characters
+    reduces this count."""
     max_bytes: int | None
-    """The most bytes the server stores for one client, or `null` when the server has no limit.
-    When `used_bytes` reaches it, each request that would store more gets 507 `storage_full`."""
+    """Maximum bytes the server stores for one client (`BXAPI_MAX_CLIENT_BYTES`, 1,073,741,824 by
+    default), or `null` when storage quotas are disabled. When `used_bytes` reaches `max_bytes`,
+    requests that store new documents fail with 507 `storage_full`."""
 
 
 class Meta(ApiModel):
-    """The server's versions, and the caller as the server sees it."""
+    """Server versions, authentication mode, caller identity, and client storage usage."""
 
     api_version: str
-    """The version of bxapi, like `"0.1.0"`."""
+    """Installed bxapi version string, such as `"0.1.0"`."""
     engine_version: str
-    """The version of osrlib that applies the rules."""
+    """Installed osrlib rules engine version string, such as `"2.5.0"`."""
     schema_version: int
-    """The version of osrlib's document format. osrlib stamps adventure, character, and save
-    documents with it, and the server refuses a document stamped with a higher one."""
+    """osrlib document format version. The server refuses adventure, character, party, and save
+    documents stamped with a higher `schema_version` with 409 `version_unsupported`."""
     auth_enabled: bool
-    """Whether the server asks for an API key."""
+    """Whether the server requires a bearer API key under `/v1`."""
     client: str
-    """The client application the caller's API key identifies, or `"local"` when the server
-    allows anonymous callers."""
+    """Client application name bound to your API key, or `"local"` when `auth_enabled` is `false`."""
     role: Role
-    """The caller's role."""
+    """Role granted to your API key (`"player"` or `"referee"`)."""
     storage: Storage
-    """How much the server stores for the caller's client, and the limit."""
+    """Current document storage usage and quota for `client`."""
 
 
 @health_router.get("/health", summary="Check that the server is up", response_description='`{"status": "ok"}`.')
 def get_health() -> Health:
-    """Return `{"status": "ok"}` while the server can answer requests.
+    """Return `{"status": "ok"}` while the HTTP server is accepting requests.
 
-    The endpoint needs no API key and reads no data, so a load balancer or a container's health check can call it
-    often. It doesn't check the database or the API key. To check an API key, call `GET /v1/meta`.
+    Requires no API key, touches no database tables, and has no rate limit, so load balancers
+    and container health probes can poll it frequently. Does not verify database connectivity or API
+    keys. To verify an API key and inspect server versions, call `GET /v1/meta`.
     """
     return Health()
 
@@ -70,18 +71,19 @@ def get_health() -> Health:
 @router.get(
     "/meta",
     summary="Get the server's versions and the caller's role",
-    response_description="The versions, whether the server asks for a key, and the caller's client and role.",
+    response_description="Server versions, authentication mode, caller client and role, and storage usage.",
 )
 def get_meta(request: Request, principal: CurrentPrincipal) -> Meta:
-    """Return the versions of bxapi and osrlib, and the client and role of the API key you sent.
+    """Verify your API key and return the server's versions, your client and role, and your storage usage.
 
-    Call it when a client starts. A 200 means the key works, and `role` says whether the client can use the
-    operations only a referee may call. If the client keeps documents, like save documents, compare
-    `schema_version` with the `schema_version` of each document. The server refuses a document with a higher one,
-    with 409 `version_unsupported`.
+    Call this operation at application startup. A 200 response confirms that your bearer token is
+    valid, and `role` indicates whether your key can call referee-only operations (`"referee"`) or
+    player operations (`"player"`). Compare `schema_version` against any adventure, character, or
+    save documents your client stores before uploading or importing them, because documents with a
+    higher `schema_version` fail with 409 `version_unsupported`.
 
-    `storage` states how many bytes of documents the server stores for your client, and the limit. Read it to
-    find out how close the client is to 507 `storage_full`, and to see what a delete freed.
+    Inspect `storage.used_bytes` and `storage.max_bytes` to monitor your client's document quota
+    before hitting 507 `storage_full` or to confirm space reclaimed after deleting resources.
     """
     return Meta(
         api_version=__version__,

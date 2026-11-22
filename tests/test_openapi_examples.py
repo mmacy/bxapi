@@ -25,6 +25,7 @@ from unittest import mock
 from fastapi.testclient import TestClient
 
 from bxapi.app import create_app
+from bxapi.json_body import SMALL_BODY_BYTES
 from bxapi.openapi import _FixedSettings, build_openapi
 from bxapi.openapi_examples import (
     EXAMPLE_REQUEST_ID,
@@ -190,12 +191,16 @@ def test_the_shared_examples_are_what_the_server_returns() -> None:
             ),
             "unauthorized": client.get("/v1/meta", headers=request_id),
             "validation_error": client.post("/v1/dice/roll", json={}, headers=key),
+            "query_validation_error": client.get("/v1/sessions?limit=0", headers=key),
             "bad_request": client.post("/v1/dice/roll", content=b'{"expression": "\xff1d6"}', headers=json_body),
             "unsupported_media_type": client.post(
                 "/v1/dice/roll", content=b'{"expression": "1d6"}', headers={**key, "Content-Type": "text/plain"}
             ),
+            "small_body_too_large": client.post(
+                "/v1/dice/roll", content=b" " * (SMALL_BODY_BYTES + 1), headers=json_body
+            ),
             "content_too_large": client.post(
-                "/v1/dice/roll", content=b" " * (settings.max_body_bytes + 1), headers=json_body
+                "/v1/adventures/validate", content=b" " * (settings.max_body_bytes + 1), headers=json_body
             ),
         }
     anonymous = _FixedSettings(database=":memory:", allow_anonymous=True)
@@ -209,6 +214,24 @@ def test_the_shared_examples_are_what_the_server_returns() -> None:
                 break
     for name, response in sent.items():
         assert response.json() == shared[name], name
+
+
+def test_each_operations_first_request_example_succeeds_and_error_examples_fit_the_route() -> None:
+    document = build_openapi()
+    statuses = {exchange["name"]: exchange["recorded"]["status"] for exchange in load_examples()}
+    for path, item in document["paths"].items():
+        for method, operation in item.items():
+            if "requestBody" in operation:
+                examples = next(iter(operation["requestBody"]["content"].values()))["examples"]
+                first = next(iter(examples))
+                assert statuses[first] < 300, f"{method.upper()} {path}: first request example {first} failed"
+            if method == "get" and "422" in operation["responses"]:
+                examples = operation["responses"]["422"]["content"]["application/problem+json"]["examples"]
+                assert examples["query_validation_error"]["value"]["errors"][0]["loc"][0] == "query"
+    roll_413 = document["paths"]["/v1/dice/roll"]["post"]["responses"]["413"]["content"]["application/problem+json"]
+    assert f"{SMALL_BODY_BYTES}" in roll_413["examples"]["small_body_too_large"]["value"]["detail"]
+    upload_413 = document["paths"]["/v1/adventures"]["post"]["responses"]["413"]["content"]["application/problem+json"]
+    assert "content_too_large" in upload_413["examples"]
 
 
 def _record() -> None:

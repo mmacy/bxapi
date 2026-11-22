@@ -67,107 +67,118 @@ SPELL_LEVEL_MIN, SPELL_LEVEL_MAX = _spell_level_bounds()
 
 
 class ClassSummary(ApiModel):
-    """The facts a class picker shows, from osrlib's `ClassDefinition`."""
+    """Summary of a character class from osrlib's `ClassDefinition`, for building a class picker."""
 
     id: str
-    """The class id to pass as `class_id` when you create a character, like `"fighter"`."""
+    """Class identifier, such as `"fighter"`. Pass as `class_id` to `POST /v1/characters` or
+    `GET /v1/rules/classes/{class_id}`."""
     name: str
-    """The display name, like `"Fighter"`."""
+    """Display name of the class, such as `"Fighter"`."""
     race: str
-    """The race of the class's characters, as a lowercase identifier like `"human"` or `"dwarf"`."""
+    """Lowercase race identifier for members of the class, such as `"human"` or `"dwarf"`."""
     prime_requisites: tuple[AbilityScore, ...]
-    """The ability scores that determine the class's XP bonus."""
+    """Ability scores that determine the class's experience point modifier."""
     requirements: dict[AbilityScore, int]
-    """The lowest score a character needs in each listed ability to take the class."""
+    """Minimum score required in each constrained ability to choose the class. Empty (`{}`) when the
+    class has no minimum ability requirements."""
     hit_die: int
-    """The die osrlib rolls for each level's hit points, as its number of sides."""
+    """Die size (number of sides, such as `8` for d8) rolled for hit points at first level and up to
+    name level."""
     max_level: int
-    """The highest level a character of the class can reach."""
+    """Highest level a character of this class can reach, such as `14` or `12`."""
 
 
 class MonsterSummary(ApiModel):
-    """The statistics a monster list shows, from osrlib's `MonsterTemplate`."""
+    """Summary statistics of a monster from osrlib's `MonsterTemplate`."""
 
     id: str
-    """The monster id, like `"goblin"`."""
+    """Monster template identifier, such as `"goblin"`. Pass to `GET /v1/rules/monsters/{monster_id}`
+    or `POST /v1/generate/monsters`."""
     name: str
-    """The name as the rulebook prints it, like `"Goblin"` or `"Centipede, Giant"`. To name the monster in a sentence,
-    use the `display_name` of `GET /v1/rules/monsters/{monster_id}`, like `"giant centipede"`."""
+    """Index name as printed in the rulebook, such as `"Goblin"` or `"Centipede, Giant"`. For prose
+    names, read `display_name` and `display_name_plural` on `GET /v1/rules/monsters/{monster_id}`."""
     hit_dice: MonsterHitDice
-    """The monster's hit dice, as osrlib's `MonsterHitDice`."""
+    """Hit dice specification (`count`, `die`, `modifier`, `asterisks`, `average_hp`, `fixed_hp`)."""
     ac: int | None
-    """The armour class where lower is better. It's `null` for a creature that every attack hits without
-    a roll, when the template's `attack_roll_required` is `false`."""
+    """Descending armour class (lower is harder to hit), or `null` when attacks hit automatically
+    (`attack_roll_required` is `false`)."""
     ac_ascending: int | None
-    """The same armour class where higher is better. It's `null` when `ac` is."""
+    """Ascending armour class (higher is harder to hit), or `null` when `ac` is `null`."""
     xp: int
-    """The experience for defeating one, as the Old-School Essentials System Reference Document (SRD) prints it."""
+    """Experience point value for defeating one monster, as printed in the Old-School Essentials
+    System Reference Document (SRD)."""
     alignment: AlignmentSpec
-    """The alignments the monster may have, and the usual one when the monster has one."""
+    """Permitted alignments (`options`) and typical alignment (`usual`), when specified."""
 
 
 class SpellSummary(ApiModel):
-    """The facts a spell list shows, from osrlib's `SpellTemplate`."""
+    """Summary of a spell from osrlib's `SpellTemplate`."""
 
     id: str
-    """The spell id, like `"magic_missile"`."""
+    """Spell identifier, such as `"magic_missile"`. Pass to `GET /v1/rules/spells/{spell_id}` or in
+    `starting_spell_ids` on `POST /v1/characters`."""
     name: str
-    """The display name, like `"Magic Missile"`."""
+    """Display name of the spell, such as `"Magic Missile"`."""
     level: int
-    """The spell level, from 1 to 6."""
+    """Spell level, from 1 to 6."""
     spell_list: str
-    """The id of the spell list the spell is on, like `"cleric"` or `"magic_user"`. A class casts the spells
-    on the list in the `spell_list` parameter of its `divine_magic` or `arcane_magic` ability."""
+    """Spell list identifier (`"cleric"` or `"magic_user"`). Clerics cast from `"cleric"`, while
+    magic-users and elves cast from `"magic_user"`."""
     range: str
-    """The range line as printed."""
+    """Printed range line, such as `"150'"` or `"The caster"`."""
     duration: str
-    """The duration line as printed."""
+    """Printed duration line, such as `"1 turn"` or `"Instant"`."""
 
 
 class EquipmentSummary(ApiModel):
-    """The facts an equipment list shows, from osrlib's four equipment templates."""
+    """Summary of a mundane equipment item from osrlib's equipment catalogs."""
 
     id: str
-    """The item id to pass in a purchase, like `"sword"`."""
+    """Equipment identifier, such as `"sword"`. Pass to `GET /v1/rules/equipment/{item_id}`, in
+    `purchases` on `POST /v1/characters`, or in a session's `purchase_equipment` command."""
     name: str
-    """The display name, like `"Sword"`."""
+    """Display name of the item, such as `"Sword"`."""
     item_type: ItemType
-    """Which of the four equipment templates the item is."""
+    """Equipment template category: `"weapon"`, `"armour"` (including shields), `"gear"`
+    (adventuring gear), or `"ammunition"`."""
     cost_gp: int
-    """The price in gold pieces."""
+    """Price in gold pieces for one purchase lot."""
 
 
 class MagicItemSummary(ApiModel):
-    """The facts a magic item list shows, from osrlib's `MagicItemTemplate`."""
+    """Summary of a magic item from osrlib's `MagicItemTemplate`."""
 
     id: str
-    """The magic item id, like `"potion_of_healing"`."""
+    """Magic item identifier, such as `"potion_of_healing"`. Pass to
+    `GET /v1/rules/magic-items/{item_id}`."""
     name: str
-    """The display name."""
+    """True display name of the magic item."""
     category: MagicItemCategory
-    """The kind of item, like `potion`, `scroll`, `ring`, or `sword`."""
+    """Catalog category: `"armour"`, `"misc"`, `"potion"`, `"ring"`, `"rod"`, `"staff"`, `"wand"`,
+    `"scroll"`, `"sword"`, or `"weapon"`."""
 
 
 class CommandSummary(ApiModel):
-    """One command you can send to a session, as osrlib defines it."""
+    """Summary of one session command defined by osrlib."""
 
     command_type: str
-    """The `command_type` to send in a command request body, like `"move_party"`."""
+    """Discriminator string to send in `POST /v1/sessions/{session_id}/commands`, such as
+    `"move_party"`."""
     kind: CommandKind
-    """Whether a player may send the command (`play`), or only a referee (`referee`)."""
+    """Who may send the command: `"play"` (any caller) or `"referee"` (`referee` role only)."""
     allowed_modes: list[SessionMode]
-    """The session modes the command is legal in, in alphabetical order."""
+    """Session modes in which the command is legal, sorted alphabetically."""
     summary: str
-    """The first paragraph of osrlib's documentation for the command, on one line, with each link
-    reduced to its text."""
+    """One-line description from the opening paragraph of osrlib's command documentation."""
 
 
 class CommandDetail(CommandSummary):
-    """A command's summary, with the JSON Schema of its request body."""
+    """Summary of a session command, plus the JSON Schema for its request body."""
 
     json_schema: dict[str, Any]
-    """The JSON Schema of osrlib's command class, which pydantic generates. `command_type` is a property
-    of the schema but isn't in its `required` list. Include it in every request body anyway."""
+    """Raw JSON Schema generated by pydantic from osrlib's command model. Include `command_type` in
+    every request body sent to `POST /v1/sessions/{session_id}/commands` even though osrlib's raw
+    schema lists `command_type` with a default instead of inside `required`."""
 
 
 class EquipmentItem(RootModel[ItemTemplate]):

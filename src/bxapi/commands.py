@@ -17,7 +17,7 @@ __all__ = ["PLAY_COMMAND_TYPES", "CommandKind", "command_kind"]
 
 
 class CommandKind(StrEnum):
-    """Who may send a command."""
+    """Who may send a command: `play` for any caller (`player` or `referee`), or `referee` for a `referee` key only."""
 
     PLAY = "play"
     """A player or a referee."""

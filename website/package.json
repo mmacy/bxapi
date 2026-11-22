@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "generate": "node scripts/stage-pages.mjs && node scripts/prepare-openapi.mjs && docs-md --clean",
+    "generate": "node scripts/stage-pages.mjs && node scripts/prepare-openapi.mjs && docs-md --clean && node scripts/fix-embeds.mjs",
     "start": "npm run generate && docusaurus start",
     "build": "npm run generate && docusaurus build",
     "serve": "docusaurus serve",

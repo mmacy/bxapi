@@ -41,62 +41,74 @@ __all__ = [
 router = APIRouter(route_class=IdempotentRoute)
 
 _SEED_FORBIDDEN = (
-    "`referee_required`: A player sent `seed`. Leave `seed` out and the server draws one, or send the request with "
-    "a referee key."
+    "`referee_required`: A player sent `seed`. Omit `seed` so the server draws one, or call with a `referee` key."
 )
 _CHARACTER_INVALID = (
-    "`character_invalid`: A choice breaks a rule, like a class the scores don't qualify for, a missing first spell "
-    "for a magic-user, or purchases the starting gold doesn't cover. `rejections` lists osrlib's reasons, each a "
-    "`code` and its `params`. For a class or item id osrlib doesn't have, or an `equip_item_ids` entry that isn't in "
-    "`purchases`, the problem has `field`, `id`, and `index` for a list field, instead of `rejections`. Change the "
-    "choice and send the request again."
+    "`character_invalid`: A choice violates a B/X creation rule, such as choosing a class whose minimum scores the "
+    "character misses, omitting a magic-user's starting spell, or spending more than starting gold. `rejections` "
+    "lists osrlib's reasons (`code` and `params`). When an unknown `class_id` or `item_id` is sent, or "
+    "`equip_item_ids` names an unpurchased item, the problem includes `field`, `id`, and `index` (for list fields) "
+    "instead of `rejections`. Adjust the choice and retry."
 )
-_REFEREE_ONLY = "`referee_required`: Only a referee may call this operation. Use a key with the referee role."
+_REFEREE_ONLY = "`referee_required`: Only a referee may call this operation. Send an API key with the `referee` role."
 _VERSION_UNSUPPORTED = (
-    "`version_unsupported`: The document's `schema_version` is higher than the server's osrlib reads, which is the "
-    "`schema_version` of `GET /v1/meta`. Import it on a server with a newer osrlib."
+    "`version_unsupported`: The document's `schema_version` exceeds the `schema_version` that `GET /v1/meta` "
+    "reports. Export the document with a compatible schema version or upgrade the server's osrlib."
 )
 
-RollId = Annotated[str, Path(description="The ability roll's id, which starts with `rol_`.")]
-CharacterId = Annotated[str, Path(description="The character's id, which starts with `chr_`.")]
+RollId = Annotated[
+    str,
+    Path(description="Ability roll `id` (`rol_` followed by 22 characters), from `POST /v1/ability-rolls`."),
+]
+CharacterId = Annotated[
+    str,
+    Path(
+        description="Character `id` (`chr_` followed by 22 characters), from `POST /v1/characters`, "
+        "`POST /v1/characters/import`, or `GET /v1/characters`."
+    ),
+]
 """The character routes. The router sets no tag, because the character generator is in the
 `generate` group of the OpenAPI document and every other route is in `characters`."""
 
 
 class AbilityRollRequest(RequestModel):
-    """The body of a request for an ability roll."""
+    """Optional request body for `POST /v1/ability-rolls`."""
 
     seed: Seed | None = None
-    """The seed for the roll. Only a referee may pass one, and the server never returns the seed. It
-    also determines the hit point and gold rolls of the character created from the roll."""
+    """Referee only. Seed (0 to 2^53 - 1) that determines the six ability scores as well as the hit
+    point and gold rolls of the character created from this roll. The server never returns `seed`.
+    Omit `seed` (or send no body) to let the server draw one."""
 
 
 class AbilityRoll(ApiModel):
-    """Six ability scores the server rolled and stored, and the classes they qualify for."""
+    """Stored set of six rolled ability scores and the classes they qualify for."""
 
     id: str
-    """The roll's id, which starts with `rol_`. Pass it as `ability_roll_id` to create a character
-    from these scores."""
+    """Ability roll identifier (`rol_` followed by 22 characters). Pass as `ability_roll_id` to
+    `POST /v1/characters`."""
     scores: dict[AbilityScore, int]
-    """The six scores, each from 3 to 18, as osrlib rolled them: 3d6 for each ability."""
+    """Six rolled ability scores (`str`, `int`, `wis`, `dex`, `con`, `cha`), each from 3 to 18."""
     eligible_class_ids: list[str]
-    """The ids of the classes whose minimum scores these scores meet, from osrlib's class check."""
+    """Class `id` values from `GET /v1/rules/classes` whose minimum ability requirements `scores`
+    satisfy, in catalog order."""
     used: bool
-    """Whether a character was created from the roll. You can create at most one character from a
-    roll, and deleting the character doesn't free the roll."""
+    """Whether `POST /v1/characters` has already consumed this roll. Each roll creates at most one
+    character, and deleting that character does not reset `used`."""
     created_at: str
-    """When the server stored the roll."""
+    """UTC timestamp when the server stored the roll, in RFC 3339 format such as
+    `"2026-11-20T22:01:05Z"`."""
 
 
 class CharacterRequest(CharacterChoices):
-    """The choices for a new stored character."""
+    """Choices and optional ability roll or referee seed for `POST /v1/characters`."""
 
     ability_roll_id: str | None = None
-    """The id of an unused ability roll to take the scores from. The roll's seed also determines the
-    hit point and gold rolls. Without it, the server rolls the scores as part of the request."""
+    """Unused ability roll `id` from `POST /v1/ability-rolls` to take scores, hit points, and
+    starting gold from. Omit to roll fresh ability scores during this request. Mutually exclusive
+    with `seed`."""
     seed: Seed | None = None
-    """The seed for the creation rolls, when the request has no `ability_roll_id`. Only a referee
-    may pass one, and the server never returns it."""
+    """Referee only. Seed (0 to 2^53 - 1) for all creation rolls when you omit `ability_roll_id`.
+    Mutually exclusive with `ability_roll_id`. The server never returns `seed`."""
 
     @model_validator(mode="after")
     def _one_source_of_dice(self) -> Self:
@@ -106,59 +118,65 @@ class CharacterRequest(CharacterChoices):
 
 
 class GenerateCharacterRequest(CharacterChoices):
-    """The choices for a character the server rolls and doesn't store."""
+    """Choices and optional seed for rolling an unstored character via `POST /v1/generate/character`."""
 
     seed: Seed | None = None
-    """The seed for the creation rolls. Leave it out to have the server draw one."""
+    """Optional seed (0 to 2^53 - 1) for all creation rolls. Any caller may pass `seed` to reproduce
+    the character, or omit it to let the server draw one."""
 
 
 class StoredCharacter(ApiModel):
-    """A character the server stored."""
+    """Stored character record with osrlib's `Character` model and computed stats."""
 
     id: str
-    """The character's id, which starts with `chr_`."""
+    """Character identifier (`chr_` followed by 22 characters). Pass in `character_ids` to
+    `POST /v1/sessions`."""
     name: str
-    """The character's name."""
+    """Character name."""
     class_id: str
-    """The character's class."""
+    """Character class `id`, such as `"fighter"`."""
     level: int
-    """The character's level."""
+    """Character experience level (1 for newly created characters, or higher when imported)."""
     created_at: str
-    """When the server stored the character."""
+    """UTC timestamp when the server stored the character, in RFC 3339 format such as
+    `"2026-11-20T22:01:05Z"`."""
     character: Character
-    """osrlib's `Character` model."""
+    """Full osrlib `Character` model: ability scores, hit points, inventory, spells, and conditions."""
     derived: DerivedValues
-    """The values osrlib computes from the character."""
+    """Combat, saving throw, modifier, and language values computed by osrlib from `character`."""
 
 
 class CharacterSummary(ApiModel):
-    """The fields a list of stored characters shows."""
+    """Summary fields returned for each character in `GET /v1/characters`."""
 
     id: str
-    """The character's id, which starts with `chr_`."""
+    """Character identifier (`chr_` followed by 22 characters). Pass to
+    `GET /v1/characters/{character_id}` or in `character_ids` on `POST /v1/sessions`."""
     name: str
-    """The character's name."""
+    """Character name."""
     class_id: str
-    """The character's class."""
+    """Character class `id`, such as `"fighter"`."""
     level: int
-    """The character's level."""
+    """Character experience level."""
     max_hp: int
-    """The character's maximum hit points."""
+    """Maximum hit points."""
     created_at: str
-    """When the server stored the character."""
+    """UTC timestamp when the server stored the character, in RFC 3339 format such as
+    `"2026-11-20T22:01:05Z"`."""
 
 
 class GeneratedCharacterResponse(ApiModel):
-    """A character the server rolled and didn't store, and the seed to roll it again."""
+    """Unstored first-level character, derived stats, creation dice, and seed."""
 
     seed: Seed
-    """The seed the server used. Send it with the same choices to get the same character."""
+    """Seed used for every creation roll. Send it with the same request body to reproduce this
+    character."""
     character: Character
-    """osrlib's `Character` model."""
+    """Generated osrlib `Character` model (with `id` set to `null`)."""
     derived: DerivedValues
-    """The values osrlib computes from the character."""
+    """Combat, saving throw, modifier, and language values computed by osrlib from `character`."""
     rolls: CreationRolls
-    """The dice osrlib rolled to create the character."""
+    """Individual dice rolled for ability scores, hit points, and starting gold."""
 
 
 def _db(request: Request) -> Database:
@@ -223,27 +241,29 @@ def _store(db: Database, client: str, character: Character, roll_id: str | None 
     status_code=201,
     tags=["characters"],
     summary="Roll ability scores",
-    response_description="The stored roll: its id, the six scores, and the classes the scores qualify for.",
+    response_description="Stored ability roll with its id, six scores, and eligible class ids.",
     responses=problem_responses({403: [_SEED_FORBIDDEN]}),
 )
 def create_ability_roll(
-    request: Request, principal: CurrentPrincipal, body: AbilityRollRequest | None = None
+    request: Request,
+    principal: CurrentPrincipal,
+    body: Annotated[AbilityRollRequest, Body(default_factory=AbilityRollRequest)],
 ) -> AbilityRoll:
-    """Roll the six ability scores with osrlib, store them, and return them with the classes they qualify for.
+    """Roll six 3d6 ability scores with osrlib, store the roll, and return the scores and eligible classes.
 
-    Show the player `scores` and `eligible_class_ids`, then pass the roll's `id` as `ability_roll_id` to
-    `POST /v1/characters` with the player's choices. The request body is optional, and a player sends none.
+    Display `scores` and `eligible_class_ids` to the player, then pass `id` as `ability_roll_id` to
+    `POST /v1/characters` along with the player's class, alignment, and equipment choices. The request body is
+    optional: players send no body, whereas a referee may pass `seed`.
 
-    The server rolls the scores from a seed, the integer osrlib draws every random number from, and stores the seed
-    with the roll. The character created from the roll gets its hit point and gold rolls from the same seed. So every
-    attempt to create a character from one roll, like a retry after osrlib refuses a choice, gets the same rolls. The
-    server never returns the seed.
+    The server stores the roll's seed privately and derives the character's hit points and starting gold from that
+    same seed when `POST /v1/characters` consumes the roll. Retrying `POST /v1/characters` after a 422
+    `character_invalid` error therefore keeps the exact same rolls.
 
-    The server doesn't limit how many rolls a client asks for, so a game that allows one roll for each character keeps
-    that rule itself. To create a character with scores the server rolls in the same request, leave
-    `ability_roll_id` out of `POST /v1/characters` and skip this operation.
+    Ability rolls cannot be deleted (each uses at most 55 bytes toward `storage.used_bytes`), and the server places
+    no limit on how many rolls a client creates. To roll scores and create the character in one step, omit
+    `ability_roll_id` on `POST /v1/characters`.
     """
-    seed = referee_seed(body.seed if body is not None else None, principal)
+    seed = referee_seed(body.seed, principal)
     rolled = roll_ability_scores(creation_stream(seed))
     row = _db(request).insert_ability_roll(
         principal.client, scores={ability.value: score for ability, score in rolled.scores.items()}, seed=seed
@@ -255,9 +275,9 @@ def create_ability_roll(
     "/ability-rolls/{roll_id}",
     tags=["characters"],
     summary="Get an ability roll",
-    response_description="The roll, with `used` set to whether a character was created from it.",
+    response_description="Stored ability roll, with `used` indicating whether a character already consumed it.",
     responses=problem_responses(
-        {404: ["`not_found`: Your client has no ability roll with this id. `POST /v1/ability-rolls` makes one."]}
+        {404: ["`not_found`: Your client has no ability roll with this id. `POST /v1/ability-rolls` creates one."]}
     ),
 )
 def get_ability_roll(
@@ -265,10 +285,11 @@ def get_ability_roll(
     principal: CurrentPrincipal,
     roll_id: RollId,
 ) -> AbilityRoll:
-    """Return an ability roll, with `used` set to whether a character was created from it.
+    """Return a stored ability roll, including its six `scores`, `eligible_class_ids`, and `used` flag.
 
-    Use it to show the scores again, like after the player reloads a character creation screen. A roll with `used`
-    set to `true` can't create another character.
+    Use this endpoint to resume character creation after a page reload. When `used` is `false`, pass `id` as
+    `ability_roll_id` to `POST /v1/characters`. When `used` is `true`, the roll has already created a character and
+    cannot be used again.
     """
     row = _db(request).get_ability_roll(principal.client, roll_id)
     if row is None:
@@ -281,39 +302,37 @@ def get_ability_roll(
     status_code=201,
     tags=["characters"],
     summary="Create a character",
-    response_description="The stored character, with its id and the values osrlib computes from it.",
+    response_description="Stored character with its new `chr_` id and derived stats.",
     responses=problem_responses(
         {
             403: [_SEED_FORBIDDEN],
             404: ["`not_found`: Your client has no ability roll with the id in `ability_roll_id`."],
             409: [
-                "`ability_roll_used`: A character was already created from the ability roll. Deleting that "
-                "character doesn't free the roll. Roll again with `POST /v1/ability-rolls`."
+                "`ability_roll_used`: A character was already created from `ability_roll_id`. Deleting that "
+                "character doesn't reset the roll. Create a new roll with `POST /v1/ability-rolls`."
             ],
             422: [
-                VALIDATION_ERROR + " A request with both `seed` and `ability_roll_id` gets this code too.",
-                _CHARACTER_INVALID + " The ability roll stays unused, so send the same `ability_roll_id` again.",
+                VALIDATION_ERROR + " Sending both `seed` and `ability_roll_id` returns this code too.",
+                _CHARACTER_INVALID + " Any `ability_roll_id` in the request remains unused for a retry.",
             ],
         }
     ),
 )
 def create_character(request: Request, principal: CurrentPrincipal, body: CharacterRequest) -> StoredCharacter:
-    """Create a first-level character from the player's choices, and store it.
+    """Create and store a first-level character from the player's choices.
 
-    Pass the character's `id` in `character_ids` to `POST /v1/sessions` to play it. A session plays a copy, so play
-    never changes the stored character.
+    Pass the returned `id` in `character_ids` to `POST /v1/sessions` to start a game. Sessions copy their party
+    members at start, so play never mutates the stored character and one character can enter any number of sessions.
 
-    With `ability_roll_id`, from `POST /v1/ability-rolls`, the character gets that roll's scores, its hit points and
-    gold come from the roll's seed, and the roll becomes used. Without it, the server rolls the scores first. Then
-    osrlib checks the choices in the request and rolls the dice, in this order: it checks the class, checks and
-    applies the ability adjustment, checks the first spells, rolls hit points, checks the extra languages, rolls
-    starting gold, and buys and equips the gear. Creation stops at the first choice osrlib refuses, and stores
-    nothing.
+    When `ability_roll_id` (from `POST /v1/ability-rolls`) is provided, the character uses those scores, draws hit
+    points and starting gold from that roll's seed, and marks the roll `used` in the same transaction. Without
+    `ability_roll_id`, the server rolls ability scores first. osrlib then validates and applies choices in order:
+    class requirements, ability `adjustment`, `starting_spell_ids`, hit point roll, `extra_languages`, starting gold
+    roll, `purchases`, and `equip_item_ids`. Creation stops at the first invalid step with 422 `character_invalid`
+    and stores nothing.
 
-    The ids in the body come from the rules reference: `class_id` from `GET /v1/rules/classes`, `starting_spell_ids`
-    from `GET /v1/rules/spells`, `extra_languages` from `GET /v1/rules/languages`, and each `item_id` from
-    `GET /v1/rules/equipment`. To show the player the dice before you store anything, use
-    `POST /v1/generate/character`, which stores nothing.
+    Look up catalog ids via `GET /v1/rules/classes`, `GET /v1/rules/spells`, `GET /v1/rules/languages`, and
+    `GET /v1/rules/equipment`. To preview rolled dice without storing anything, call `POST /v1/generate/character`.
     """
     db = _db(request)
     if body.ability_roll_id is None:
@@ -333,16 +352,17 @@ def create_character(request: Request, principal: CurrentPrincipal, body: Charac
     status_code=201,
     tags=["characters"],
     summary="Import a character document",
-    response_description="The stored character, with a new id.",
+    response_description="Stored character with a newly assigned `chr_` id.",
     responses=problem_responses(
         {
             403: [_REFEREE_ONLY],
             409: [_VERSION_UNSUPPORTED],
             422: [
                 VALIDATION_ERROR,
-                "`content_invalid`: The body isn't a character document, osrlib refuses the character, the character "
-                "refers to an item osrlib doesn't have, or the character has a stat modifier or a condition with an "
-                "`effect_id`. `detail` says which. Fix the document.",
+                "`content_invalid`: The body isn't a valid character document, osrlib refuses the character or "
+                "cannot compute derived stats (such as an unknown item id), `stat_modifiers` is non-empty, a "
+                "condition has an `effect_id`, `max_hp` exceeds 2^63 - 1, or `name` contains a control character. "
+                "Check `detail` and fix the document.",
             ],
         }
     ),
@@ -351,31 +371,30 @@ def create_character(request: Request, principal: CurrentPrincipal, body: Charac
 def import_character(
     request: Request,
     principal: RefereePrincipal,
-    document: Annotated[dict[str, Any], Body(description="A character document, as osrlib's `to_document` writes it.")],
+    document: Annotated[
+        dict[str, Any],
+        Body(
+            description='Character document envelope (`kind` set to `"character"`, `schema_version`, '
+            "`engine_version`, and `payload`), as written by osrlib's `Character.to_document`."
+        ),
+    ],
 ) -> StoredCharacter:
-    """Store a character from a character document, the format osrlib's `Character.to_document` writes.
+    """Requires a `referee` API key. Validate and store a character from an osrlib character document.
 
-    Only a referee may import a character. Use it to bring a character from another server or from a program that
-    uses osrlib, or to store a character that `POST /v1/characters` can't create, like a fighter at level 14. The
-    server accepts any character osrlib's `Character` model accepts.
+    Pass the returned `id` in `character_ids` to `POST /v1/sessions`. Use this operation to migrate characters
+    between servers, import characters built with osrlib, or store characters above level 1 that
+    `POST /v1/characters` doesn't create.
 
-    A character document is an object with `kind` set to `character`, `schema_version` and `engine_version`, and the
-    character in `payload`. The `character` of a stored character, from `GET /v1/characters/{character_id}`, is a
-    valid `payload`. Take `schema_version` from `GET /v1/meta`.
+    Send an envelope object with `kind` set to `"character"`, `schema_version` (at most the `schema_version` from
+    `GET /v1/meta`), `engine_version`, and an osrlib `Character` in `payload` (matching `character` on
+    `GET /v1/characters/{character_id}`). The request body may be up to `BXAPI_MAX_BODY_BYTES` (8,388,608 bytes by
+    default). The server clears `payload.id` so each session assigns a fresh party-member id, and assigns a new
+    `chr_` id to the stored record.
 
-    The server clears the `id` field of the character in the document, because osrlib gives each party member
-    without an id a new one when a session starts. The stored character gets a new `chr_` id.
-
-    When an effect grants a character a condition or a stat modifier, the condition or modifier
-    refers to the effect by its `effect_id`, and the effect belongs to the game the character
-    came from. In a new session the condition would never end, and the modifier would end with
-    an unrelated effect that has the same id. So a character with a stat modifier, or with a
-    condition that has an `effect_id`, gets 422 `content_invalid`. A condition with no
-    `effect_id`, like `dead`, is accepted.
-
-    A character whose `max_hp` is larger than 2^63 - 1, the largest integer the server's database
-    stores, gets 422 `content_invalid` too. So does a character whose `name` has a control
-    character, like a tab or a newline.
+    Refuses characters with `stat_modifiers` or conditions with an `effect_id` (422 `content_invalid`), because
+    those reference active effects from another session's ledger. The server accepts permanent conditions with
+    `effect_id` set to `null` (such as `dead`). Also refuses `max_hp` above 2^63 - 1 or a `name` containing control
+    characters.
     """
     character = Character.from_document(document)
     if character.stat_modifiers or any(condition.effect_id is not None for condition in character.conditions):
@@ -399,10 +418,11 @@ def import_character(
     response_description="A page of character summaries, newest first.",
 )
 def list_characters(request: Request, principal: CurrentPrincipal, page: PageQuery) -> Page[CharacterSummary]:
-    """Return a page of your client's characters, newest first.
+    """Return a page of your client's stored characters, ordered newest first.
 
-    Use it for a character picker before you start a session. Each summary has the fields a list shows. For the whole
-    character, with its scores, inventory, and the values osrlib computes, use `GET /v1/characters/{character_id}`.
+    Use this list to populate a party-selection screen before calling `POST /v1/sessions`. Each item contains summary
+    fields (`id`, `name`, `class_id`, `level`, `max_hp`, `created_at`). Call `GET /v1/characters/{character_id}` for
+    full ability scores, inventory, spells, and derived stats.
     """
     rows = _db(request).list_characters(principal.client, limit=page.limit, offset=page.offset)
     items = [
@@ -423,16 +443,18 @@ def list_characters(request: Request, principal: CurrentPrincipal, page: PageQue
     "/characters/{character_id}",
     tags=["characters"],
     summary="Get a stored character",
-    response_description="The stored character, with the values osrlib computes from it.",
-    responses=problem_responses({404: ["`not_found`: Your client has no character with this id."]}),
+    response_description="Stored character with computed `derived` values.",
+    responses=problem_responses(
+        {404: ["`not_found`: Your client has no character with this id. `GET /v1/characters` lists your characters."]}
+    ),
 )
 def get_character(request: Request, principal: CurrentPrincipal, character_id: CharacterId) -> StoredCharacter:
-    """Return a stored character, with the values osrlib derives from it.
+    """Return one stored character's full osrlib `Character` model and computed `derived` values.
 
-    `character` is osrlib's `Character` model: the scores, hit points, inventory, spells, and conditions. `derived`
-    has the values osrlib computes from the character and doesn't store, like `thac0`, `armour_class`, and `saves`.
-    The stored character stays as it was created. To see a character as it is in a game, read the session's
-    `GET /v1/sessions/{session_id}/view`.
+    `character` contains scores, hit points, inventory, spells, and conditions, while `derived` contains computed
+    values such as `thac0`, `armour_class`, `saves`, and ability modifiers (`derived` omits `movement_rate_feet`
+    because it depends on a session's `ruleset`). Because sessions copy characters when starting, this record never
+    reflects in-session changes. Read `GET /v1/sessions/{session_id}/view` for a party member's state during play.
     """
     row = _db(request).get_character(principal.client, character_id)
     if row is None:
@@ -450,11 +472,11 @@ def get_character(request: Request, principal: CurrentPrincipal, character_id: C
     responses=problem_responses({404: ["`not_found`: Your client has no character with this id."]}),
 )
 def delete_character(request: Request, principal: CurrentPrincipal, character_id: CharacterId) -> Response:
-    """Delete a stored character. A session that started with the character has a copy and isn't affected.
+    """Delete a stored character and reclaim its bytes in your client's storage quota (`GET /v1/meta`).
 
-    Deleting the character doesn't free the ability roll it was created from. The character's bytes no longer count
-    toward your client's storage, which `GET /v1/meta` reports. A retry of a delete that succeeded gets 404
-    `not_found`.
+    Existing sessions that started with this character use their copies and continue unaffected. Deleting a
+    character does not reset the `used` flag on the ability roll it came from, and repeating a completed delete
+    returns 404 `not_found`.
     """
     if not _db(request).delete_character(principal.client, character_id):
         raise not_found("character", character_id)
@@ -465,18 +487,19 @@ def delete_character(request: Request, principal: CurrentPrincipal, character_id
     "/generate/character",
     tags=["generate"],
     summary="Roll a character without storing it",
-    response_description="The character, the values osrlib computes from it, every die rolled, and the seed.",
+    response_description="Generated character, derived stats, creation rolls, and the seed used.",
     responses=problem_responses({422: [VALIDATION_ERROR, _CHARACTER_INVALID]}),
 )
 def generate_character(body: GenerateCharacterRequest) -> GeneratedCharacterResponse:
-    """Roll a first-level character from the choices `POST /v1/characters` accepts, and store nothing.
+    """Roll an unstored first-level character with osrlib from the same choices `POST /v1/characters` accepts.
 
-    The server rolls the ability scores, then applies the choices with the same osrlib steps as
-    `POST /v1/characters`. `rolls` has every die: the three dice of each ability score, the hit point roll, and the
-    gold roll. Send the same body with the returned seed to get the same character again. Any caller may pass a seed.
+    osrlib rolls the six ability scores and applies your class, adjustment, spell, language, and equipment choices in
+    order, returning the `character`, `derived` stats, and every individual die in `rolls` (`ability_rolls`,
+    `hit_point_roll`, and `gold_roll`). Both `player` and `referee` keys may pass `seed` to reproduce a character, or
+    omit it to draw a new seed.
 
-    Use it for a character generator, or for an NPC a referee needs now. The result has no id, so you can't pass it in
-    `character_ids` to start a session. To store a character for play, use `POST /v1/characters`.
+    Because the character isn't stored, it has `id` set to `null` and cannot be passed in `character_ids` to
+    `POST /v1/sessions`. To store a character for play, call `POST /v1/characters` instead.
     """
     seed = seed_or_draw(body.seed)
     generated = roll_character(body, seed)
