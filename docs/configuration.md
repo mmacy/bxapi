@@ -31,7 +31,7 @@ For an invalid entry in `BXAPI_API_KEYS`, the error identifies the 1-based entry
 | `BXAPI_ALLOW_ANONYMOUS` | `false` | Allows startup when `BXAPI_API_KEYS` is empty, treating every caller as `referee` for client `local` and restricting `/v1` requests to `Host` values `localhost`, `127.0.0.1`, or `[::1]`. Ignored when `BXAPI_API_KEYS` contains any key. |
 | `BXAPI_CORS_ORIGINS` | none | JSON array of allowed browser origins (`scheme://host[:port]`, with no path or trailing slash. The server rejects `*`.) When unset, the server sends no CORS headers. |
 | `BXAPI_RATE_LIMIT_PER_MINUTE` | `600` | Per-process token-bucket request limit per minute for each `client` name under `/v1` (unauthenticated requests share one bucket of the same size). Set to `0` to disable. |
-| `BXAPI_SESSION_CACHE_SIZE` | `256` | Maximum active sessions cached in memory per process (minimum `1`). Evicts least-recently-used sessions to SQLite and reloads them on demand. |
+| `BXAPI_SESSION_CACHE_SIZE` | `256` | Maximum active sessions kept in memory per process (minimum `1`). Every accepted command writes through to SQLite immediately. Eviction drops the least-recently-used in-memory copy and reloads it from SQLite on demand. |
 | `BXAPI_MAX_CLIENT_BYTES` | `1073741824` | Maximum stored document bytes per `client` across ability rolls, characters, adventures (info and document), sessions, saves, and 24-hour idempotency replay bodies (`1` GiB by default, shared across processes via SQLite). Set to `0` to disable. |
 | `BXAPI_MAX_BODY_BYTES` | `8388608` | Maximum request body size in bytes (`8` MiB by default, minimum `1024`) for the five operations that accept osrlib documents: [`POST /v1/adventures`](https://mmacy.github.io/bxapi/reference/endpoint/adventures#operation-upload_adventure), [`POST /v1/adventures/validate`](https://mmacy.github.io/bxapi/reference/endpoint/adventures#operation-validate_adventure), [`POST /v1/characters/import`](https://mmacy.github.io/bxapi/reference/endpoint/characters#operation-import_character), [`POST /v1/saves/import`](https://mmacy.github.io/bxapi/reference/endpoint/saves#operation-import_save), and [`POST /v1/sessions`](https://mmacy.github.io/bxapi/reference/endpoint/sessions#operation-create_session). The server caps all other request bodies at the smaller of `65536` bytes or `BXAPI_MAX_BODY_BYTES`. Save documents grow as sessions accumulate events, so size this setting above your largest imported save. |
 | `BXAPI_BODY_TIMEOUT_SECONDS` | `30` | Maximum seconds allowed for a request body to arrive once reading starts (greater than `0`). Slower uploads fail with 408 `request_timeout`. |
@@ -47,22 +47,31 @@ Each object in `BXAPI_API_KEYS` configures one bearer token:
 - `key`: secret string of at least `16` printable ASCII characters (`0x21` to `0x7E`) with no spaces. Every entry in `BXAPI_API_KEYS` must have a distinct `key`.
 - `role`: `"player"` (default) or `"referee"`.
 
-1. Generate a random key for each role or client application:
+1. Generate a random secret and store it in a shell variable:
 
    ```sh
-   python3 -c "import secrets; print(secrets.token_urlsafe(24))"
+   PLAYER_KEY="$(python3 -c 'import secrets; print(secrets.token_urlsafe(24))')"
+   echo "$PLAYER_KEY"
    ```
 
-2. Pass the key list in `BXAPI_API_KEYS` (or place it in `.env`) and start the server:
+2. Pass the key in `BXAPI_API_KEYS` (or write it into `.env`) and start the server:
 
    ```sh
-   BXAPI_API_KEYS='[{"client": "my-game", "key": "I2xREiV099R-y8OEwT_Xb7FFZuP4vWrK", "role": "player"}]' uv run bxapi
+   BXAPI_API_KEYS="[{\"client\": \"my-game\", \"key\": \"$PLAYER_KEY\", \"role\": \"player\"}]" uv run bxapi
    ```
 
    At startup, bxapi logs the key count, client names, and allowed CORS origins without logging any secret:
 
    ```text
    INFO:     bxapi requires an API key. Keys: 1. Clients: my-game. CORS origins: none.
+   ```
+
+3. From a second terminal (with `PLAYER_KEY` exported to the same secret), verify that `/health` answers without a key, `/v1/meta` rejects unauthenticated requests with `401`, and your bearer token resolves to `my-game` with the `player` role:
+
+   ```sh
+   curl -sS -w '\n' http://127.0.0.1:8640/health
+   curl -sSi http://127.0.0.1:8640/v1/meta | head -n 1
+   curl -sS -w '\n' http://127.0.0.1:8640/v1/meta -H "Authorization: Bearer $PLAYER_KEY"
    ```
 
 When you run locally with `BXAPI_ALLOW_ANONYMOUS=true` and no `BXAPI_API_KEYS`, the server checks the `Host` header on `/v1` requests and rejects anything other than `localhost`, `127.0.0.1`, or `[::1]` with 421 `misdirected_request`. That check blocks DNS-rebinding attacks from untrusted websites open in your local browser, which send their domain in `Host`. When you configure `BXAPI_API_KEYS`, bxapi accepts any `Host` header because unauthenticated requests fail with 401 `unauthorized`.
@@ -82,23 +91,22 @@ Never run a shared server with `BXAPI_ALLOW_ANONYMOUS=true` (any local process o
 If a browser single-page application calls bxapi directly, list its exact origin (`scheme://host[:port]`) in `BXAPI_CORS_ORIGINS`:
 
 ```sh
-BXAPI_API_KEYS='[{"client": "my-game", "key": "I2xREiV099R-y8OEwT_Xb7FFZuP4vWrK", "role": "player"}]' BXAPI_CORS_ORIGINS='["https://game.example"]' uv run bxapi
+BXAPI_API_KEYS="[{\"client\": \"my-game\", \"key\": \"$PLAYER_KEY\", \"role\": \"player\"}]" BXAPI_CORS_ORIGINS='["https://game.example"]' uv run bxapi
 ```
 
 bxapi answers unauthenticated `OPTIONS` preflight requests automatically and exposes `WWW-Authenticate`, `Retry-After`, `ETag`, `Idempotent-Replayed`, and `X-Request-Id` to browser scripts via `Access-Control-Expose-Headers`. Embed only a `player` key in browser code, never a `referee` key.
 
 ### Store and back up the SQLite database
 
-Set `BXAPI_DATABASE` to a persistent path on backed-up storage. Because the database stores each session's master seed, bxapi creates the database file (along with SQLite's `-wal` and `-shm` write-ahead log files while running) with `0600` permissions. Plan disk capacity for `BXAPI_MAX_CLIENT_BYTES` per configured `client`, plus one extra document per client and SQLite table and index overhead.
+Create dedicated database and backup directories owned by the service account with `0700` permissions, and set `BXAPI_DATABASE` to a file inside the database directory. Because the database stores each session's master seed, bxapi creates new database files (along with SQLite's `-wal` and `-shm` write-ahead log files while running) with `0600` permissions, whereas existing or restored files keep their current permissions. Plan disk capacity for `BXAPI_MAX_CLIENT_BYTES` per configured `client`, plus one extra document per client and SQLite table and index overhead.
 
-Don't copy a live database with `cp`, which can miss committed frames still in `-wal`. Run SQLite's online `.backup` command instead, then restrict the backup file's permissions:
+Don't copy a live database with `cp`, which can miss committed frames still in `-wal`. Run SQLite's online `.backup` command inside your `0700` backup directory under a restrictive `umask` so the backup file is never world-readable while being written:
 
 ```sh
-sqlite3 /var/lib/bxapi/game.db ".backup /var/backups/bxapi/game-backup.db"
-chmod 600 /var/backups/bxapi/game-backup.db
+(umask 077 && sqlite3 /var/lib/bxapi/game.db ".backup /var/backups/bxapi/game-backup.db")
 ```
 
-To restore from a backup, stop all bxapi processes, replace the file at `BXAPI_DATABASE` with the backup, and start the server again. bxapi performs no automatic schema migrations: if a database file's `PRAGMA user_version` doesn't match the installed release's table layout version, startup fails with an error naming the path and versions.
+To restore from a backup, stop all bxapi processes, copy the backup to `BXAPI_DATABASE` with `0600` permissions owned by the service account, and start the server again. bxapi performs no automatic schema migrations: if a database file's `PRAGMA user_version` doesn't match the installed release's table layout version, startup fails with an error naming the path and versions.
 
 ### Read access logs and trace errors
 
@@ -114,7 +122,7 @@ If you run the ASGI application factory directly (for example, `uvicorn bxapi.ap
 
 ### Run multiple server processes
 
-The `bxapi` command runs a single process. To scale horizontally, run multiple processes on separate ports behind your reverse proxy against the same SQLite database file:
+The `bxapi` command runs a single process. To scale on one machine, run multiple processes on separate ports behind your reverse proxy against the same local SQLite database file (never place a SQLite WAL database on a network filesystem such as NFS or SMB, and independent hosts don't share state):
 
 - **Session concurrency:** Before executing a command, each process verifies the session's `revision` in SQLite and commits only if no other process updated the row in the meantime. If another process wrote first, the losing request makes no changes and returns 409 `session_busy` with the current `revision`.
 - **SQLite write locks:** Processes serialize database writes and wait up to 5 seconds for the write lock before returning 503 `database_busy` with `Retry-After: 1`.

@@ -1,6 +1,8 @@
 # bxapi
 
-bxapi is an HTTP API for the 1981 B/X (Basic/Expert) fantasy adventure game rules, built with [FastAPI](https://fastapi.tiangolo.com/) on [osrlib](https://github.com/mmacy/osrlib-python). Your application renders the interface and reads player input, while bxapi rolls dice, enforces B/X rules, stores characters, adventures (the towns, dungeons, and encounters a party plays), sessions (active games in progress), and saved snapshots in SQLite, and serializes requests to each active game. You can query rules catalogs, roll dice, and generate characters, treasure, rooms, or monsters without storing state, or run full dungeon-crawl sessions from character creation through combat.
+bxapi is an HTTP API for the 1981 B/X (Basic/Expert) fantasy adventure game rules, built with [FastAPI](https://fastapi.tiangolo.com/) on [osrlib](https://github.com/mmacy/osrlib-python). Your client renders the interface and reads player input, while bxapi rolls dice, enforces B/X rules, persists games in SQLite, and serializes concurrent requests to each active game.
+
+Use the stateless endpoints to query rules catalogs, roll dice, or generate characters, treasure, rooms, and monsters without storing anything. Use the stateful endpoints to store characters and adventures (the towns, dungeons, and encounters a party plays), run dungeon-crawl sessions (active games in progress), and branch from saved snapshots.
 
 ## Prerequisites
 
@@ -25,7 +27,7 @@ bxapi is an HTTP API for the 1981 B/X (Basic/Expert) fantasy adventure game rule
 2. In a second terminal, check that the server is listening:
 
    ```sh
-   curl -s http://127.0.0.1:8640/health
+   curl -sS http://127.0.0.1:8640/health
    ```
 
    ```json
@@ -35,7 +37,7 @@ bxapi is an HTTP API for the 1981 B/X (Basic/Expert) fantasy adventure game rule
 3. Send a seeded roll to [`POST /v1/dice/roll`](https://mmacy.github.io/bxapi/reference/endpoint/dice#operation-roll_dice):
 
    ```sh
-   curl -s -X POST http://127.0.0.1:8640/v1/dice/roll -H "Content-Type: application/json" -d '{"expression": "3d6", "seed": 7}'
+   curl -sS -X POST http://127.0.0.1:8640/v1/dice/roll -H "Content-Type: application/json" -d '{"expression": "3d6", "seed": 7}'
    ```
 
    ```json
@@ -53,7 +55,7 @@ The [API reference](https://mmacy.github.io/bxapi/reference/) documents every en
 A running server also serves interactive Swagger UI documentation at <http://127.0.0.1:8640/docs>, ReDoc at <http://127.0.0.1:8640/redoc>, and the raw OpenAPI 3.1 specification at <http://127.0.0.1:8640/openapi.json>:
 
 ```sh
-curl -s http://127.0.0.1:8640/openapi.json > openapi.json
+curl -sS http://127.0.0.1:8640/openapi.json > openapi.json
 ```
 
 To export the same OpenAPI document without starting a server, run `bxapi.openapi`. It builds the application with fixed in-memory settings, ignores `BXAPI_` environment variables and `.env`, and writes the JSON specification to standard output:

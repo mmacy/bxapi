@@ -14,7 +14,7 @@ Walk through a dungeon-crawl session (one game in progress) of `builtin-barrow`,
 
    ```sh
    export KEY=player-key-0123456789
-   curl -s http://127.0.0.1:8640/v1/meta -H "Authorization: Bearer $KEY"
+   curl -sS -w '\n' http://127.0.0.1:8640/v1/meta -H "Authorization: Bearer $KEY"
    ```
 
    ```json
@@ -36,7 +36,7 @@ The output blocks below format and abbreviate the server's compact JSON with `..
 1. Roll six 3d6 ability scores with [`POST /v1/ability-rolls`](https://mmacy.github.io/bxapi/reference/endpoint/characters#operation-create_ability_roll) to see which B/X classes the roll qualifies for:
 
    ```sh
-   curl -s -X POST http://127.0.0.1:8640/v1/ability-rolls -H "Authorization: Bearer $KEY"
+   curl -sS -w '\n' -X POST http://127.0.0.1:8640/v1/ability-rolls -H "Authorization: Bearer $KEY"
    ```
 
    ```json
@@ -55,10 +55,10 @@ The output blocks below format and abbreviate the server's compact JSON with `..
    export ROLL=rol_yQsuUWgqmzpnDA6Sm51kQA
    ```
 
-3. Create a fighter from that roll with [`POST /v1/characters`](https://mmacy.github.io/bxapi/reference/endpoint/characters#operation-create_character), buying and equipping starting gear from [`GET /v1/rules/equipment`](https://mmacy.github.io/bxapi/reference/endpoint/rules#operation-list_equipment):
+3. Create a fighter from that roll with [`POST /v1/characters`](https://mmacy.github.io/bxapi/reference/endpoint/characters#operation-create_character), buying and equipping leather armour (15 gp) and a sword (10 gp) from [`GET /v1/rules/equipment`](https://mmacy.github.io/bxapi/reference/endpoint/rules#operation-list_equipment):
 
    ```sh
-   curl -s -X POST http://127.0.0.1:8640/v1/characters -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d "{\"name\": \"Brenna\", \"class_id\": \"fighter\", \"alignment\": \"lawful\", \"ability_roll_id\": \"$ROLL\", \"purchases\": [{\"item_id\": \"chainmail\"}, {\"item_id\": \"shield\"}, {\"item_id\": \"sword\"}], \"equip_item_ids\": [\"chainmail\", \"shield\", \"sword\"]}"
+   curl -sS -w '\n' -X POST http://127.0.0.1:8640/v1/characters -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d "{\"name\": \"Brenna\", \"class_id\": \"fighter\", \"alignment\": \"lawful\", \"ability_roll_id\": \"$ROLL\", \"purchases\": [{\"item_id\": \"leather\"}, {\"item_id\": \"sword\"}], \"equip_item_ids\": [\"leather\", \"sword\"]}"
    ```
 
    ```json
@@ -69,17 +69,17 @@ The output blocks below format and abbreviate the server's compact JSON with `..
      "level": 1,
      "created_at": "2026-11-21T05:24:33Z",
      "character": {"name": "Brenna", "scores": {...}, "max_hp": 3, "current_hp": 3, "inventory": {...}, ...},
-     "derived": {"thac0": 19, "attack_bonus": 0, "armour_class": 4, "armour_class_ascending": 15, "saves": {...}, ...}
+     "derived": {"thac0": 19, "attack_bonus": 0, "armour_class": 7, "armour_class_ascending": 12, "saves": {...}, ...}
    }
    ```
 
-   If the rolled starting gold (3d6 × 10 gp) falls short of the 65 gp total, the server returns 422 `character_invalid` with `items.purchase.insufficient_funds` in `rejections` and leaves `$ROLL` unused: retry with `"leather"` instead of `"chainmail"`. To show rolled gold to a player before shopping, omit `purchases` and `equip_item_ids`, read `character.inventory.purse.gp` from the response, and buy gear after starting the session in `town` mode with the `purchase_equipment` and `equip_item` commands.
+   Every starting gold roll (3d6 × 10 gp, from 30 to 180 gp) covers this 25 gp kit. If a player requests gear costing more than the rolled gold (such as `chainmail`, `shield`, and `sword` for 60 gp total), the server returns 422 `character_invalid` with `items.purchase.insufficient_funds` in `rejections` and leaves `$ROLL` unused with the same gold roll so the player can retry with cheaper gear. To show rolled gold before shopping, omit `purchases` and `equip_item_ids`, read `character.inventory.purse.gp` from the response, and buy gear after starting a session in `town` mode with `purchase_equipment` and `equip_item`.
 
 4. Create a cleric and a thief without `ability_roll_id` so the server rolls their scores inline:
 
    ```sh
-   curl -s -X POST http://127.0.0.1:8640/v1/characters -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"name": "Tomas", "class_id": "cleric", "alignment": "lawful", "purchases": [{"item_id": "mace"}, {"item_id": "leather"}], "equip_item_ids": ["mace", "leather"]}'
-   curl -s -X POST http://127.0.0.1:8640/v1/characters -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"name": "Wren", "class_id": "thief", "alignment": "neutral", "purchases": [{"item_id": "dagger"}, {"item_id": "leather"}], "equip_item_ids": ["dagger", "leather"]}'
+   curl -sS -w '\n' -X POST http://127.0.0.1:8640/v1/characters -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"name": "Tomas", "class_id": "cleric", "alignment": "lawful", "purchases": [{"item_id": "mace"}, {"item_id": "leather"}], "equip_item_ids": ["mace", "leather"]}'
+   curl -sS -w '\n' -X POST http://127.0.0.1:8640/v1/characters -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"name": "Wren", "class_id": "thief", "alignment": "neutral", "purchases": [{"item_id": "dagger"}, {"item_id": "leather"}], "equip_item_ids": ["dagger", "leather"]}'
    ```
 
 5. Replace the three `chr_` IDs below with the `id` values returned for Brenna, Tomas, and Wren:
@@ -95,7 +95,7 @@ The output blocks below format and abbreviate the server's compact JSON with `..
 1. Start a session of `builtin-barrow` with [`POST /v1/sessions`](https://mmacy.github.io/bxapi/reference/endpoint/sessions#operation-create_session), passing `character_ids` in marching order (front rank first):
 
    ```sh
-   curl -s -X POST http://127.0.0.1:8640/v1/sessions -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d "{\"adventure_id\": \"builtin-barrow\", \"character_ids\": [\"$BRENNA\", \"$TOMAS\", \"$WREN\"]}"
+   curl -sS -w '\n' -X POST http://127.0.0.1:8640/v1/sessions -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d "{\"adventure_id\": \"builtin-barrow\", \"character_ids\": [\"$BRENNA\", \"$TOMAS\", \"$WREN\"]}"
    ```
 
    ```json
@@ -126,7 +126,7 @@ The output blocks below format and abbreviate the server's compact JSON with `..
 3. List the commands legal in `town` mode with [`GET /v1/sessions/{session_id}/commands`](https://mmacy.github.io/bxapi/reference/endpoint/sessions#operation-list_session_commands):
 
    ```sh
-   curl -s "http://127.0.0.1:8640/v1/sessions/$SESSION/commands" -H "Authorization: Bearer $KEY"
+   curl -sS -w '\n' "http://127.0.0.1:8640/v1/sessions/$SESSION/commands" -H "Authorization: Bearer $KEY"
    ```
 
    ```json
@@ -147,7 +147,7 @@ The output blocks below format and abbreviate the server's compact JSON with `..
 4. Enter the `barrow` dungeon:
 
    ```sh
-   curl -s -X POST "http://127.0.0.1:8640/v1/sessions/$SESSION/commands" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"command_type": "enter_dungeon", "dungeon_id": "barrow"}'
+   curl -sS -w '\n' -X POST "http://127.0.0.1:8640/v1/sessions/$SESSION/commands" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"command_type": "enter_dungeon", "dungeon_id": "barrow"}'
    ```
 
    ```json
@@ -172,7 +172,7 @@ The output blocks below format and abbreviate the server's compact JSON with `..
 1. Try moving `north` into a wall:
 
    ```sh
-   curl -s -X POST "http://127.0.0.1:8640/v1/sessions/$SESSION/commands" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"command_type": "move_party", "direction": "north"}'
+   curl -sS -w '\n' -X POST "http://127.0.0.1:8640/v1/sessions/$SESSION/commands" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"command_type": "move_party", "direction": "north"}'
    ```
 
    ```json
@@ -181,11 +181,11 @@ The output blocks below format and abbreviate the server's compact JSON with `..
 
    Because the HTTP request itself is valid, the server returns `200 OK` with `accepted` set to `false`, osrlib's `rejections`, and `revision` unchanged at `1` (see [Refused commands](https://mmacy.github.io/bxapi/reference/#refused-commands)).
 
-2. Step `east` twice, adding `include=view` on the second move so the response includes the updated player view when the party enters the guard room:
+2. Step `east` into `(1, 0)`, then step `east` again with `include=view` to enter the guard room and receive the updated player view in the same response:
 
    ```sh
-   curl -s -X POST "http://127.0.0.1:8640/v1/sessions/$SESSION/commands" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"command_type": "move_party", "direction": "east"}'
-   curl -s -X POST "http://127.0.0.1:8640/v1/sessions/$SESSION/commands?include=view" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"command_type": "move_party", "direction": "east"}'
+   curl -sS -w '\n' -X POST "http://127.0.0.1:8640/v1/sessions/$SESSION/commands" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"command_type": "move_party", "direction": "east"}'
+   curl -sS -w '\n' -X POST "http://127.0.0.1:8640/v1/sessions/$SESSION/commands?include=view" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"command_type": "move_party", "direction": "east"}'
    ```
 
    ```json
@@ -224,32 +224,30 @@ The output blocks below format and abbreviate the server's compact JSON with `..
    }
    ```
 
-   You can also fetch the player view separately at any time with [`GET /v1/sessions/{session_id}/view`](https://mmacy.github.io/bxapi/reference/endpoint/sessions#operation-get_player_view). In `encounter` mode, the party has met monsters (`group-0001` at 20 feet) and can `parley`, `evade`, `engage_battle`, or `wait`.
+   You can also fetch the player view separately at any time with [`GET /v1/sessions/{session_id}/view`](https://mmacy.github.io/bxapi/reference/endpoint/sessions#operation-get_player_view). Check `mode` in your response before continuing: most runs enter `encounter` mode (where the party can `parley`, `evade`, `engage_battle`, or `wait`), whereas an immediate monster attack or surprise roll can transition directly into `battle` mode (or even end a short fight).
 
 ## Fight a battle round
 
-1. Start combat with `engage_battle`:
+1. If your session is in `encounter` mode, start combat with `engage_battle` and pass `include=view` to inspect `view.encounter` (if your session is already in `battle` mode, skip to step 2, or skip to [Save and restore](#save-and-restore) if surprise already ended combat):
 
    ```sh
-   curl -s -X POST "http://127.0.0.1:8640/v1/sessions/$SESSION/commands" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"command_type": "engage_battle"}'
+   curl -sS -w '\n' -X POST "http://127.0.0.1:8640/v1/sessions/$SESSION/commands?include=view" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"command_type": "engage_battle"}'
    ```
 
-   `mode` becomes `battle` at `revision` `4` (unless monster surprise resolved an immediate round or ended the fight).
-
-2. In `battle` mode, `resolve_battle_round` requires one declaration for every character listed in `encounter.declarers`. Only characters in `encounter.front_rank` (`character-0001` and `character-0002` in this corridor of width `2`) can make melee attacks. osrlib refuses a melee attack from `character-0003` (`Wren`) with `battle.declaration.not_in_front_rank`:
+2. In `battle` mode, `resolve_battle_round` requires one declaration for every character in `view.encounter.declarers`, and only characters in `view.encounter.front_rank` can make melee attacks. When all three party members are still in `declarers` and `front_rank` contains only `character-0001` and `character-0002` (corridor width `2`), osrlib refuses a melee attack from `character-0003` (`Wren`) with `battle.declaration.not_in_front_rank`:
 
    ```sh
-   curl -s -X POST "http://127.0.0.1:8640/v1/sessions/$SESSION/commands" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"command_type": "resolve_battle_round", "declarations": [{"character_id": "character-0001", "action": "attack", "target_group_id": "group-0001", "move": "close"}, {"character_id": "character-0002", "action": "attack", "target_group_id": "group-0001", "move": "close"}, {"character_id": "character-0003", "action": "attack", "target_group_id": "group-0001", "move": "close"}]}'
+   curl -sS -w '\n' -X POST "http://127.0.0.1:8640/v1/sessions/$SESSION/commands" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"command_type": "resolve_battle_round", "declarations": [{"character_id": "character-0001", "action": "attack", "target_group_id": "group-0001", "move": "close"}, {"character_id": "character-0002", "action": "attack", "target_group_id": "group-0001", "move": "close"}, {"character_id": "character-0003", "action": "attack", "target_group_id": "group-0001", "move": "close"}]}'
    ```
 
    ```json
    {"accepted":false,"rejections":[{"code":"battle.declaration.not_in_front_rank","params":{"character":"character-0003"}}],"events":[],"messages":[],"mode":"battle","ended":false,"revision":4}
    ```
 
-3. Have Brenna and Tomas close the 20-foot gap (`"move": "close"`) to attack `group-0001` while Wren holds (`"action": "hold"`):
+3. Submit one valid declaration per character in your current `view.encounter.declarers` (if a surprise round already closed the gap to 5 feet or knocked out a character, omit `"move": "close"` or drop that character's entry to match `view.encounter`):
 
    ```sh
-   curl -s -X POST "http://127.0.0.1:8640/v1/sessions/$SESSION/commands?include=view" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"command_type": "resolve_battle_round", "declarations": [{"character_id": "character-0001", "action": "attack", "target_group_id": "group-0001", "move": "close"}, {"character_id": "character-0002", "action": "attack", "target_group_id": "group-0001", "move": "close"}, {"character_id": "character-0003", "action": "hold"}]}'
+   curl -sS -w '\n' -X POST "http://127.0.0.1:8640/v1/sessions/$SESSION/commands?include=view" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"command_type": "resolve_battle_round", "declarations": [{"character_id": "character-0001", "action": "attack", "target_group_id": "group-0001", "move": "close"}, {"character_id": "character-0002", "action": "attack", "target_group_id": "group-0001", "move": "close"}, {"character_id": "character-0003", "action": "hold"}]}'
    ```
 
    ```json
@@ -278,7 +276,7 @@ The output blocks below format and abbreviate the server's compact JSON with `..
 1. Snapshot the session with [`POST /v1/sessions/{session_id}/saves`](https://mmacy.github.io/bxapi/reference/endpoint/sessions#operation-save_session):
 
    ```sh
-   curl -s -X POST "http://127.0.0.1:8640/v1/sessions/$SESSION/saves" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"label": "After round 1"}'
+   curl -sS -w '\n' -X POST "http://127.0.0.1:8640/v1/sessions/$SESSION/saves" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"label": "After round 1"}'
    ```
 
    ```json
@@ -294,13 +292,15 @@ The output blocks below format and abbreviate the server's compact JSON with `..
    }
    ```
 
+   `clock` tracks total in-game time since the adventure began (two 10-minute dungeon exploration turns equal 120 10-second rounds, plus 1 combat round), which is separate from the session's HTTP `revision`.
+
 2. Replace `sav_E6NKZNiBl4c2jL_rkyY8Bg` with your save's `id` and branch a new session from that checkpoint with [`POST /v1/saves/{save_id}/restore`](https://mmacy.github.io/bxapi/reference/endpoint/saves#operation-restore_save):
 
    ```sh
    export SAVE=sav_E6NKZNiBl4c2jL_rkyY8Bg
-   curl -s -X POST "http://127.0.0.1:8640/v1/saves/$SAVE/restore" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"name": "Second try"}'
+   curl -sS -w '\n' -X POST "http://127.0.0.1:8640/v1/saves/$SAVE/restore" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"name": "Second try"}'
    ```
 
-   Restoring starts an independent session at `revision` `0` while leaving both the original session and the save untouched.
+   Restoring returns a new `ses_` ID at `revision` `0` while leaving both the original `$SESSION` and `$SAVE` untouched. Export the returned `id` to `SESSION` before sending commands to the restored game.
 
 Read [Build a client](client-guide.md) next for key topologies, safe retries (`Idempotency-Key` and `expected_revision`), `ETag` polling, custom adventures, and referee tools, or inspect [`examples/play_barrow.py`](../examples/README.md) to see this loop automated in Python.
