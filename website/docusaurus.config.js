@@ -59,7 +59,15 @@ const config = {
           routeBasePath: "/",
           sidebarPath: "./sidebars.js",
           beforeDefaultRemarkPlugins: [
-            [repoLinks, { contentRoot, repoRoot: path.resolve(siteDir, ".."), blobUrl: `${repoUrl}/blob/main` }],
+            [
+              repoLinks,
+              {
+                contentRoot,
+                repoRoot: path.resolve(siteDir, ".."),
+                blobUrl: `${repoUrl}/blob/main`,
+                siteUrl: "https://mmacy.github.io/bxapi",
+              },
+            ],
             [unescapeCodeBraces, { generatedRoot: referenceRoot }],
             [docsMdFixes, { generatedRoot: referenceRoot, openapiFile: path.resolve(siteDir, "generated/openapi.json") }],
             [
