@@ -444,6 +444,201 @@ def test_racing_creations_from_two_servers_make_one_character(player: TestClient
     assert player.get("/v1/characters").json()["total"] == 5
 
 
+# Previews
+
+
+def preview(caller: TestClient, roll_id: str, body: dict[str, Any]) -> Any:
+    return caller.post(f"/v1/ability-rolls/{roll_id}/preview", json=body)
+
+
+def all_classes_seed() -> int:
+    """Return a seed whose scores meet every class's requirements."""
+    return seed_where(lambda scores: osrlib_eligible(scores) == CLASS_IDS)
+
+
+@pytest.mark.parametrize("hp_reroll", [False, True])
+@pytest.mark.parametrize("class_id", CLASS_IDS)
+def test_a_preview_is_what_creation_then_stores(referee: TestClient, class_id: str, hp_reroll: bool) -> None:
+    for seed, choices in full_cases(class_id, hp_reroll=hp_reroll):
+        result = osrlib_character(seed, class_id, hp_reroll=hp_reroll, **choices)
+        body = request_body(class_id, choices, hp_reroll=hp_reroll)
+        roll = referee.post("/v1/ability-rolls", json={"seed": seed}).json()
+        response = preview(referee, roll["id"], body)
+        assert response.status_code == 200, response.text
+        assert response.json() == {
+            "character": result.character.model_dump(mode="json"),
+            "derived": expected_derived(result.character),
+            "rolls": {
+                "ability_rolls": result.ability_rolls.model_dump(mode="json"),
+                "hit_point_roll": result.hit_point_roll.model_dump(mode="json"),
+                "gold_roll": result.gold_roll.model_dump(mode="json"),
+            },
+        }, f"seed {seed}"
+        assert referee.get(f"/v1/ability-rolls/{roll['id']}").json()["used"] is False
+        stored = referee.post("/v1/characters", json=body | {"ability_roll_id": roll["id"]}).json()
+        assert stored["character"] == response.json()["character"]
+        assert stored["derived"] == response.json()["derived"]
+
+
+def test_a_preview_without_purchases_shows_the_gold_creation_starts_with(player: TestClient) -> None:
+    roll = player.post("/v1/ability-rolls").json()
+    shown = preview(player, roll["id"], FIGHTER).json()
+    gold = shown["rolls"]["gold_roll"]["total"]
+    assert shown["character"]["inventory"]["purse"]["gp"] == gold
+    assert shown["character"]["max_hp"] == shown["rolls"]["hit_point_roll"]["hit_points"]
+    assert shown["rolls"]["ability_rolls"]["scores"] == roll["scores"]
+    dagger = load_equipment().get("dagger").cost_gp
+    body = FIGHTER | {"ability_roll_id": roll["id"], "purchases": [{"item_id": "dagger", "quantity": gold // dagger}]}
+    stored = player.post("/v1/characters", json=body).json()
+    assert stored["character"]["inventory"]["purse"]["gp"] == gold - (gold // dagger) * dagger
+    assert stored["character"]["max_hp"] == shown["character"]["max_hp"]
+
+
+def test_previews_are_equal_and_store_nothing(player: TestClient) -> None:
+    roll = player.post("/v1/ability-rolls").json()
+    used_bytes = player.get("/v1/meta").json()["storage"]["used_bytes"]
+    previews = [preview(player, roll["id"], FIGHTER | GEAR) for _ in range(5)]
+    assert {response.status_code for response in previews} == {200}
+    assert len({json.dumps(response.json()) for response in previews}) == 1
+    assert set(previews[0].json()) == {"character", "derived", "rolls"}
+    assert previews[0].json()["character"]["id"] is None
+    assert player.get("/v1/meta").json()["storage"]["used_bytes"] == used_bytes
+    assert player.get("/v1/characters").json()["total"] == 0
+    assert player.get(f"/v1/ability-rolls/{roll['id']}").json() == roll
+
+
+@pytest.mark.parametrize(
+    "choices",
+    [
+        {"name": "Durin", "class_id": "dwarf"},
+        {"class_id": "magic_user"},
+        {"starting_spell_ids": ["sleep"]},
+        {"adjustment": {"lowered": {"dex": 2}, "raised": {"str": 1}}},
+        {"extra_languages": ["no_such_language"]},
+        {"purchases": [{"item_id": "plate_mail", "quantity": 4}]},
+        {"class_id": "cleric", "purchases": [{"item_id": "sword"}], "equip_item_ids": ["sword"]},
+        {"class_id": "no_such_class"},
+        {"purchases": [{"item_id": "dagger"}, {"item_id": "no_such_item"}]},
+        {"purchases": [{"item_id": "dagger"}], "equip_item_ids": ["dagger", "sword"]},
+        {"purchases": [{"item_id": "dagger", "quantity": 2}], "equip_item_ids": ["dagger", "dagger"]},
+    ],
+)
+def test_a_refused_preview_is_the_refused_creation(referee: TestClient, choices: dict[str, Any]) -> None:
+    seed = seed_where(lambda scores: scores["con"] < 9) if choices.get("class_id") == "dwarf" else all_classes_seed()
+    roll = referee.post("/v1/ability-rolls", json={"seed": seed}).json()
+    refused = preview(referee, roll["id"], FIGHTER | choices)
+    assert (refused.status_code, refused.json()["code"]) == (422, "character_invalid")
+    assert referee.get(f"/v1/ability-rolls/{roll['id']}").json()["used"] is False
+    created = referee.post("/v1/characters", json=FIGHTER | choices | {"ability_roll_id": roll["id"]})
+    assert created.status_code == 422
+    assert problem_without_id(refused) == problem_without_id(created)
+    assert referee.get(f"/v1/ability-rolls/{roll['id']}").json()["used"] is False
+
+
+def test_a_preview_of_another_clients_roll_or_an_unknown_roll_is_not_found(
+    player: TestClient, other: TestClient
+) -> None:
+    roll = player.post("/v1/ability-rolls").json()
+    stolen = preview(other, roll["id"], FIGHTER)
+    assert stolen.status_code == 404
+    assert (stolen.json()["code"], stolen.json()["resource"], stolen.json()["id"]) == (
+        "not_found",
+        "ability roll",
+        roll["id"],
+    )
+    assert preview(player, "rol_5mJq0nY2bXr8TzW4cH1eKd", FIGHTER).json()["code"] == "not_found"
+    assert player.get(f"/v1/ability-rolls/{roll['id']}").json()["used"] is False
+
+
+def test_a_preview_of_a_used_roll_is_a_conflict(player: TestClient) -> None:
+    roll = player.post("/v1/ability-rolls").json()
+    assert player.post("/v1/characters", json=FIGHTER | {"ability_roll_id": roll["id"]}).status_code == 201
+    used = preview(player, roll["id"], FIGHTER)
+    assert (used.status_code, used.json()["code"]) == (409, "ability_roll_used")
+    again = player.post("/v1/characters", json=FIGHTER | {"ability_roll_id": roll["id"]})
+    assert problem_without_id(used) == problem_without_id(again)
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [{"seed": 5}, {"ability_roll_id": "rol_5mJq0nY2bXr8TzW4cH1eKd"}, {"ability_roll_id": None}, {"dry_run": True}],
+)
+def test_a_preview_body_with_a_member_creation_doesnt_take_here_is_a_validation_error(
+    referee: TestClient, extra: dict[str, Any]
+) -> None:
+    roll = referee.post("/v1/ability-rolls").json()
+    response = preview(referee, roll["id"], FIGHTER | extra)
+    assert (response.status_code, response.json()["code"]) == (422, "validation_error")
+    assert response.json()["errors"][0]["type"] == "extra_forbidden"
+    assert referee.get(f"/v1/ability-rolls/{roll['id']}").json()["used"] is False
+
+
+def test_a_malformed_preview_body_is_a_validation_error(player: TestClient) -> None:
+    roll = player.post("/v1/ability-rolls").json()
+    for body in ({"class_id": "fighter", "alignment": "lawful"}, FIGHTER | {"alignment": "evil"}, [FIGHTER]):
+        response = player.post(f"/v1/ability-rolls/{roll['id']}/preview", json=body)
+        assert (response.status_code, response.json()["code"]) == (422, "validation_error")
+
+
+def single_choice_variants(class_id: str, choices: dict[str, Any], *, hp_reroll: bool) -> list[dict[str, Any]]:
+    """Return request bodies that each differ from the fewest legal choices in one choice that takes no dice."""
+    full = request_body(class_id, choices, hp_reroll=hp_reroll)
+    base = FIGHTER | {
+        "class_id": class_id,
+        "starting_spell_ids": choices["starting_spell_ids"],
+        "hp_reroll_at_first_level": hp_reroll,
+    }
+    # The extra language is legal only with the adjustment, which raises a score that can add a language.
+    variants = [
+        base | {"adjustment": full["adjustment"]},
+        base | {"adjustment": full["adjustment"], "extra_languages": full["extra_languages"]},
+        base | {"purchases": full["purchases"]},
+        base | {"purchases": full["purchases"], "equip_item_ids": full["equip_item_ids"]},
+        base | {"name": "Someone else"},
+        base | {"alignment": "chaotic"},
+        full,
+    ]
+    profile = caster_profile(load_classes().get(class_id))
+    if choices["starting_spell_ids"] and profile is not None:
+        other_spell = load_spells().by_list(profile.spell_list, 1)[-1].id
+        assert other_spell not in choices["starting_spell_ids"]
+        variants.append(base | {"starting_spell_ids": [other_spell]})
+    return [base, *variants]
+
+
+@pytest.mark.parametrize("hp_reroll", [False, True])
+@pytest.mark.parametrize("class_id", CLASS_IDS)
+def test_only_the_class_and_the_reroll_option_change_the_hit_point_and_gold_rolls(
+    referee: TestClient, class_id: str, hp_reroll: bool
+) -> None:
+    for seed, choices in full_cases(class_id, hp_reroll=hp_reroll):
+        roll = referee.post("/v1/ability-rolls", json={"seed": seed}).json()
+        shown = []
+        for body in single_choice_variants(class_id, choices, hp_reroll=hp_reroll):
+            response = preview(referee, roll["id"], body)
+            assert response.status_code == 200, response.text
+            rolls = response.json()["rolls"]
+            shown.append((rolls["hit_point_roll"], rolls["gold_roll"]))
+        assert len({json.dumps(rolls) for rolls in shown}) == 1, f"seed {seed}"
+
+
+def test_the_class_and_the_reroll_option_can_change_the_gold(referee: TestClient) -> None:
+    # A d6 sometimes discards a raw draw where a d8 never does, and a reroll takes more draws, so the gold can move.
+    by_class, by_reroll = False, False
+    for seed in range(200):
+        roll = referee.post("/v1/ability-rolls", json={"seed": seed}).json()
+        if not {"fighter", "cleric"} <= set(roll["eligible_class_ids"]):
+            continue
+        fighter = preview(referee, roll["id"], FIGHTER).json()["rolls"]["gold_roll"]
+        cleric = preview(referee, roll["id"], FIGHTER | {"class_id": "cleric"}).json()["rolls"]["gold_roll"]
+        rerolled = preview(referee, roll["id"], FIGHTER | {"hp_reroll_at_first_level": True}).json()["rolls"]
+        by_class = by_class or fighter != cleric
+        by_reroll = by_reroll or (len(rerolled["hit_point_roll"]["rolls"]) > 1 and rerolled["gold_roll"] != fighter)
+        if by_class and by_reroll:
+            return
+    raise AssertionError("no seed below 200 changes the gold with the class and with the reroll option")
+
+
 # Import, list, get, and delete
 
 
@@ -531,6 +726,7 @@ def test_the_openapi_document_names_and_tags_the_operations(client: TestClient) 
     operations = {
         ("/v1/ability-rolls", "post"): "create_ability_roll",
         ("/v1/ability-rolls/{roll_id}", "get"): "get_ability_roll",
+        ("/v1/ability-rolls/{roll_id}/preview", "post"): "preview_character",
         ("/v1/characters", "post"): "create_character",
         ("/v1/characters", "get"): "list_characters",
         ("/v1/characters/import", "post"): "import_character",

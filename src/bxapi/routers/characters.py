@@ -30,6 +30,8 @@ from bxapi.seeds import Seed, referee_seed, seed_or_draw
 __all__ = [
     "AbilityRoll",
     "AbilityRollRequest",
+    "CharacterPreview",
+    "CharacterPreviewRequest",
     "CharacterRequest",
     "CharacterSummary",
     "GenerateCharacterRequest",
@@ -85,7 +87,7 @@ class AbilityRoll(ApiModel):
 
     id: str
     """Ability roll identifier (`rol_` followed by 22 characters). Pass as `ability_roll_id` to
-    `POST /v1/characters`."""
+    `POST /v1/characters`, or as `roll_id` to `POST /v1/ability-rolls/{roll_id}/preview`."""
     scores: dict[AbilityScore, int]
     """Six rolled ability scores (`str`, `int`, `wis`, `dex`, `con`, `cha`), each from 3 to 18."""
     eligible_class_ids: list[str]
@@ -115,6 +117,14 @@ class CharacterRequest(CharacterChoices):
         if self.ability_roll_id is not None and self.seed is not None:
             raise ValueError("pass seed or ability_roll_id, not both: an ability roll already has a seed")
         return self
+
+
+class CharacterPreviewRequest(CharacterChoices):
+    """Choices for previewing the character `POST /v1/characters` would create from an ability roll.
+
+    The body has every member `POST /v1/characters` accepts except `ability_roll_id`, because the
+    path names the roll, and `seed`, because the roll's seed decides the dice.
+    """
 
 
 class GenerateCharacterRequest(CharacterChoices):
@@ -179,6 +189,18 @@ class GeneratedCharacterResponse(ApiModel):
     """Individual dice rolled for ability scores, hit points, and starting gold."""
 
 
+class CharacterPreview(ApiModel):
+    """Unstored first-level character that `POST /v1/characters` would create from an ability roll, with its dice."""
+
+    character: Character
+    """osrlib `Character` model that `POST /v1/characters` stores for the same roll and choices, with
+    `id` set to `null`."""
+    derived: DerivedValues
+    """Combat, saving throw, modifier, and language values computed by osrlib from `character`."""
+    rolls: CreationRolls
+    """Individual dice rolled for the roll's ability scores, the hit points, and the starting gold."""
+
+
 def _db(request: Request) -> Database:
     return request.app.state.db
 
@@ -196,6 +218,15 @@ def _ability_roll(row: AbilityRollRow) -> AbilityRoll:
 
 def _roll_used(roll_id: str) -> ApiError:
     return conflict("ability_roll_used", f"A character was already created from the ability roll {roll_id!r}.")
+
+
+def _unused_roll(db: Database, client: str, roll_id: str) -> AbilityRollRow:
+    roll = db.get_ability_roll(client, roll_id)
+    if roll is None:
+        raise not_found("ability roll", roll_id)
+    if roll.used:
+        raise _roll_used(roll_id)
+    return roll
 
 
 def _derived(character: Character) -> DerivedValues:
@@ -257,7 +288,8 @@ def create_ability_roll(
 
     The server stores the roll's seed privately and derives the character's hit points and starting gold from that
     same seed when `POST /v1/characters` consumes the roll. Retrying `POST /v1/characters` after a 422
-    `character_invalid` error therefore keeps the exact same rolls.
+    `character_invalid` error therefore keeps the exact same rolls. To show the player those hit points and that gold
+    before you create the character, call `POST /v1/ability-rolls/{roll_id}/preview`.
 
     Ability rolls cannot be deleted (each uses at most 55 bytes toward `storage.used_bytes`), and the server places
     no limit on how many rolls a client creates. To roll scores and create the character in one step, omit
@@ -298,6 +330,64 @@ def get_ability_roll(
 
 
 @router.post(
+    "/ability-rolls/{roll_id}/preview",
+    tags=["characters"],
+    summary="Preview a character from an ability roll",
+    response_description="The character `POST /v1/characters` would store, its derived stats, and its dice.",
+    responses=problem_responses(
+        {
+            404: [
+                "`not_found`: Your client has no ability roll with this id, including a roll that another client "
+                "created. `POST /v1/ability-rolls` creates one."
+            ],
+            409: [
+                "`ability_roll_used`: A character was already created from this roll, so `POST /v1/characters` "
+                "would refuse it too. Create a new roll with `POST /v1/ability-rolls`."
+            ],
+            422: [
+                VALIDATION_ERROR + " A body with `seed` or `ability_roll_id` returns this code too, as does any member "
+                "`POST /v1/characters` doesn't accept.",
+                _CHARACTER_INVALID + " The roll stays unused, and `POST /v1/characters` refuses the same choices with "
+                "the same problem.",
+            ],
+        }
+    ),
+)
+def preview_character(
+    request: Request, principal: CurrentPrincipal, roll_id: RollId, body: CharacterPreviewRequest
+) -> CharacterPreview:
+    """Return the character that `POST /v1/characters` would create from this ability roll and these choices.
+
+    The response has the `character`, its `derived` stats, and every die osrlib rolled for it in `rolls`: the dice
+    behind the roll's scores in `ability_rolls`, the hit point roll in `hit_point_roll`, and the starting gold roll in
+    `gold_roll`. Use it to show a player their hit points and starting gold before they shop, and before the character
+    exists. The roll stays unused. Without an `Idempotency-Key`, the server stores nothing and `storage.used_bytes`
+    doesn't change. With one, the server stores the response for the key, as it does for every `POST`.
+
+    Send the choices `POST /v1/characters` accepts, without `ability_roll_id`, because the path names the roll, and
+    without `seed`. The preview and the creation run the same steps on the roll's private seed, so:
+
+    - Every preview of one roll with the same choices returns the same response.
+    - `POST /v1/characters` with this roll and the same choices stores a character equal to `character`, with the
+      same hit points, gold, and inventory.
+    - A choice that `POST /v1/characters` refuses gets the same 422 `character_invalid` here, with the same members,
+      and the roll stays unused.
+
+    For one roll, `hit_point_roll` and `gold_roll` change only when `class_id` or `hp_reroll_at_first_level` changes.
+    The `adjustment`, `starting_spell_ids`, `extra_languages`, `name`, `alignment`, `purchases`, and `equip_item_ids`
+    change neither roll. So once the player has chosen a class and the reroll option, you can show the hit points and
+    gold and let the player make every other choice without the dice changing. A different class or reroll option can
+    change the gold as well as the hit points.
+
+    The response has no `seed`, because the roll's seed stays private, and no `id`, because the server stores no
+    character. `character.id` is `null`. A `player` key and a `referee` key can both call this operation.
+    """
+    roll = _unused_roll(_db(request), principal.client, roll_id)
+    previewed = character_from_roll(body, roll.seed, scores_from_json(roll.scores))
+    return CharacterPreview(character=previewed.character, derived=_derived(previewed.character), rolls=previewed.rolls)
+
+
+@router.post(
     "/characters",
     status_code=201,
     tags=["characters"],
@@ -332,19 +422,17 @@ def create_character(request: Request, principal: CurrentPrincipal, body: Charac
     and stores nothing.
 
     Look up catalog ids via `GET /v1/rules/classes`, `GET /v1/rules/spells`, `GET /v1/rules/languages`, and
-    `GET /v1/rules/equipment`. To preview rolled dice without storing anything, call `POST /v1/generate/character`.
+    `GET /v1/rules/equipment`. To show the player the hit points and starting gold of an ability roll before you
+    create the character, call `POST /v1/ability-rolls/{roll_id}/preview` with the same choices. To roll a character
+    from new scores without storing anything, call `POST /v1/generate/character`.
     """
     db = _db(request)
     if body.ability_roll_id is None:
         seed = referee_seed(body.seed, principal)
         return _store(db, principal.client, roll_character(body, seed).character)
-    roll = db.get_ability_roll(principal.client, body.ability_roll_id)
-    if roll is None:
-        raise not_found("ability roll", body.ability_roll_id)
-    if roll.used:
-        raise _roll_used(body.ability_roll_id)
-    character = character_from_roll(body, roll.seed, scores_from_json(roll.scores))
-    return _store(db, principal.client, character, body.ability_roll_id)
+    roll = _unused_roll(db, principal.client, body.ability_roll_id)
+    created = character_from_roll(body, roll.seed, scores_from_json(roll.scores))
+    return _store(db, principal.client, created.character, body.ability_roll_id)
 
 
 @router.post(
@@ -499,7 +587,9 @@ def generate_character(body: GenerateCharacterRequest) -> GeneratedCharacterResp
     omit it to draw a new seed.
 
     Because the character isn't stored, it has `id` set to `null` and cannot be passed in `character_ids` to
-    `POST /v1/sessions`. To store a character for play, call `POST /v1/characters` instead.
+    `POST /v1/sessions`. To store a character for play, call `POST /v1/characters` instead. This operation rolls new
+    scores and takes no `ability_roll_id`. To see the character a stored ability roll would create, call
+    `POST /v1/ability-rolls/{roll_id}/preview`.
     """
     seed = seed_or_draw(body.seed)
     generated = roll_character(body, seed)

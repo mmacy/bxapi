@@ -2883,6 +2883,272 @@
     }
   },
   {
+    "name": "aldric_preview",
+    "operation": "preview_character",
+    "summary": "Preview the fighter the roll would make, with a sword and leather armour",
+    "request": {
+      "method": "POST",
+      "path": "/v1/ability-rolls/{ability_roll.id}/preview",
+      "body": {
+        "name": "Aldric",
+        "class_id": "fighter",
+        "alignment": "lawful",
+        "purchases": [
+          {
+            "item_id": "sword"
+          },
+          {
+            "item_id": "leather"
+          }
+        ],
+        "equip_item_ids": [
+          "sword",
+          "leather"
+        ]
+      }
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/ability-rolls/rol_WmenVZTVnr258xLqI57VPw/preview",
+      "body": {
+        "name": "Aldric",
+        "class_id": "fighter",
+        "alignment": "lawful",
+        "purchases": [
+          {
+            "item_id": "sword"
+          },
+          {
+            "item_id": "leather"
+          }
+        ],
+        "equip_item_ids": [
+          "sword",
+          "leather"
+        ]
+      },
+      "status": 200,
+      "response": {
+        "character": {
+          "id": null,
+          "name": "Aldric",
+          "class_id": "fighter",
+          "custom_class": null,
+          "race": "human",
+          "level": 1,
+          "xp": 0,
+          "scores": {
+            "str": 9,
+            "int": 9,
+            "wis": 12,
+            "dex": 15,
+            "con": 12,
+            "cha": 5
+          },
+          "alignment": "lawful",
+          "extra_languages": [],
+          "max_hp": 8,
+          "current_hp": 8,
+          "nonregen_damage": 0,
+          "inventory": {
+            "items": [],
+            "purse": {
+              "pp": 0,
+              "gp": 80,
+              "ep": 0,
+              "sp": 0,
+              "cp": 0
+            },
+            "valuables": [],
+            "worn_armour": {
+              "instance_type": "item",
+              "template": {
+                "item_type": "armour",
+                "id": "leather",
+                "name": "Leather",
+                "cost_gp": 20,
+                "weight_coins": 200,
+                "ac": 7,
+                "ac_ascending": 12,
+                "ac_bonus": null,
+                "category": "light",
+                "overrides_applied": []
+              },
+              "quantity": 1
+            },
+            "shield": null,
+            "wielded": [
+              {
+                "instance_type": "item",
+                "template": {
+                  "item_type": "weapon",
+                  "id": "sword",
+                  "name": "Sword",
+                  "cost_gp": 10,
+                  "weight_coins": 60,
+                  "damage": "1d8",
+                  "qualities": [
+                    "melee"
+                  ],
+                  "missile_ranges": null,
+                  "material": "standard",
+                  "overrides_applied": []
+                },
+                "quantity": 1
+              }
+            ],
+            "rings": []
+          },
+          "carrying_treasure": false,
+          "conditions": [],
+          "stat_modifiers": [],
+          "spell_book": [],
+          "memorized_spells": []
+        },
+        "derived": {
+          "thac0": 19,
+          "attack_bonus": 0,
+          "armour_class": 6,
+          "armour_class_ascending": 13,
+          "saves": {
+            "death": 12,
+            "wands": 13,
+            "paralysis": 14,
+            "breath": 15,
+            "spells": 16
+          },
+          "melee_modifier": 0,
+          "open_doors_chance": 2,
+          "missile_modifier": 1,
+          "initiative_modifier": 1,
+          "hit_point_modifier": 0,
+          "magic_save_modifier": 0,
+          "npc_reaction_modifier": -1,
+          "xp_modifier_pct": 0,
+          "level_title": "Veteran",
+          "alignment_tongue": "alignment_lawful",
+          "languages": [
+            "alignment_lawful",
+            "common"
+          ]
+        },
+        "rolls": {
+          "ability_rolls": {
+            "scores": {
+              "str": 9,
+              "int": 9,
+              "wis": 12,
+              "dex": 15,
+              "con": 12,
+              "cha": 5
+            },
+            "rolls": {
+              "str": [
+                1,
+                6,
+                2
+              ],
+              "int": [
+                4,
+                2,
+                3
+              ],
+              "wis": [
+                4,
+                4,
+                4
+              ],
+              "dex": [
+                5,
+                5,
+                5
+              ],
+              "con": [
+                4,
+                2,
+                6
+              ],
+              "cha": [
+                1,
+                2,
+                2
+              ]
+            }
+          },
+          "hit_point_roll": {
+            "rolls": [
+              8
+            ],
+            "hit_points": 8
+          },
+          "gold_roll": {
+            "rolls": [
+              4,
+              4,
+              3
+            ],
+            "modifier": 0,
+            "multiplier": 10,
+            "total": 110
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "preview_beyond_gold",
+    "operation": "preview_character",
+    "summary": "Preview purchases that cost more than the starting gold",
+    "request": {
+      "method": "POST",
+      "path": "/v1/ability-rolls/{ability_roll.id}/preview",
+      "body": {
+        "name": "Aldric",
+        "class_id": "fighter",
+        "alignment": "lawful",
+        "purchases": [
+          {
+            "item_id": "plate_mail",
+            "quantity": 4
+          }
+        ]
+      }
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/ability-rolls/rol_WmenVZTVnr258xLqI57VPw/preview",
+      "body": {
+        "name": "Aldric",
+        "class_id": "fighter",
+        "alignment": "lawful",
+        "purchases": [
+          {
+            "item_id": "plate_mail",
+            "quantity": 4
+          }
+        ]
+      },
+      "status": 422,
+      "response": {
+        "type": "about:blank",
+        "title": "Unprocessable Content",
+        "status": 422,
+        "detail": "The starting gold doesn't cover the purchases.",
+        "code": "character_invalid",
+        "request_id": "req_c35fNo1nTsT6lWglrEHCcg",
+        "rejections": [
+          {
+            "code": "items.purchase.insufficient_funds",
+            "params": {
+              "item": "plate_mail",
+              "cost_gp": 240
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
     "name": "no_first_spell",
     "operation": "create_character",
     "summary": "A magic-user without a first spell",
@@ -3117,6 +3383,38 @@
         "detail": "A character was already created from the ability roll 'rol_WmenVZTVnr258xLqI57VPw'.",
         "code": "ability_roll_used",
         "request_id": "req_cpa-YoQ8atwYtHcT7m7MLQ"
+      }
+    }
+  },
+  {
+    "name": "preview_used_roll",
+    "operation": "preview_character",
+    "summary": "Preview a character from a roll that already made one",
+    "request": {
+      "method": "POST",
+      "path": "/v1/ability-rolls/{ability_roll.id}/preview",
+      "body": {
+        "name": "Aldric",
+        "class_id": "fighter",
+        "alignment": "lawful"
+      }
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/ability-rolls/rol_WmenVZTVnr258xLqI57VPw/preview",
+      "body": {
+        "name": "Aldric",
+        "class_id": "fighter",
+        "alignment": "lawful"
+      },
+      "status": 409,
+      "response": {
+        "type": "about:blank",
+        "title": "Conflict",
+        "status": 409,
+        "detail": "A character was already created from the ability roll 'rol_WmenVZTVnr258xLqI57VPw'.",
+        "code": "ability_roll_used",
+        "request_id": "req_y1-QbrAVxqa7Tm3L-oIG5g"
       }
     }
   },
@@ -8961,6 +9259,85 @@
         "request_id": "req_ZO9xD9FzTp3kOZUuiusOyw",
         "resource": "ability roll",
         "id": "rol_5mJq0nY2bXr8TzW4cH1eKd"
+      }
+    }
+  },
+  {
+    "name": "preview_missing_roll",
+    "operation": "preview_character",
+    "summary": "Preview a character from a roll that doesn't exist",
+    "request": {
+      "method": "POST",
+      "path": "/v1/ability-rolls/rol_5mJq0nY2bXr8TzW4cH1eKd/preview",
+      "body": {
+        "name": "Wren",
+        "class_id": "fighter",
+        "alignment": "neutral"
+      }
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/ability-rolls/rol_5mJq0nY2bXr8TzW4cH1eKd/preview",
+      "body": {
+        "name": "Wren",
+        "class_id": "fighter",
+        "alignment": "neutral"
+      },
+      "status": 404,
+      "response": {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No ability roll has the id 'rol_5mJq0nY2bXr8TzW4cH1eKd'.",
+        "code": "not_found",
+        "request_id": "req_NvWlEFEBIZ09CYMylHlGfg",
+        "resource": "ability roll",
+        "id": "rol_5mJq0nY2bXr8TzW4cH1eKd"
+      }
+    }
+  },
+  {
+    "name": "preview_with_seed",
+    "operation": "preview_character",
+    "summary": "Preview with a seed",
+    "request": {
+      "method": "POST",
+      "path": "/v1/ability-rolls/{ability_roll.id}/preview",
+      "body": {
+        "name": "Wren",
+        "class_id": "fighter",
+        "alignment": "neutral",
+        "seed": 20261120
+      }
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/ability-rolls/rol_WmenVZTVnr258xLqI57VPw/preview",
+      "body": {
+        "name": "Wren",
+        "class_id": "fighter",
+        "alignment": "neutral",
+        "seed": 20261120
+      },
+      "status": 422,
+      "response": {
+        "type": "about:blank",
+        "title": "Unprocessable Content",
+        "status": 422,
+        "detail": "The request failed validation. See `errors` for each field.",
+        "code": "validation_error",
+        "request_id": "req_ucJZcIzrUpsU77DUEZBaFQ",
+        "errors": [
+          {
+            "loc": [
+              "body",
+              "seed"
+            ],
+            "msg": "Extra inputs are not permitted",
+            "type": "extra_forbidden"
+          }
+        ],
+        "error_count": 1
       }
     }
   },

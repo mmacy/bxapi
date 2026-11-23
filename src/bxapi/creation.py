@@ -4,10 +4,12 @@ A character starts from an ability roll the server stored earlier, or from score
 rolls in the same request. Either way, one seed determines every roll: the ability scores, the hit
 points, and the starting gold. [`roll_character`][bxapi.creation.roll_character] rolls a new
 character from a seed, and [`character_from_roll`][bxapi.creation.character_from_roll] creates
-one from a stored roll and its seed. Both run the step-by-step creation functions from
-`osrlib.core.character`, in the order osrlib lists them, so the result is the character that
-osrlib's `create_character` returns for the same seed and choices. bxapi doesn't call
-`create_character`, because `create_character` reports only the first refused choice, as a
+one from a stored roll and its seed. `POST /v1/characters` and
+`POST /v1/ability-rolls/{roll_id}/preview` both call `character_from_roll` for a stored roll, so a
+preview is the character that creation stores. Both functions run the step-by-step creation
+functions from `osrlib.core.character`, in the order osrlib lists them, so the result is the
+character that osrlib's `create_character` returns for the same seed and choices. bxapi doesn't
+call `create_character`, because `create_character` reports only the first refused choice, as a
 `ValueError` with no `Rejection` records.
 
 If a step refuses a choice, creation stops there with 422 `character_invalid`. When osrlib
@@ -105,10 +107,10 @@ class CharacterChoices(RequestModel):
     """Extra language `id` values from `GET /v1/rules/languages` (entries with `choosable` set to
     `true`), up to the bonus languages granted by the character's adjusted Intelligence score."""
     purchases: list[Purchase] = []
-    """Starting equipment bought in list order from rolled starting gold (3d6 x 10 gp). Because the
-    server rolls gold during this same request, leave `purchases` empty if you want the player to
-    see their gold first, then send `purchase_equipment` and `equip_item` commands to a session in
-    `town` mode."""
+    """Starting equipment bought in list order from rolled starting gold (3d6 x 10 gp). To show the
+    player their gold before they shop, call `POST /v1/ability-rolls/{roll_id}/preview` with the
+    same roll, class, and `hp_reroll_at_first_level`, and read `rolls.gold_roll.total`. The
+    purchases don't change the gold roll."""
     equip_item_ids: list[str] = []
     """Purchased item `id` values to wear or wield, applied in list order. Each entry equips one
     purchased stack from `purchases` and must be permitted for `class_id`."""
@@ -169,7 +171,7 @@ class DerivedValues(ApiModel):
 
 @dataclass(frozen=True)
 class GeneratedCharacter:
-    """A character created from scores rolled in the same request, and the dice rolled for it."""
+    """A first-level character, and the dice osrlib rolled for it."""
 
     character: Character
     """The first-level character."""
@@ -304,14 +306,20 @@ def roll_character(choices: CharacterChoices, seed: int) -> GeneratedCharacter:
     return GeneratedCharacter(character=character, rolls=rolls)
 
 
-def character_from_roll(choices: CharacterChoices, seed: int, scores: dict[AbilityScore, int]) -> Character:
+def character_from_roll(choices: CharacterChoices, seed: int, scores: dict[AbilityScore, int]) -> GeneratedCharacter:
     """Create a first-level character from a stored ability roll and the seed it was rolled from.
 
     The function re-creates the creation stream for `seed` and rolls the ability scores on it
-    again, so the hit points and the gold come from the same draws on every attempt. The
-    character gets `scores`, the scores the player saw. With the osrlib that rolled them, the
-    scores rolled again are the same, and the character is the one osrlib's `create_character`
-    returns for the same seed and choices.
+    again, so the hit points and the gold come from the same draws on every call. The character
+    gets `scores`, the scores the player saw. With the osrlib that rolled them, the scores rolled
+    again are the same, and the character is the one osrlib's `create_character` returns for the
+    same seed and choices.
+
+    `rolls.ability_rolls` is the roll osrlib makes again, unchanged. osrlib's
+    `ABILITY_ROLL_ORDER` promises that the same stream always gives the same six scores, so its
+    `scores` equal `scores`. If a later osrlib broke that promise, `rolls.ability_rolls` would show
+    the dice that osrlib rolled, which are the draws the hit point and gold rolls follow, while the
+    character kept `scores`.
 
     After the ability roll, the function runs osrlib's step-by-step creation functions in the
     order the `osrlib.core.character` module lists them:
@@ -326,13 +334,20 @@ def character_from_roll(choices: CharacterChoices, seed: int, scores: dict[Abili
        for each item to equip.
     8. The `Character` constructor, then `choose_starting_spells` to write the spell book.
 
+    Only steps 4 and 6 draw from the stream. Step 4 draws once for the class's hit die, and again
+    for each 1 or 2 when `hp_reroll_at_first_level` is on. So for one seed, the hit point roll and
+    the gold roll change only with `class_id` and `hp_reroll_at_first_level`. The hit points also
+    add the Constitution modifier, which no adjustment changes. osrlib lets an adjustment lower
+    only Strength, Intelligence, and Wisdom and raise only a prime requisite, and no class in
+    osrlib's catalog has Constitution as a prime requisite.
+
     Args:
         choices: The player's choices.
         seed: The seed the stored roll was rolled from.
         scores: The stored roll's six ability scores.
 
     Returns:
-        The character.
+        The character, and the dice rolled for it.
 
     Raises:
         ApiError: With status 422 and the code `character_invalid`, at the first step that
@@ -341,9 +356,10 @@ def character_from_roll(choices: CharacterChoices, seed: int, scores: dict[Abili
     """
     definition = _class(choices.class_id)
     stream = creation_stream(seed)
-    roll_ability_scores(stream)
-    character, _, _ = _create(choices, definition, scores, stream)
-    return character
+    ability_rolls = roll_ability_scores(stream)
+    character, hit_point_roll, gold_roll = _create(choices, definition, scores, stream)
+    rolls = CreationRolls(ability_rolls=ability_rolls, hit_point_roll=hit_point_roll, gold_roll=gold_roll)
+    return GeneratedCharacter(character=character, rolls=rolls)
 
 
 def _create(
