@@ -139,7 +139,7 @@ Stateless. Any role. Every request body accepts an optional `seed` (an integer f
 | Method and path | Body | Returns |
 | --- | --- | --- |
 | `POST /v1/dice/roll` | `expression`, `times` (1 to 100, default 1) | `expression`, `seed`, and `rolls`: one osrlib `RollResult` (`rolls`, `modifier`, `multiplier`, `total`) for each time. |
-| `POST /v1/generate/character` | The choices `POST /v1/characters` accepts, except `ability_roll_id`. | `seed`, `character`, `derived`, and the creation `rolls`. The server stores nothing. |
+| `POST /v1/generate/character` | The choices `POST /v1/characters` accepts, except `ability_roll_id`. | `seed`, `character`, `derived`, and the creation `rolls`. The server stores nothing. To preview the character a stored ability roll creates, see `POST /v1/ability-rolls/{roll_id}/preview` under **Characters**. |
 | `POST /v1/generate/treasure` | `treasure_type` (a letter), `tier` (`basic` or `expert`) | `seed` and `treasure`, osrlib's generated treasure. |
 | `POST /v1/generate/npc-party` | `kind` (`basic` or `expert`), `count` (1 to 100) | `seed` and `party`, osrlib's NPC party. |
 | `POST /v1/generate/room` | `level_number` (1 or more) | `seed` and `room`, the stocked area osrlib rolled. |
@@ -151,12 +151,13 @@ A dice expression osrlib can't parse gets 422 `content_invalid`. An unknown mons
 
 The server rolls a character and stores it. When a session starts, the server copies its characters into it, so a stored character stays as it was created, and you can start any number of sessions with it.
 
-B/X players roll ability scores before they choose a class. To support that, a client first asks for an *ability roll*, shows the player the scores and the classes they qualify for, and then creates the character from that roll. The server rolls the scores from a seed and stores the seed with the roll, and it never returns that seed. The character created from the roll gets its hit point and gold rolls from the same seed, so every attempt to create a character from one roll, like a retry after osrlib refuses a choice, gets the same rolls. bxapi doesn't limit how many ability rolls a client asks for, so a game that wants a limit enforces it.
+B/X players roll ability scores before they choose a class. To support that, a client first asks for an *ability roll*, shows the player the scores and the classes they qualify for, and then creates the character from that roll. The server rolls the scores from a seed and stores the seed with the roll, and it never returns that seed. The character created from the roll gets its hit point and gold rolls from the same seed, so every attempt to create a character from one roll, like a retry after osrlib refuses a choice, gets the same rolls. A client can preview that character, with its hit point and gold rolls, before it creates it. bxapi doesn't limit how many ability rolls a client asks for, so a game that wants a limit enforces it.
 
 | Method and path | Role | Body | Returns |
 | --- | --- | --- | --- |
 | `POST /v1/ability-rolls` | player | `seed` (referee only), which determines the scores and the hit point and gold rolls. The body is optional. | 201: the roll: `id`, `scores`, `eligible_class_ids`, `used` (`false`), `created_at` |
 | `GET /v1/ability-rolls/{roll_id}` | player | | The roll, with `used` set to whether a character was created from it. |
+| `POST /v1/ability-rolls/{roll_id}/preview` | player | The choices `POST /v1/characters` accepts, except `ability_roll_id` and `seed`. | `character`, `derived`, and the creation `rolls` of the character `POST /v1/characters` would create from the roll. The server stores nothing. |
 | `POST /v1/characters` | player | See below. | 201: the stored character. |
 | `POST /v1/characters/import` | referee | A character document. | 201: the stored character. |
 | `GET /v1/characters` | player | | A page of character summaries: `id`, `name`, `class_id`, `level`, `max_hp`, `created_at`. |
@@ -200,7 +201,13 @@ The `document` column of a `characters` row is what osrlib's `Character.to_docum
 
 An import also gets 422 `content_invalid` when the character has a stat modifier, or a condition with an `effect_id`. Each of these refers to an effect in the game the character came from. In a new session such a condition would never end, and osrlib would remove such a modifier when an unrelated effect with the same `effect_id` ended. A condition with no `effect_id`, like `dead`, is accepted.
 
-`POST /v1/generate/character` runs the same steps and stores nothing. Its `rolls` is `{ability_rolls, hit_point_roll, gold_roll}`: osrlib's `AbilityScoreRolls`, `HitPointRoll`, and `RollResult`. With the same seed and choices, it returns the character osrlib's `create_character` returns.
+`POST /v1/ability-rolls/{roll_id}/preview` returns the character that `POST /v1/characters` would create from the roll and the choices in the body, and stores nothing. The response is `{character, derived, rolls}`. `character` and `derived` are what a stored character has under the same names, and `rolls` is `{ability_rolls, hit_point_roll, gold_roll}`: osrlib's `AbilityScoreRolls`, `HitPointRoll`, and `RollResult`. `ability_rolls` has the three dice behind each of the roll's scores, and `gold_roll.total` is the gold the character has before its purchases. The response has no `seed` and no `id`, and `character.id` is `null`. The body is the body of `POST /v1/characters` without `ability_roll_id`, because the path names the roll, and without `seed`. A body with either of them, or with any other member `POST /v1/characters` doesn't accept, gets 422 `validation_error`.
+
+A preview and a creation run the same steps on the roll's seed. So every preview of one roll with the same choices returns the same response, and `POST /v1/characters` with the roll and the same choices then stores a character equal to the previewed `character`, with the same hit points, gold, and inventory. A choice that creation refuses gets the same 422 `character_invalid` from the preview, with the same members. A preview never marks the roll used, whether it succeeds or osrlib refuses a choice, and it adds nothing to `storage.used_bytes` unless the request has an `Idempotency-Key`, whose stored response counts as **Storage** under **Conventions** describes. A roll that another client created, or that doesn't exist, gets 404 `not_found`. A used roll gets 409 `ability_roll_used`, because creation would refuse it too.
+
+For one ability roll, `hit_point_roll` and `gold_roll` change only when `class_id` or `hp_reroll_at_first_level` changes. The `adjustment`, `starting_spell_ids`, `extra_languages`, `name`, `alignment`, `purchases`, and `equip_item_ids` change neither roll. A client can therefore show a player the hit points and gold for the chosen class and reroll option, and let the player make every other choice without the dice changing. A change of class or of the reroll option can change the gold as well as the hit points, because osrlib rolls the gold after the hit points, from the same seed, and the number of random draws that the hit point roll takes depends on the class's hit die and on the reroll option.
+
+`POST /v1/generate/character` runs the same steps and stores nothing. Its `rolls` is the same `{ability_rolls, hit_point_roll, gold_roll}`. With the same seed and choices, it returns the character osrlib's `create_character` returns. It rolls new scores, so it can't preview a stored roll.
 
 ### Adventures
 

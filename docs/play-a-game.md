@@ -55,7 +55,27 @@ The output blocks below format and abbreviate the server's compact JSON with `..
    export ROLL=rol_yQsuUWgqmzpnDA6Sm51kQA
    ```
 
-3. Create a fighter from that roll with [`POST /v1/characters`](https://mmacy.github.io/bxapi/reference/endpoint/characters#operation-create_character), buying and equipping leather armour (15 gp) and a sword (10 gp) from [`GET /v1/rules/equipment`](https://mmacy.github.io/bxapi/reference/endpoint/rules#operation-list_equipment):
+3. Preview a fighter from that roll with [`POST /v1/ability-rolls/{roll_id}/preview`](https://mmacy.github.io/bxapi/reference/endpoint/characters#operation-preview_character) to see the hit points and starting gold before the player shops. The server stores nothing and leaves `$ROLL` unused:
+
+   ```sh
+   curl -sS -w '\n' -X POST http://127.0.0.1:8640/v1/ability-rolls/$ROLL/preview -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"name": "Brenna", "class_id": "fighter", "alignment": "lawful"}'
+   ```
+
+   ```json
+   {
+     "character": {"name": "Brenna", "scores": {...}, "max_hp": 3, "current_hp": 3, "inventory": {"purse": {"gp": 90, ...}, ...}, ...},
+     "derived": {"thac0": 19, "armour_class": 9, ...},
+     "rolls": {
+       "ability_rolls": {...},
+       "hit_point_roll": {"rolls": [5], "hit_points": 3},
+       "gold_roll": {"rolls": [3, 2, 4], "modifier": 0, "multiplier": 10, "total": 90}
+     }
+   }
+   ```
+
+   The purchases, the equipment, and every other choice except the class and `hp_reroll_at_first_level` leave `hit_point_roll` and `gold_roll` as they are. So you can show the player 90 gp, let them shop, and preview again to check the purchases before you create the character.
+
+4. Create a fighter from that roll with [`POST /v1/characters`](https://mmacy.github.io/bxapi/reference/endpoint/characters#operation-create_character), buying and equipping leather armour (20 gp) and a sword (10 gp) from [`GET /v1/rules/equipment`](https://mmacy.github.io/bxapi/reference/endpoint/rules#operation-list_equipment):
 
    ```sh
    curl -sS -w '\n' -X POST http://127.0.0.1:8640/v1/characters -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d "{\"name\": \"Brenna\", \"class_id\": \"fighter\", \"alignment\": \"lawful\", \"ability_roll_id\": \"$ROLL\", \"purchases\": [{\"item_id\": \"leather\"}, {\"item_id\": \"sword\"}], \"equip_item_ids\": [\"leather\", \"sword\"]}"
@@ -73,16 +93,16 @@ The output blocks below format and abbreviate the server's compact JSON with `..
    }
    ```
 
-   Every starting gold roll (3d6 × 10 gp, from 30 to 180 gp) covers this 25 gp kit. If a player requests gear costing more than the rolled gold (such as `chainmail`, `shield`, and `sword` for 60 gp total), the server returns 422 `character_invalid` with `items.purchase.insufficient_funds` in `rejections` and leaves `$ROLL` unused with the same gold roll so the player can retry with cheaper gear. To show rolled gold before shopping, omit `purchases` and `equip_item_ids`, read `character.inventory.purse.gp` from the response, and buy gear after starting a session in `town` mode with `purchase_equipment` and `equip_item`.
+   Brenna has the 3 hit points that the preview showed, and 60 gp: the 90 gp from the preview less the 30 gp kit. Every starting gold roll (3d6 × 10 gp, from 30 to 180 gp) covers this 30 gp kit. If a player requests gear costing more than the rolled gold (such as `chainmail`, `shield`, and `sword` for 60 gp total), the server returns 422 `character_invalid` with `items.purchase.insufficient_funds` in `rejections` and leaves `$ROLL` unused with the same gold roll so the player can retry with cheaper gear. A preview with the same choices returns the same 422, so you can check the gear before you create the character. A player can also buy gear after the session starts, in `town` mode, with `purchase_equipment` and `equip_item`.
 
-4. Create a cleric and a thief without `ability_roll_id` so the server rolls their scores inline:
+5. Create a cleric and a thief without `ability_roll_id` so the server rolls their scores inline:
 
    ```sh
    curl -sS -w '\n' -X POST http://127.0.0.1:8640/v1/characters -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"name": "Tomas", "class_id": "cleric", "alignment": "lawful", "purchases": [{"item_id": "mace"}, {"item_id": "leather"}], "equip_item_ids": ["mace", "leather"]}'
    curl -sS -w '\n' -X POST http://127.0.0.1:8640/v1/characters -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"name": "Wren", "class_id": "thief", "alignment": "neutral", "purchases": [{"item_id": "dagger"}, {"item_id": "leather"}], "equip_item_ids": ["dagger", "leather"]}'
    ```
 
-5. Replace the three `chr_` IDs below with the `id` values returned for Brenna, Tomas, and Wren:
+6. Replace the three `chr_` IDs below with the `id` values returned for Brenna, Tomas, and Wren:
 
    ```sh
    export BRENNA=chr_PUtflt1xPCTJIwhqMcAIrA

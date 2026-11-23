@@ -106,7 +106,8 @@ reference is relative to the server's address. Every operation except `GET /heal
 1. `GET /v1/meta` checks your API key and returns your client name, role, and storage usage.
 2. `POST /v1/ability-rolls` rolls six ability scores and lists the classes they qualify for.
 3. `POST /v1/characters` creates a character from the roll and the player's choices. Save the
-   character's `id`.
+   character's `id`. To show the player the hit points and starting gold first, send the same
+   choices to `POST /v1/ability-rolls/{roll_id}/preview`, which stores nothing.
 4. `GET /v1/adventures` lists the adventures you can play. Every server includes `builtin-barrow`.
 5. `POST /v1/sessions` starts a game of an adventure with a party of stored characters. Save the
    session's `id`.
@@ -361,15 +362,18 @@ starting gold from the same seed, so retrying after an invalid choice keeps the 
 
 1. `POST /v1/ability-rolls` rolls and stores six scores, returning `id`, `scores`, and
    `eligible_class_ids`. `GET /v1/ability-rolls/{roll_id}` reads a stored roll again.
-2. `POST /v1/characters` creates and stores a first-level character from `ability_roll_id` (or
+2. `POST /v1/ability-rolls/{roll_id}/preview` returns the character, hit points, and starting
+   gold that the player's choices would give, without storing anything or using the roll. Call it
+   as often as the player changes a choice.
+3. `POST /v1/characters` creates and stores a first-level character from `ability_roll_id` (or
    freshly rolled scores) and the player's choices.
-3. `POST /v1/sessions` starts a game session with the character's `id` in `character_ids`.
+4. `POST /v1/sessions` starts a game session with the character's `id` in `character_ids`.
 
 `GET /v1/characters` lists your client's stored characters, `GET /v1/characters/{character_id}`
 returns one character with its derived stats, and `DELETE /v1/characters/{character_id}` deletes
 one without affecting active sessions. A referee can import an osrlib *character document* (`kind`,
 `schema_version`, `engine_version`, and `payload`) with `POST /v1/characters/import`. To roll a
-character without storing it, call `POST /v1/generate/character`.
+character from new scores without storing it, call `POST /v1/generate/character`.
 """,
     },
     {
