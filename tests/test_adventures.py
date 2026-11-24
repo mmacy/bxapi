@@ -119,6 +119,11 @@ def test_get_and_document_for_a_built_in(player: TestClient, referee: TestClient
     document = referee.get(f"/v1/adventures/{BARROW_ID}/document")
     assert document.status_code == 200
     assert document.json() == builtin_adventures()[BARROW_ID].document
+    level_two = next(level for level in document.json()["payload"]["dungeons"][0]["levels"] if level["number"] == 2)
+    assert {
+        "chance_in_six": level_two["wandering"]["chance_in_six"],
+        "interval_turns": level_two["wandering"]["interval_turns"],
+    } == {"chance_in_six": 1, "interval_turns": 2}
 
 
 def test_the_document_of_a_stored_adventure_is_for_referees(player: TestClient, referee: TestClient) -> None:
