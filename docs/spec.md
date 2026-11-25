@@ -157,7 +157,7 @@ B/X players roll ability scores before they choose a class. To support that, a c
 
 | Method and path | Role | Body | Returns |
 | --- | --- | --- | --- |
-| `POST /v1/ability-rolls` | player | `seed` (referee only), which determines the scores and the hit point and gold rolls. The body is optional. | 201: the roll: `id`, `scores`, `eligible_class_ids`, `used` (`false`), `created_at` |
+| `POST /v1/ability-rolls` | player | `seed` (referee only), which determines the scores and the hit point and gold rolls. The body is optional. | 201: the roll: `id`, `scores`, `rolls`, `eligible_class_ids`, `used` (`false`), `created_at`. `rolls` is osrlib's `AbilityScoreRolls`, with the three d6 behind each score. The server stores the seed and rolls the dice again from it for each response, as the preview does. |
 | `GET /v1/ability-rolls/{roll_id}` | player | | The roll, with `used` set to whether a character was created from it. |
 | `POST /v1/ability-rolls/{roll_id}/preview` | player | The choices `POST /v1/characters` accepts, except `ability_roll_id` and `seed`. | `character`, `derived`, and the creation `rolls` of the character `POST /v1/characters` would create from the roll. The server stores nothing. |
 | `POST /v1/characters` | player | See below. | 201: the stored character. |
