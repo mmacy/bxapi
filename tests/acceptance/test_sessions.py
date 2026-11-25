@@ -20,20 +20,31 @@ from bxapi.settings import Settings
 from ..conftest import REFEREE_KEY, bearer
 from .conftest import (
     ADVENTURE_NAME,
+    ANTECHAMBER_TEXT,
+    DUNGEON_ID,
+    DUNGEON_NAME,
     ENTER,
+    FEATURE_DESCRIPTION,
+    FEATURE_ID,
+    FEATURE_ITEM_ID,
+    FEATURE_VALUABLE_NAME,
+    GUARD_ROOM_TEXT,
     PLAYER_SECRETS,
     ROUTE_TO_ENCOUNTER,
     ROUTE_TO_VICTORY,
     SEED,
     SESSION_INFO_KEYS,
+    SHRINE_TEXT,
     TO_ANTECHAMBER,
     TO_GUARD_ROOM,
     TO_SHRINE,
     Oracle,
+    adventure_document,
     assert_id,
     assert_page,
     assert_timestamp,
     battle_round,
+    build_player_view_adventure,
     clock_of,
     create_character_via_api,
     create_session,
@@ -42,6 +53,7 @@ from .conftest import (
     info,
     party_document,
     plan,
+    player_action_party_document,
     read_all_events,
     referee_view,
     send,
@@ -468,6 +480,149 @@ def test_the_commands_endpoint_lists_what_the_mode_and_role_allow(player: TestCl
 # Views
 
 
+def test_a_player_can_map_features_and_target_individual_encounter_members(
+    player: TestClient, referee: TestClient, other: TestClient
+) -> None:
+    adventure = upload_adventure(referee, adventure_document(build_player_view_adventure()))
+    session = create_session(
+        referee,
+        adventure["id"],
+        party_document=player_action_party_document(),
+    )
+    session_id = session["id"]
+
+    town = view(player, session_id)
+    thief = next(member for member in town["party"] if member["class_id"] == "thief")
+    mage = next(member for member in town["party"] if member["class_id"] == "magic_user")
+    assert town["dungeons"] == [] and town["can_travel_to_town"] is False
+    granted = send(
+        referee,
+        session_id,
+        {"command_type": "grant_item", "character_id": thief["id"], "item_id": "sword_plus_1_light"},
+    )
+    assert granted["accepted"]
+    equipped_town = view(player, session_id)
+    light_sword = next(
+        item
+        for member in equipped_town["party"]
+        if member["id"] == thief["id"]
+        for item in member["inventory"]["items"]
+        if item["instance_type"] == "magic_item"
+    )
+    assert send(
+        player,
+        session_id,
+        {"command_type": "equip_item", "character_id": thief["id"], "item_id": light_sword["instance_id"]},
+    )["accepted"]
+    assert send(player, session_id, {"command_type": "rest", "kind": "night"})["accepted"]
+    prepared = {
+        "command_type": "prepare_spells",
+        "character_id": mage["id"],
+        "selections": [{"spell_id": "magic_missile"}],
+    }
+    assert send(player, session_id, prepared)["accepted"]
+
+    assert send(player, session_id, ENTER)["accepted"]
+    assert send(
+        player,
+        session_id,
+        {"command_type": "use_item", "character_id": thief["id"], "item_id": light_sword["instance_id"]},
+    )["accepted"]
+    entrance = view(player, session_id)
+    assert entrance["dungeons"] == [{"id": DUNGEON_ID, "name": DUNGEON_NAME}]
+    assert entrance["can_travel_to_town"] is True
+    [level] = entrance["explored"]
+    assert level["entrance"] == [0, 0]
+    assert level["transitions"] == [{"position": [0, 0], "kind": "stairs_down", "side": None}]
+    assert level["areas"] == level["features"] == []
+    assert ANTECHAMBER_TEXT not in json.dumps(entrance)
+
+    assert send(player, session_id, TO_ANTECHAMBER)["accepted"]
+    known = view(player, session_id)
+    assert known["can_travel_to_town"] is False
+    [level] = known["explored"]
+    assert level["areas"] == [
+        {
+            "id": "antechamber",
+            "name": "Antechamber",
+            "description": ANTECHAMBER_TEXT,
+            "cells": [[1, 0]],
+        }
+    ]
+    [feature] = level["features"]
+    assert set(feature) == {"id", "kind", "description", "cell", "area_id", "trap_state"}
+    assert feature["id"].startswith("feature:")
+    assert feature["kind"] == "treasure_cache"
+    assert feature["description"] == FEATURE_DESCRIPTION
+    assert feature["cell"] is None and feature["area_id"] == "antechamber"
+    for private in (
+        *PLAYER_SECRETS,
+        FEATURE_ID,
+        FEATURE_ITEM_ID,
+        FEATURE_VALUABLE_NAME,
+        GUARD_ROOM_TEXT,
+        SHRINE_TEXT,
+    ):
+        assert private not in json.dumps(known)
+
+    handle = feature["id"]
+    expect_not_found(
+        other.post(
+            f"/v1/sessions/{session_id}/commands",
+            json={"command_type": "take_treasure", "feature_id": handle},
+        ),
+        session_id,
+    )
+    inspected = send(
+        player,
+        session_id,
+        {"command_type": "inspect_treasure", "character_id": thief["id"], "feature_id": handle},
+    )
+    assert inspected["accepted"]
+    assert FEATURE_ID not in json.dumps(inspected)
+    assert send(player, session_id, {"command_type": "take_treasure", "feature_id": handle})["accepted"]
+
+    assert send(player, session_id, ROUTE_TO_ENCOUNTER[2])["accepted"]
+    assert send(player, session_id, TO_GUARD_ROOM)["accepted"]
+    encounter = view(player, session_id)
+    [level] = encounter["explored"]
+    assert {area["id"] for area in level["areas"]} == {"antechamber", "guardroom"}
+    assert GUARD_ROOM_TEXT in json.dumps(level["areas"])
+    assert SHRINE_TEXT not in json.dumps(encounter)
+    [group] = encounter["encounter"]["groups"]
+    assert all(set(member) == {"id", "status"} for member in group["members"])
+    assert "monster_ids" not in group
+    assert all("current_hp" not in member for member in group["members"])
+    target_id = next(member["id"] for member in group["members"] if member["status"] == "alive")
+    assert target_id.startswith("monster-")
+    assert encounter["party"][0]["current_hp"] >= 0
+
+    if info(player, session_id)["mode"] == "encounter":
+        assert send(player, session_id, {"command_type": "engage_battle"})["accepted"]
+    battle = view(player, session_id)
+    assert battle["mode"] == "battle"
+    mage_id = next(member["id"] for member in battle["party"] if member["class_id"] == "magic_user")
+    assert mage_id == mage["id"]
+    declarations = [
+        {
+            "character_id": member_id,
+            "action": "cast",
+            "spell_id": "magic_missile",
+            "spell_mode": "missiles",
+            "targets": [target_id],
+        }
+        if member_id == mage_id
+        else {"character_id": member_id, "action": "hold"}
+        for member_id in battle["encounter"]["declarers"]
+    ]
+    round_outcome = send(
+        player,
+        session_id,
+        {"command_type": "resolve_battle_round", "declarations": declarations},
+    )
+    assert round_outcome["accepted"], round_outcome["rejections"]
+
+
 def test_the_player_view_equals_osrlib_after_each_command(player: TestClient, referee: TestClient) -> None:
     commands = plan(ROUTE_TO_ENCOUNTER)
     oracle = Oracle.new()
@@ -560,15 +715,34 @@ def test_reading_new_events_after_catching_up(player: TestClient, referee: TestC
 # Determinism and durability
 
 
-def test_the_same_seed_party_and_commands_give_the_same_game(referee: TestClient) -> None:
-    commands = plan(ROUTE_TO_ENCOUNTER)
-    adventure = upload_adventure(referee)
+def test_same_seed_sessions_match_except_for_independent_feature_handles(
+    player: TestClient, referee: TestClient
+) -> None:
+    commands = (ENTER, TO_ANTECHAMBER)
+    adventure = upload_adventure(referee, adventure_document(build_player_view_adventure()))
     first = create_session(referee, adventure["id"])
     second = create_session(referee, adventure["id"])
     for command in commands:
         assert send(referee, first["id"], command) == send(referee, second["id"], command)
-    assert view(referee, first["id"]) == view(referee, second["id"])
+    first_view, second_view = view(player, first["id"]), view(player, second["id"])
+    first_handle = next(feature["id"] for level in first_view["explored"] for feature in level["features"])
+    second_handle = next(feature["id"] for level in second_view["explored"] for feature in level["features"])
+    assert first_handle.startswith("feature:") and second_handle.startswith("feature:")
+    assert first_handle != second_handle
+    assert json.dumps(first_view).replace(first_handle, "<feature>") == json.dumps(second_view).replace(
+        second_handle, "<feature>"
+    )
     assert referee_view(referee, first["id"]) == referee_view(referee, second["id"])
+    keys = []
+    for session_id in (first["id"], second["id"]):
+        saved = expect(player.post(f"/v1/sessions/{session_id}/saves"), 201)
+        document = expect(referee.get(f"/v1/saves/{saved['id']}/document"), 200)
+        encoded_key = document["payload"]["player_handle_key"]
+        assert len(bytes.fromhex(encoded_key)) == 32
+        keys.append(encoded_key)
+        assert "player_handle_key" not in view(player, session_id)
+        assert "player_handle_key" not in referee_view(referee, session_id)
+    assert keys[0] != keys[1]
 
 
 def test_a_session_survives_a_new_application(keyed_settings: Settings) -> None:
@@ -590,6 +764,33 @@ def test_a_session_survives_a_new_application(keyed_settings: Settings) -> None:
         for command, outcome in zip(commands[4:], expected[4:], strict=True):
             assert send(after, session["id"], command) == outcome
         assert referee_view(after, session["id"]) == oracle.view(Visibility.REFEREE)
+
+
+def test_a_feature_handle_survives_a_new_application(keyed_settings: Settings) -> None:
+    with TestClient(create_app(keyed_settings), headers=bearer(REFEREE_KEY)) as before:
+        adventure = upload_adventure(before, adventure_document(build_player_view_adventure()))
+        session = create_session(before, adventure["id"])
+        for command in (ENTER, TO_ANTECHAMBER):
+            assert send(before, session["id"], command)["accepted"]
+        handle = next(
+            feature["id"] for level in view(before, session["id"])["explored"] for feature in level["features"]
+        )
+        created = expect(before.post(f"/v1/sessions/{session['id']}/saves"), 201)
+        document = expect(before.get(f"/v1/saves/{created['id']}/document"), 200)
+        encoded_key = document["payload"]["player_handle_key"]
+    with TestClient(create_app(keyed_settings), headers=bearer(REFEREE_KEY)) as after:
+        restored_handle = next(
+            feature["id"] for level in view(after, session["id"])["explored"] for feature in level["features"]
+        )
+        assert restored_handle == handle
+        assert send(
+            after,
+            session["id"],
+            {"command_type": "take_treasure", "feature_id": handle},
+        )["accepted"]
+        saved_again = expect(after.post(f"/v1/sessions/{session['id']}/saves"), 201)
+        continued = expect(after.get(f"/v1/saves/{saved_again['id']}/document"), 200)
+        assert continued["payload"]["player_handle_key"] == encoded_key
 
 
 def test_a_cache_of_one_session_alternates_without_mixing_sessions(
@@ -740,6 +941,8 @@ def test_a_player_never_sees_the_seed_or_a_referee_event(player: TestClient, ref
     assert str(BIG_SEED) not in text, "a response to a player contains the master seed"
     leaked = [secret for secret in PLAYER_SECRETS if secret in text]
     assert not leaked, f"a response to a player contains {leaked}"
+    assert ANTECHAMBER_TEXT in text and GUARD_ROOM_TEXT in text
+    assert SHRINE_TEXT not in text, "a response to a player contains an unentered area's prose"
     assert len(read_all_events(referee, session_id, limit=500, visibility="referee")["events"]) > len(log["events"])
 
 

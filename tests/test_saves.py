@@ -164,6 +164,7 @@ def test_the_document_is_for_referees(player: TestClient, referee: TestClient) -
     problem(player.get(f"/v1/saves/{created['id']}/document"), 403, "referee_required")
     document = ok(referee.get(f"/v1/saves/{created['id']}/document"))
     assert document["kind"] == "save" and document["payload"]["master_seed"] == SEED
+    assert len(bytes.fromhex(document["payload"]["player_handle_key"])) == 32
     assert load_game(document).view(Visibility.PLAYER).model_dump(mode="json") == ok(
         player.get(f"/v1/sessions/{created['session_id']}/view")
     )
@@ -233,7 +234,7 @@ def test_another_client_cannot_read_or_change_a_save(referee: TestClient, other:
     assert ok(referee.get(f"/v1/saves/{save_id}")) == created
 
 
-def test_a_player_never_receives_the_seed_from_a_save(player: TestClient, referee: TestClient) -> None:
+def test_a_player_never_receives_the_seed_or_handle_key_from_a_save(player: TestClient, referee: TestClient) -> None:
     seed = 5_550_123_987_654_321
     session_id = entered(referee, seed=seed)
     bodies = [player.post(f"/v1/sessions/{session_id}/saves", json={"label": "x"}).text]
@@ -241,7 +242,11 @@ def test_a_player_never_receives_the_seed_from_a_save(player: TestClient, refere
     bodies += [player.get("/v1/saves").text, player.get(f"/v1/saves/{save_id}").text]
     restored = player.post(f"/v1/saves/{save_id}/restore", json={})
     bodies += [restored.text, player.get(f"/v1/sessions/{restored.json()['id']}/view").text]
-    assert str(seed) not in "\n".join(bodies)
+    document = ok(referee.get(f"/v1/saves/{save_id}/document"))
+    handle_key = document["payload"]["player_handle_key"]
+    text = "\n".join(bodies)
+    assert str(seed) not in text
+    assert handle_key not in text and "player_handle_key" not in text
 
 
 def test_import_stores_the_document_osrlib_writes_back(referee: TestClient) -> None:

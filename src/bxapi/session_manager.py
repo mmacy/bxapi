@@ -25,9 +25,14 @@ a copy of what the database has:
 - The manager registers osrlib's `Interpreter` on every session it creates, restores, or loads,
   so the adventure's triggers and quests run, and a loaded session plays on as the original
   would have.
+- A new session gets a cryptographically random key for osrlib's opaque player feature
+  handles. The session's stored save contains the key, so cache and process reloads keep the same
+  handles. Player and referee views never contain it. A restore uses the key in the save. A legacy
+  save without a key stays keyless and keeps osrlib's seed-derived compatibility handles.
 """
 
 import logging
+import secrets
 import threading
 from collections import OrderedDict
 from collections.abc import Callable, Iterator, Mapping
@@ -288,6 +293,9 @@ class SessionManager:
     ) -> SessionRow:
         """Start a new game in town and store it at revision 0.
 
+        The game gets a fresh 32-byte key for opaque player feature handles. osrlib stores the
+        key in the session's save document. The player and referee views never return the key.
+
         Args:
             client: The client the session belongs to.
             name: The session's name, or `None` for the adventure's name.
@@ -311,7 +319,13 @@ class SessionManager:
         """
         if len(party.members) > MAX_PARTY_SIZE:
             raise invalid("party_invalid", f"A party on this server has at most {MAX_PARTY_SIZE} members.")
-        game = GameSession.new(party, adventure, seed=seed, ruleset=ruleset)
+        game = GameSession.new(
+            party,
+            adventure,
+            seed=seed,
+            ruleset=ruleset,
+            player_handle_key=secrets.token_bytes(32),
+        )
         member_ids = [member.id for member in game.party.members]
         if len(set(member_ids)) != len(member_ids):
             raise invalid("party_invalid", "Two characters in the party have the same id.")

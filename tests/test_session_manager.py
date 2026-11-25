@@ -1,20 +1,26 @@
+import secrets
 import threading
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
+from unittest import mock
 
 import pytest
 from osrlib.core.alignment import Alignment
 from osrlib.core.character import CHARACTER_CREATION_STREAM, Character, create_character
 from osrlib.core.events import Visibility
+from osrlib.core.items import Coins
 from osrlib.core.rng import RngStreams
 from osrlib.core.ruleset import Ruleset
-from osrlib.crawl.commands import AddJournalEntry, Command, CommandResult, EnterDungeon, MoveParty
-from osrlib.crawl.dungeon import Direction
+from osrlib.crawl.adventure import Adventure, TownSpec
+from osrlib.crawl.commands import AddJournalEntry, Command, CommandResult, EnterDungeon, MoveParty, TakeTreasure
+from osrlib.crawl.dungeon import Direction, DungeonSpec, FeatureSpec, LevelSpec
 from osrlib.crawl.interpreter import Interpreter
 from osrlib.crawl.party import Party
 from osrlib.crawl.session import GameSession
+from osrlib.crawl.views import build_player_view
 from osrlib.persistence import load_game, save_game
+from osrlib.versioning import SCHEMA_VERSION
 
 from bxapi.adventures import builtin_adventures
 from bxapi.db import Database
@@ -28,6 +34,34 @@ EAST = MoveParty(direction=Direction.EAST)
 WEST = MoveParty(direction=Direction.WEST)
 NORTH = MoveParty(direction=Direction.NORTH)
 ROUTE = (ENTER, EAST, WEST, EAST)
+FEATURE_ADVENTURE = Adventure(
+    name="The Handle Vault",
+    town=TownSpec(name="Handleton", travel_turns={"handle-vault": 1}),
+    dungeons=(
+        DungeonSpec(
+            id="handle-vault",
+            name="The Handle Vault",
+            levels=(
+                LevelSpec(
+                    number=1,
+                    width=1,
+                    height=1,
+                    entrance=(0, 0),
+                    features=(
+                        FeatureSpec(
+                            id="private-cache",
+                            kind="treasure_cache",
+                            description="A copper-bound cache.",
+                            cell=(0, 0),
+                            coins=Coins(gp=3),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    ),
+)
+ENTER_FEATURE = EnterDungeon(dungeon_id="handle-vault")
 
 
 def party() -> Party:
@@ -39,8 +73,12 @@ def party() -> Party:
     return Party(members=[Character.from_document(made.character.to_document()) for made in members])
 
 
-def oracle(seed: int) -> GameSession:
-    game = GameSession.new(party(), BARROW, seed=seed)
+def _test_handle_key(seed: int) -> bytes:
+    return seed.to_bytes(16, "big") * 2
+
+
+def oracle(seed: int, adventure: Adventure = BARROW) -> GameSession:
+    game = GameSession.new(party(), adventure, seed=seed, player_handle_key=_test_handle_key(seed))
     game.register_listener(Interpreter(game))
     return game
 
@@ -68,11 +106,170 @@ def databases(path: str) -> Iterator[Callable[[], Database]]:
         db.close()
 
 
-def start(manager: SessionManager, seed: int, client: str = CLIENT) -> str:
-    row = manager.start(
-        client, name=None, adventure_id="builtin-barrow", adventure=BARROW, party=party(), seed=seed, ruleset=None
-    )
+def start(
+    manager: SessionManager,
+    seed: int,
+    client: str = CLIENT,
+    *,
+    adventure: Adventure = BARROW,
+    adventure_id: str = "builtin-barrow",
+) -> str:
+    real_token_bytes = secrets.token_bytes
+    key = _test_handle_key(seed)
+    with mock.patch(
+        "bxapi.session_manager.secrets.token_bytes",
+        side_effect=lambda size: key if size == 32 else real_token_bytes(size),
+    ):
+        row = manager.start(
+            client,
+            name=None,
+            adventure_id=adventure_id,
+            adventure=adventure,
+            party=party(),
+            seed=seed,
+            ruleset=None,
+        )
     return row.id
+
+
+def feature_handle(manager: SessionManager, session_id: str) -> str:
+    return manager.read(
+        CLIENT,
+        session_id,
+        lambda game: build_player_view(game).explored[0].features[0].id,
+    )
+
+
+def test_new_sessions_persist_independent_handle_keys_and_keep_them_out_of_views(
+    databases: Callable[[], Database],
+) -> None:
+    db = databases()
+    manager = SessionManager(db, cache_size=4)
+    first_key, second_key = bytes(range(32)), bytes(range(32, 64))
+    keys = iter((first_key, second_key))
+    real_token_bytes = secrets.token_bytes
+    with mock.patch(
+        "bxapi.session_manager.secrets.token_bytes",
+        side_effect=lambda size: next(keys) if size == 32 else real_token_bytes(size),
+    ) as draw:
+        first = manager.start(
+            CLIENT,
+            name=None,
+            adventure_id="handle-vault",
+            adventure=FEATURE_ADVENTURE,
+            party=party(),
+            seed=7,
+            ruleset=None,
+        )
+        second = manager.start(
+            CLIENT,
+            name=None,
+            adventure_id="handle-vault",
+            adventure=FEATURE_ADVENTURE,
+            party=party(),
+            seed=7,
+            ruleset=None,
+        )
+    assert [call for call in draw.call_args_list if call == mock.call(32)] == [mock.call(32), mock.call(32)]
+    first_document = db.get_session_with_document(CLIENT, first.id)
+    second_document = db.get_session_with_document(CLIENT, second.id)
+    assert first_document is not None and second_document is not None
+    assert first_document.document["payload"]["player_handle_key"] == first_key.hex()
+    assert second_document.document["payload"]["player_handle_key"] == second_key.hex()
+    assert first_key != second_key
+
+    manager.execute(CLIENT, first.id, ENTER_FEATURE)
+    manager.execute(CLIENT, second.id, ENTER_FEATURE)
+    first_handle = feature_handle(manager, first.id)
+    second_handle = feature_handle(manager, second.id)
+    assert first_handle.startswith("feature:") and second_handle.startswith("feature:")
+    assert first_handle != second_handle
+    for session_id, key in ((first.id, first_key), (second.id, second_key)):
+        shown = manager.read(
+            CLIENT,
+            session_id,
+            lambda game: (game.view(Visibility.PLAYER), game.view(Visibility.REFEREE)),
+        )
+        for view in shown:
+            dumped = view.model_dump(mode="json")
+            assert "player_handle_key" not in dumped
+            assert key.hex() not in str(dumped)
+
+
+def test_feature_handle_survives_cache_reload_and_restore(databases: Callable[[], Database]) -> None:
+    db = databases()
+    manager = SessionManager(db, cache_size=1)
+    key = bytes(range(32))
+    real_token_bytes = secrets.token_bytes
+    with mock.patch(
+        "bxapi.session_manager.secrets.token_bytes",
+        side_effect=lambda size: key if size == 32 else real_token_bytes(size),
+    ):
+        session = manager.start(
+            CLIENT,
+            name=None,
+            adventure_id="handle-vault",
+            adventure=FEATURE_ADVENTURE,
+            party=party(),
+            seed=17,
+            ruleset=None,
+        )
+        other = manager.start(
+            CLIENT,
+            name=None,
+            adventure_id="handle-vault",
+            adventure=FEATURE_ADVENTURE,
+            party=party(),
+            seed=18,
+            ruleset=None,
+        )
+    manager.execute(CLIENT, session.id, ENTER_FEATURE)
+    document = manager.read(CLIENT, session.id, save_game)
+    handle = feature_handle(manager, session.id)
+    manager.read(CLIENT, other.id, lambda game: game.mode)
+    assert manager.loaded() == [(CLIENT, other.id)]
+    assert feature_handle(manager, session.id) == handle
+    assert manager.execute(CLIENT, session.id, TakeTreasure(feature_id=handle)).result.accepted
+
+    restored = manager.restore(CLIENT, name="Again", adventure_id="handle-vault", game=load_game(document))
+    assert feature_handle(manager, restored.id) == handle
+    restored_document = db.get_session_with_document(CLIENT, restored.id)
+    assert restored_document is not None
+    assert restored_document.document["payload"]["player_handle_key"] == key.hex()
+    assert manager.execute(CLIENT, restored.id, TakeTreasure(feature_id=handle)).result.accepted
+    for call in (
+        lambda: manager.read("other", restored.id, save_game),
+        lambda: manager.execute("other", restored.id, TakeTreasure(feature_id=handle)),
+    ):
+        with pytest.raises(ApiError) as caught:
+            call()
+        assert caught.value.status == 404
+
+
+def test_legacy_save_uses_its_seed_derived_handle_without_adding_a_key() -> None:
+    legacy = GameSession.new(party(), FEATURE_ADVENTURE, seed=23)
+    legacy.execute(ENTER_FEATURE)
+    document = save_game(legacy)
+    assert SCHEMA_VERSION == 4
+    assert "player_handle_key" not in document["payload"]
+
+    first = load_game(document)
+    second = load_game(document)
+    handle = build_player_view(first).explored[0].features[0].id
+    assert handle == build_player_view(second).explored[0].features[0].id
+    assert first.execute(TakeTreasure(feature_id=handle)).accepted
+    assert "player_handle_key" not in save_game(first)["payload"]
+
+
+def test_an_explicit_handle_key_round_trips() -> None:
+    key = bytes(range(32))
+    game = GameSession.new(party(), FEATURE_ADVENTURE, seed=29, player_handle_key=key)
+    game.execute(ENTER_FEATURE)
+    document = save_game(game)
+    assert document["payload"]["player_handle_key"] == key.hex()
+    restored = load_game(document)
+    assert save_game(restored)["payload"]["player_handle_key"] == key.hex()
+    assert restored.view(Visibility.PLAYER) == game.view(Visibility.PLAYER)
 
 
 def test_an_accepted_command_is_in_the_database_before_execute_returns(databases: Callable[[], Database]) -> None:

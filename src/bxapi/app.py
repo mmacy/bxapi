@@ -170,7 +170,9 @@ doesn't exist.
   stateless operations under `/v1/dice` and `/v1/generate` accept an optional `seed` from any
   caller and return the seed they used. Sending the same request with the same seed returns the
   same result on the same osrlib version. For ability rolls, characters, and sessions, only a
-  referee may choose a seed, and the server never returns it to a player.
+  referee may choose a seed, and the server never returns it to a player. Each new session also
+  gets a separate secret key for opaque player feature handles. Session and save documents store
+  that key, while both views omit it.
 - **Unknown fields.** A request body with a field the operation doesn't define gets 422
   `validation_error`, whereas commands and documents are osrlib models and ignore unknown fields.
 - **osrlib's descriptions.** The schema descriptions for commands, events, views, and rules models
