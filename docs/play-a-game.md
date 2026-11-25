@@ -33,7 +33,7 @@ The output blocks below format and abbreviate the server's compact JSON with `..
 
 ## Roll ability scores and create a party
 
-1. Roll six 3d6 ability scores with [`POST /v1/ability-rolls`](https://mmacy.github.io/bxapi/reference/endpoint/characters#operation-create_ability_roll) to see which B/X classes the roll qualifies for:
+1. Roll six 3d6 ability scores with [`POST /v1/ability-rolls`](https://mmacy.github.io/bxapi/reference/endpoint/characters#operation-create_ability_roll) to see which B/X classes the roll qualifies for. `rolls.rolls` lists the three d6 behind each score, for a client that animates the dice:
 
    ```sh
    curl -sS -w '\n' -X POST http://127.0.0.1:8640/v1/ability-rolls -H "Authorization: Bearer $KEY"
@@ -43,6 +43,10 @@ The output blocks below format and abbreviate the server's compact JSON with `..
    {
      "id": "rol_yQsuUWgqmzpnDA6Sm51kQA",
      "scores": {"str": 6, "int": 12, "wis": 17, "dex": 11, "con": 5, "cha": 11},
+     "rolls": {
+       "scores": {"str": 6, "int": 12, "wis": 17, "dex": 11, "con": 5, "cha": 11},
+       "rolls": {"str": [1, 3, 2], "int": [4, 5, 3], "wis": [6, 5, 6], "dex": [2, 4, 5], "con": [1, 1, 3], "cha": [3, 6, 2]}
+     },
      "eligible_class_ids": ["cleric", "elf", "fighter", "magic_user", "thief"],
      "used": false,
      "created_at": "2026-11-21T05:24:33Z"

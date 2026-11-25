@@ -4,7 +4,7 @@ from typing import Annotated, Any, Self
 
 from fastapi import APIRouter, Body, Path, Request, Response
 from osrlib.core.abilities import AbilityScore
-from osrlib.core.character import Character, roll_ability_scores
+from osrlib.core.character import AbilityScoreRolls, Character, roll_ability_scores
 from pydantic import model_validator
 
 from bxapi.auth import CurrentPrincipal, RefereePrincipal
@@ -90,6 +90,9 @@ class AbilityRoll(ApiModel):
     `POST /v1/characters`, or as `roll_id` to `POST /v1/ability-rolls/{roll_id}/preview`."""
     scores: dict[AbilityScore, int]
     """Six rolled ability scores (`str`, `int`, `wis`, `dex`, `con`, `cha`), each from 3 to 18."""
+    rolls: AbilityScoreRolls
+    """osrlib's `AbilityScoreRolls` behind `scores`: each score's total and its three d6 results in the order
+    osrlib rolled them, the same as `rolls.ability_rolls` on `POST /v1/ability-rolls/{roll_id}/preview`."""
     eligible_class_ids: list[str]
     """Class `id` values from `GET /v1/rules/classes` whose minimum ability requirements `scores`
     satisfy, in catalog order."""
@@ -205,11 +208,18 @@ def _db(request: Request) -> Database:
     return request.app.state.db
 
 
-def _ability_roll(row: AbilityRollRow) -> AbilityRoll:
+def _ability_roll(row: AbilityRollRow, rolled: AbilityScoreRolls | None = None) -> AbilityRoll:
+    """Return the response for a stored roll.
+
+    The server stores the seed and not the dice. It rolls the scores again from the seed, as
+    [`character_from_roll`][bxapi.creation.character_from_roll] does, unless the caller passes the
+    roll it just made.
+    """
     scores = scores_from_json(row.scores)
     return AbilityRoll(
         id=row.id,
         scores=scores,
+        rolls=roll_ability_scores(creation_stream(row.seed)) if rolled is None else rolled,
         eligible_class_ids=eligible_class_ids(scores),
         used=row.used,
         created_at=row.created_at,
@@ -280,11 +290,12 @@ def create_ability_roll(
     principal: CurrentPrincipal,
     body: Annotated[AbilityRollRequest, Body(default_factory=AbilityRollRequest)],
 ) -> AbilityRoll:
-    """Roll six 3d6 ability scores with osrlib, store the roll, and return the scores and eligible classes.
+    """Roll six 3d6 ability scores with osrlib, store the roll, and return the scores, their dice, and eligible classes.
 
-    Display `scores` and `eligible_class_ids` to the player, then pass `id` as `ability_roll_id` to
-    `POST /v1/characters` along with the player's class, alignment, and equipment choices. The request body is
-    optional: players send no body, whereas a referee may pass `seed`.
+    Display `scores` and `eligible_class_ids` to the player. A client that animates the dice shows `rolls.rolls`, the
+    three d6 osrlib rolled for each score. Then pass `id` as `ability_roll_id` to `POST /v1/characters` along with
+    the player's class, alignment, and equipment choices. The request body is optional: players send no body, whereas
+    a referee may pass `seed`.
 
     The server stores the roll's seed privately and derives the character's hit points and starting gold from that
     same seed when `POST /v1/characters` consumes the roll. Retrying `POST /v1/characters` after a 422
@@ -300,7 +311,7 @@ def create_ability_roll(
     row = _db(request).insert_ability_roll(
         principal.client, scores={ability.value: score for ability, score in rolled.scores.items()}, seed=seed
     )
-    return _ability_roll(row)
+    return _ability_roll(row, rolled)
 
 
 @router.get(
@@ -317,7 +328,7 @@ def get_ability_roll(
     principal: CurrentPrincipal,
     roll_id: RollId,
 ) -> AbilityRoll:
-    """Return a stored ability roll, including its six `scores`, `eligible_class_ids`, and `used` flag.
+    """Return a stored ability roll: its six `scores`, the dice in `rolls`, `eligible_class_ids`, and `used`.
 
     Use this endpoint to resume character creation after a page reload. When `used` is `false`, pass `id` as
     `ability_roll_id` to `POST /v1/characters`. When `used` is `true`, the roll has already created a character and

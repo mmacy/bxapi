@@ -172,6 +172,11 @@ def rolled_scores(seed: int) -> dict[str, int]:
     return {ability.value: score for ability, score in rolled.scores.items()}
 
 
+def rolled_dice(seed: int) -> dict[str, Any]:
+    """Return osrlib's `AbilityScoreRolls` for a seed, as JSON."""
+    return roll_ability_scores(RngStreams(master_seed=seed).get(CHARACTER_CREATION_STREAM)).model_dump(mode="json")
+
+
 def stored_row(settings: Settings, character_id: str) -> CharacterDocumentRow:
     """Read a character's row from the database file the test applications share."""
     db = Database(settings.database)
@@ -192,9 +197,11 @@ def test_a_referee_roll_matches_osrlib_and_lists_the_eligible_classes(referee: T
     response = referee.post("/v1/ability-rolls", json={"seed": 7})
     assert response.status_code == 201
     body = response.json()
-    assert set(body) == {"id", "scores", "eligible_class_ids", "used", "created_at"}
+    assert set(body) == {"id", "scores", "rolls", "eligible_class_ids", "used", "created_at"}
     assert body["id"].startswith("rol_")
     assert body["scores"] == rolled_scores(7)
+    assert body["rolls"] == rolled_dice(7)
+    assert referee.get(f"/v1/ability-rolls/{body['id']}").json()["rolls"] == body["rolls"]
     assert body["eligible_class_ids"] == osrlib_eligible(body["scores"])
     assert body["used"] is False
     assert "seed" not in body
@@ -216,6 +223,20 @@ def test_a_player_rolls_without_a_body_but_not_with_a_seed(player: TestClient) -
     assert player.post("/v1/ability-rolls", json={}).status_code == 201
     refused = player.post("/v1/ability-rolls", json={"seed": 1})
     assert (refused.status_code, refused.json()["code"]) == (403, "referee_required")
+
+
+def test_the_dice_of_a_roll_add_up_to_its_scores_and_match_the_preview(player: TestClient) -> None:
+    roll = player.post("/v1/ability-rolls").json()
+    assert roll["rolls"]["scores"] == roll["scores"]
+    assert {ability: sum(dice) for ability, dice in roll["rolls"]["rolls"].items()} == roll["scores"]
+    assert all(1 <= die <= 6 for dice in roll["rolls"]["rolls"].values() for die in dice)
+    body = {"name": "Brenna", "class_id": "fighter", "alignment": "lawful"}
+    # A fighter has no minimum scores, so every roll can make one.
+    previewed = preview(player, roll["id"], body)
+    assert previewed.status_code == 200, previewed.text
+    assert previewed.json()["rolls"]["ability_rolls"] == roll["rolls"]
+    assert player.post("/v1/characters", json=body | {"ability_roll_id": roll["id"]}).status_code == 201
+    assert player.get(f"/v1/ability-rolls/{roll['id']}").json() == roll | {"used": True}
 
 
 def test_get_ability_roll_and_the_client_filter(player: TestClient, other: TestClient) -> None:
