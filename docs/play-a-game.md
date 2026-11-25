@@ -264,6 +264,12 @@ The output blocks below format and abbreviate the server's compact JSON with `..
    {"accepted":false,"rejections":[{"code":"battle.declaration.not_in_front_rank","params":{"character":"character-0003"}}],"events":[],"messages":[],"mode":"battle","ended":false,"revision":4}
    ```
 
+   To learn which declaration osrlib would refuse before you send the round, send the same declarations to [`POST /v1/sessions/{session_id}/battle-round/preview`](https://mmacy.github.io/bxapi/reference/endpoint/sessions#operation-preview_battle_round). The preview changes nothing in the session, and its `rejections` lists each member's refusals under that member's id:
+
+   ```sh
+   curl -sS -w '\n' -X POST "http://127.0.0.1:8640/v1/sessions/$SESSION/battle-round/preview" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"declarations": [{"character_id": "character-0001", "action": "attack", "target_group_id": "group-0001", "move": "close"}, {"character_id": "character-0002", "action": "attack", "target_group_id": "group-0001", "move": "close"}, {"character_id": "character-0003", "action": "attack", "target_group_id": "group-0001", "move": "close"}]}'
+   ```
+
 3. Submit one valid declaration per character in your current `view.encounter.declarers` (if a surprise round already closed the gap to 5 feet or knocked out a character, omit `"move": "close"` or drop that character's entry to match `view.encounter`):
 
    ```sh

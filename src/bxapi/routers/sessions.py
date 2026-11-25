@@ -15,7 +15,9 @@ from osrlib.core.clock import GameClock
 from osrlib.core.events import Event, Visibility
 from osrlib.core.ruleset import Ruleset
 from osrlib.core.validation import Rejection
-from osrlib.crawl.commands import ALL_COMMAND_CLASSES, AnyCommand, Command, SessionMode
+from osrlib.crawl import battle
+from osrlib.crawl.battle import BattleRoundPreview
+from osrlib.crawl.commands import ALL_COMMAND_CLASSES, AnyCommand, BattleDeclaration, Command, SessionMode
 from osrlib.crawl.events import AnyEvent
 from osrlib.crawl.party import Party
 from osrlib.crawl.session import GameSession
@@ -28,7 +30,16 @@ from bxapi.adventures import find_adventure
 from bxapi.auth import CurrentPrincipal, Principal, RefereePrincipal
 from bxapi.commands import CommandKind, command_kind
 from bxapi.db import Database, JsonObject, SaveRow, SessionRow
-from bxapi.errors import INTERNAL_ERROR, VALIDATION_ERROR, ApiError, forbidden, invalid, not_found, problem_responses
+from bxapi.errors import (
+    INTERNAL_ERROR,
+    VALIDATION_ERROR,
+    ApiError,
+    conflict,
+    forbidden,
+    invalid,
+    not_found,
+    problem_responses,
+)
 from bxapi.idempotency import IdempotentRoute
 from bxapi.json_body import accepts_document
 from bxapi.models import ApiModel, NameText, RequestModel, left_out_when_none
@@ -38,6 +49,7 @@ from bxapi.session_manager import MAX_PARTY_SIZE, SessionManager
 
 __all__ = [
     "NAME_MAX_LENGTH",
+    "BattleRoundPreviewRequest",
     "Clock",
     "CommandChoice",
     "CommandOutcome",
@@ -231,6 +243,14 @@ class CreateSaveRequest(RequestModel):
     label: NameText | None = Field(default=None, min_length=1, max_length=NAME_MAX_LENGTH)
     """Optional label for save menus, 1 to 200 characters without control characters, or `null` (the
     default) for an unlabeled save."""
+
+
+class BattleRoundPreviewRequest(RequestModel):
+    """The declarations planned so far for a battle round, for `POST /v1/sessions/{session_id}/battle-round/preview`."""
+
+    declarations: list[BattleDeclaration] = Field(max_length=MAX_PARTY_SIZE)
+    """osrlib `BattleDeclaration` objects, at most one for each member ID in `encounter.declarers` of the player view,
+    in any order. Pass any subset of the declarers, including none (`[]`). At most 20 entries."""
 
 
 class CommandChoice(ApiModel):
@@ -704,6 +724,64 @@ def send_command(
         revision=executed.revision,
         view=executed.view,
     )
+
+
+@router.post(
+    "/{session_id}/battle-round/preview",
+    summary="Preview a battle round",
+    response_description="osrlib's `BattleRoundPreview`: each declaration's rejections, keyed by member ID, and "
+    "where the members would stand.",
+    responses=problem_responses(
+        {
+            404: [_NOT_FOUND],
+            409: [
+                "`not_in_battle`: The session isn't in `battle` mode (`mode` reports its mode). Read "
+                "`GET /v1/sessions/{session_id}/view` and preview a round only while `mode` is `battle`.",
+                _BUSY,
+            ],
+            422: [
+                VALIDATION_ERROR + " More than 20 `declarations` returns this code too.",
+                "`declaration_invalid`: A declaration names a member who isn't in `encounter.declarers`, or two "
+                "declarations name the same member. Send at most one declaration for each member in "
+                "`encounter.declarers`.",
+            ],
+            500: [INTERNAL_ERROR, _UNREADABLE],
+        }
+    ),
+)
+def preview_battle_round(
+    request: Request, principal: CurrentPrincipal, session_id: SessionId, body: BattleRoundPreviewRequest
+) -> BattleRoundPreview:
+    """Judge the declarations planned so far for a battle round, and show where they would leave the party.
+
+    Call this after each choice on a battle screen, with every declaration made so far, to learn which declarations
+    the session would refuse and whose they are. `rejections` has one entry for each declaration you sent, keyed by
+    the declaring member's ID, with the same `code` and `params` that `resolve_battle_round` returns on
+    `POST /v1/sessions/{session_id}/commands`. An empty list means the session would accept that declaration. When
+    you send one declaration for each member in `encounter.declarers` and every list in `rejections` is empty,
+    `resolve_battle_round` accepts the same declarations.
+
+    `advance_feet` gives each living member's projected place on the range track once the planned moves are made,
+    and `front_rank` gives each group's projected front rank, keyed by group ID. The projection leaves out what the
+    monsters do, because the session decides that after it rolls initiative.
+
+    The preview takes the session lock, rolls no dice, passes no game time, and changes nothing: `revision` stays the
+    same, so the request takes no `expected_revision` and needs no `Idempotency-Key`.
+    """
+
+    def preview(game: GameSession) -> BattleRoundPreview:
+        if game.battle is None:
+            raise conflict(
+                "not_in_battle",
+                f"The session is in {game.mode.value!r} mode, not 'battle'.",
+                mode=game.mode.value,
+            )
+        try:
+            return battle.preview_battle_round(game, body.declarations)
+        except ValueError as error:
+            raise invalid("declaration_invalid", f"osrlib refused the declarations: {error}") from error
+
+    return _sessions(request).read(principal.client, session_id, preview)
 
 
 @router.get(

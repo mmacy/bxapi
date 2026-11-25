@@ -80,6 +80,7 @@ Every error response is an RFC 9457 problem document with the media type `applic
 | 409 | `ability_roll_used` | A character was already created from that ability roll. | |
 | 409 | `idempotency_key_in_progress` | The first request with the `Idempotency-Key` is still running. The response has the header `Retry-After: 1`. | |
 | 409 | `idempotency_key_interrupted` | The server failed or stopped while it handled the first request with the `Idempotency-Key`, and has no record of whether that request took effect. | |
+| 409 | `not_in_battle` | A battle round preview was requested for a session that isn't in `battle` mode. | `mode` |
 | 409 | `version_unsupported` | A document is stamped with a schema version newer than the server's osrlib. | |
 | 408 | `request_timeout` | The request body didn't arrive within `BXAPI_BODY_TIMEOUT_SECONDS`. | |
 | 413 | `content_too_large` | The request body is larger than `BXAPI_MAX_BODY_BYTES`, or larger than 65,536 bytes on an operation that takes no document. | |
@@ -89,6 +90,7 @@ Every error response is an RFC 9457 problem document with the media type `applic
 | 422 | `idempotency_key_reused` | The client already sent the `Idempotency-Key` with a different method, path, query string, body, or role. | |
 | 422 | `content_invalid` | osrlib refused a document or a value as malformed, or the server refused an imported character. | |
 | 422 | `character_invalid` | The choices for a new character break a rule, or name a class or an item osrlib doesn't have. | `rejections`, when osrlib reports them. Otherwise `field` (the request field that's wrong, like `equip_item_ids`), `index` (the entry's position, when `field` is a list), and `id` (the value of that entry). |
+| 422 | `declaration_invalid` | A battle round preview has a declaration for a member who isn't one of the round's declarers, or two declarations for the same member. | |
 | 422 | `party_invalid` | The characters named for a new session can't form a party: osrlib refused the party, a `party_document` has more than 20 members, or two members end up with the same id. | |
 | 429 | `rate_limited` | The client sent more requests in a minute than `BXAPI_RATE_LIMIT_PER_MINUTE`, or the server got that many with no valid API key. The response has the header `Retry-After`, with the seconds to wait. | |
 | 500 | `internal_error` | A bug. The response says nothing about the cause, and the server logs the traceback. | |
@@ -255,6 +257,7 @@ A session is one game in progress. It starts in town and ends in `game_over` or 
 | `DELETE /v1/sessions/{session_id}` | player | 204. The session's saves stay. |
 | `GET /v1/sessions/{session_id}/commands` | player | `mode`, `revision`, and `commands`: the `command_type` and `kind` of each command that's legal in the session's mode and that the caller's role may send. |
 | `POST /v1/sessions/{session_id}/commands` | player | The command outcome, with the player view when the request has `include=view`. |
+| `POST /v1/sessions/{session_id}/battle-round/preview` | player | osrlib's `BattleRoundPreview` of the declarations in the body. See **Battle round previews**. |
 | `GET /v1/sessions/{session_id}/view` | player | osrlib's `PlayerView`: the party sheets, entered world knowledge and known map objects, public encounter roster, journal, quests, and town healing prices. |
 | `GET /v1/sessions/{session_id}/referee-view` | referee | osrlib's `RefereeView`. |
 | `GET /v1/sessions/{session_id}/events` | player | A page of the event log. |
@@ -305,6 +308,20 @@ Every command has an optional `source`: a note of who or what issued the command
 **Revisions.** A session's revision starts at 0 and goes up by 1 for each command request that osrlib accepts, whatever commands the adventure's triggers run in response. A refused command leaves it unchanged. The revision and `updated_at` count every accepted command, a referee's too, so a player can tell that something happened without seeing what. A client that might send a request twice, like a retry after a timeout, sends an `Idempotency-Key`, as **Conventions** describes, or passes `expected_revision` as a query parameter. If the session's revision is different, the server executes nothing and returns 409 `revision_conflict` with the current `revision`. The client then reads the view and decides what to do.
 
 **Busy sessions.** 409 `session_busy` means the command had no effect, and the problem has the session's current `revision`. If you sent `expected_revision`, read the session before you decide what to do: when the revision has changed, sending the same request again gets `revision_conflict`. If you didn't send `expected_revision`, send the command again.
+
+#### Battle round previews
+
+The body of `POST /v1/sessions/{session_id}/battle-round/preview` is `{"declarations": [...]}`: osrlib `BattleDeclaration` objects for any subset of the members in the player view's `encounter.declarers`, at most 20. The server passes them to osrlib's `preview_battle_round` and returns its `BattleRoundPreview`:
+
+| Field | Meaning |
+| --- | --- |
+| `rejections` | For each declaration, keyed by the declaring member's id, the rejections that `resolve_battle_round` would return for it. An empty list means the session would accept it. |
+| `advance_feet` | Each living member's projected place on the range track after the declared moves. |
+| `front_rank` | Each group's projected front rank after the declared moves, keyed by group id. |
+
+A client with several players uses the preview to tell each player which of their choices the session would refuse, because some rejections of `resolve_battle_round`, like `combat.attack.out_of_reach`, don't name the member. When the preview has a declaration for every declarer and every list in `rejections` is empty, `resolve_battle_round` accepts the same declarations.
+
+The preview takes the session's lock, takes no random number, and changes nothing, so the session's revision stays the same. A session that isn't in `battle` mode gets 409 `not_in_battle`, with the session's `mode`. A declaration for a member who isn't a declarer, or a second declaration for one member, gets 422 `declaration_invalid`.
 
 #### Events
 

@@ -16,7 +16,8 @@ from osrlib.core.events import Event, Visibility
 from osrlib.core.rng import RngStreams
 from osrlib.core.ruleset import Ruleset
 from osrlib.crawl.adventure import Adventure, TownSpec
-from osrlib.crawl.commands import ALL_COMMAND_CLASSES, SessionMode, SetFlag, parse_command
+from osrlib.crawl.battle import preview_battle_round
+from osrlib.crawl.commands import ALL_COMMAND_CLASSES, BattleDeclaration, SessionMode, SetFlag, parse_command
 from osrlib.crawl.dungeon import AreaSpec, DungeonSpec, Edge, EdgeKind, LevelSpec, WanderingSpec
 from osrlib.crawl.interpreter import Interpreter
 from osrlib.crawl.party import Party
@@ -46,6 +47,9 @@ NORTH = {"command_type": "move_party", "direction": "north"}
 ROUTE = [ENTER, EAST, WEST, EAST, WEST]
 NOTE = {"command_type": "record_note", "text": "The referee notes a draught."}
 JOURNAL = {"command_type": "add_journal_entry", "text": "A line from the referee."}
+ENGAGE = {"command_type": "engage_battle"}
+TO_BATTLE = [ENTER, EAST, EAST, ENGAGE]
+"""Commands that take the test party into a battle with the barrow's goblins, with the test seed."""
 INFO_KEYS = {
     "id",
     "name",
@@ -497,6 +501,89 @@ def test_the_openapi_document_describes_every_command_and_event(client: TestClie
     assert operation["operationId"] == "send_command"
 
 
+# Battle round previews
+
+
+def preview(client: TestClient, session_id: str, declarations: list[dict[str, Any]]) -> Any:
+    return client.post(f"/v1/sessions/{session_id}/battle-round/preview", json={"declarations": declarations})
+
+
+def test_a_preview_is_osrlibs_and_changes_nothing(player: TestClient, referee: TestClient) -> None:
+    session = start(referee)
+    oracle = Oracle(roll_characters())
+    for command in TO_BATTLE:
+        send(player, session["id"], command)
+        oracle.execute(command)
+    declarers = ok(player.get(f"/v1/sessions/{session['id']}/view"))["encounter"]["declarers"]
+    before = state(player, session["id"])
+    plans = [
+        [],
+        [{"character_id": declarers[0], "action": "attack", "target_group_id": "group-0001"}],
+        [
+            {"character_id": member, "action": "attack", "move": "close", "target_group_id": "group-0001"}
+            for member in declarers
+        ],
+    ]
+    for plan in plans:
+        expected = preview_battle_round(oracle.game, [BattleDeclaration.model_validate(entry) for entry in plan])
+        assert ok(preview(player, session["id"], plan)) == expected.model_dump(mode="json")
+    assert state(player, session["id"]) == before
+    # The preview takes no random number, so the round plays as it does in a session that never previewed.
+    attack = {"command_type": "resolve_battle_round", "declarations": plans[2]}
+    assert send(player, session["id"], attack) == oracle.execute(attack)
+
+
+def test_a_preview_attributes_each_rejection_to_its_member(player: TestClient, referee: TestClient) -> None:
+    session = start(referee)
+    for command in TO_BATTLE:
+        send(player, session["id"], command)
+    first, second = ok(player.get(f"/v1/sessions/{session['id']}/view"))["encounter"]["declarers"]
+    plan = [
+        {"character_id": first, "action": "hold"},
+        {"character_id": second, "action": "attack", "target_group_id": "group-0001"},
+    ]
+    rejections = ok(preview(player, session["id"], plan))["rejections"]
+    assert rejections[first] == []
+    assert [rejection["code"] for rejection in rejections[second]] == ["combat.attack.out_of_reach"]
+
+
+def test_a_preview_outside_a_battle_is_409(player: TestClient, referee: TestClient) -> None:
+    session = start(referee)
+    found = problem(preview(player, session["id"], []), 409, "not_in_battle")
+    assert found["mode"] == "town"
+
+
+@pytest.mark.parametrize(
+    "plan",
+    [
+        [{"character_id": "character-0099", "action": "hold"}],
+        [{"character_id": "character-0001", "action": "hold"}, {"character_id": "character-0001", "action": "hold"}],
+    ],
+)
+def test_a_preview_of_a_member_who_cannot_declare_is_422(
+    player: TestClient, referee: TestClient, plan: list[dict[str, Any]]
+) -> None:
+    session = start(referee)
+    for command in TO_BATTLE:
+        send(player, session["id"], command)
+    problem(preview(player, session["id"], plan), 422, "declaration_invalid")
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"declarations": [{"character_id": "character-0001", "action": "hold"}] * (MAX_PARTY_SIZE + 1)},
+        {"declarations": [], "expected_revision": 3},
+        {"declarations": [{"character_id": "character-0001", "action": "dance"}]},
+        {},
+    ],
+)
+def test_a_malformed_preview_is_a_validation_error(referee: TestClient, body: dict[str, Any]) -> None:
+    session = start(referee)
+    response = referee.post(f"/v1/sessions/{session['id']}/battle-round/preview", json=body)
+    problem(response, 422, "validation_error")
+
+
 # Views and events
 
 
@@ -610,6 +697,7 @@ def test_another_client_cannot_read_or_change_a_session(referee: TestClient, oth
         other.delete(f"/v1/sessions/{session_id}"),
         other.get(f"/v1/sessions/{session_id}/commands"),
         other.post(f"/v1/sessions/{session_id}/commands", json=EAST),
+        other.post(f"/v1/sessions/{session_id}/battle-round/preview", json={"declarations": []}),
         other.get(f"/v1/sessions/{session_id}/view"),
         other.get(f"/v1/sessions/{session_id}/referee-view"),
         other.get(f"/v1/sessions/{session_id}/events"),
