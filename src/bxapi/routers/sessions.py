@@ -280,8 +280,9 @@ class CommandOutcome(ApiModel):
     revision: int
     """Session revision after the command (incremented by 1 when `accepted` is `true`)."""
     view: PlayerView | SkipJsonSchema[None] = left_out_when_none()
-    """Updated `PlayerView` at `revision` (matching `GET /v1/sessions/{session_id}/view`), included
-    only when the request passes `include=view`."""
+    """Updated `PlayerView` at `revision` (matching `GET /v1/sessions/{session_id}/view`), with
+    known map features and encounter member IDs, included only when the request passes
+    `include=view`."""
 
 
 class EventPage(ApiModel):
@@ -446,7 +447,8 @@ def create_session(request: Request, principal: CurrentPrincipal, body: CreateSe
 
     Sessions copy their party members and adventure at start, so play never mutates stored characters or adventures.
     A referee may pass `party_document` (up to `BXAPI_MAX_BODY_BYTES`, 8,388,608 bytes by default) instead of
-    `character_ids`, and may choose `seed`. The server never exposes `seed` outside `GET /v1/saves/{save_id}/document`.
+    `character_ids`, and may choose `seed`. The server also draws a separate secret key for opaque player feature
+    handles. It never exposes `seed` or that key outside `GET /v1/saves/{save_id}/document`.
     """
     seed = referee_seed(body.seed, principal)
     if body.party_document is not None and not principal.is_referee:
@@ -586,7 +588,8 @@ def list_session_commands(request: Request, principal: CurrentPrincipal, session
 @router.post(
     "/{session_id}/commands",
     summary="Send a command to a session",
-    response_description="Command outcome (`accepted: false` with `rejections` when refused by the B/X rules).",
+    response_description="Command outcome, with the updated player-visible session view when `include=view` "
+    "(`accepted: false` with `rejections` when refused by the B/X rules).",
     responses=problem_responses(
         {
             403: [
@@ -660,11 +663,13 @@ def send_command(
       member ID in `encounter.declarers`. Pass `target_group_id` from `encounter.groups[i].id` (such as
       `"group-0001"`) for `attack`, `close`, thrown splash items, and `area` or `hd_budget` spells (such as
       `fire_ball` or `sleep` with `spell_mode: "hd_budget"`). In battle, spell casts set `spell_mode` rather than
-      `mode`. Spells with `single` or `up_to_n` targeting (such as `magic_missile` with `spell_mode: "missiles"`)
-      require individual creature IDs in `targets`: `PlayerView` hides `group.monster_ids`, so a `player`-only
-      client knows a monster's `"monster-NNNN"` ID only after that monster appears in a player-visible combat event
-      (`attacker_id` or `target_id`), whereas a `referee` backend can read `group.monster_ids` from
-      `GET /v1/sessions/{session_id}/referee-view`.
+      `mode`. Spells and scrolls with `single` or `up_to_n` targeting (such as `magic_missile` with
+      `spell_mode: "missiles"`) take individual `"monster-NNNN"` or `"npc-NNNN"` IDs from
+      `encounter.groups[i].members` in `targets`. Use an entry whose `status` is `"alive"`.
+    - **Treasure caches (`inspect_treasure`, `remove_treasure_trap`, `take_treasure`):** Pass the opaque
+      `explored[i].features[j].id` as `feature_id` for a feature on the party's current cell. The handle starts with
+      `feature:`. Don't parse it or use an authored adventure ID as a substitute. A player can use the handle without
+      reading the referee view.
 
     When osrlib refuses a command under the B/X rules, this operation still returns HTTP 200 with `accepted` set to
     `false` and rule `rejections`, leaving the session and `revision` unchanged. When accepted, the server persists
@@ -704,7 +709,7 @@ def send_command(
 @router.get(
     "/{session_id}/view",
     summary="Get the player view",
-    response_description="osrlib's `PlayerView` of the session.",
+    response_description="osrlib's player-visible session state, including known map and encounter IDs.",
     responses=problem_responses({404: [_NOT_FOUND], 409: [_BUSY], 500: [INTERNAL_ERROR, _UNREADABLE]}),
 )
 def get_player_view(request: Request, principal: CurrentPrincipal, session_id: SessionId) -> PlayerView:
@@ -712,8 +717,8 @@ def get_player_view(request: Request, principal: CurrentPrincipal, session_id: S
 
     Render your game screen from this object (or pass `include=view` to `POST /v1/sessions/{session_id}/commands` to
     receive `PlayerView` alongside `revision` in one response, because standalone `PlayerView` omits `revision`).
-    Acquires the session lock so the snapshot always reflects state between commands, and never includes unexplored
-    cells, monster hit points, or referee rolls.
+    Acquires the session lock so the snapshot always reflects state between commands. The view never includes
+    unexplored cells, monster hit points, referee rolls, or the secret feature-handle key.
 
     Key fields for rendering a client UI:
 
@@ -724,13 +729,18 @@ def get_player_view(request: Request, principal: CurrentPrincipal, session_id: S
       `character_id` to commands), hit points, conditions, inventory, `scores`, `armour_class`, `thac0`, `saves`,
       `movement_rate_feet`, and `thief_skills`. Combat stats include bonuses and curses from worn unidentified magic
       items while `inventory` masks unidentified names (such as `"a shield with a faint aura"`).
-    - `explored`: visited cells and known `x,y:side` edges (such as `"0,0:north"`) per explored dungeon level.
+    - `dungeons`: IDs and names of dungeons the party has entered. `can_travel_to_town` states whether
+      `travel_to_town` is currently usable from the party's position.
+    - `explored`: the party's known map for each level. Each entry includes mapped `cells` and `edges`, entered
+      `areas` with their names, descriptions, and walked cells, visible `features` with opaque `feature:` IDs,
+      known `transitions` without destinations or gates, and `entrance` when that cell is known. A feature ID is ready
+      to pass as `feature_id`. Feature cache contents, hidden discoveries, and destinations that the party hasn't
+      learned stay omitted.
     - `encounter`: active encounter state, or `null`. Pass `declarers` to build `resolve_battle_round`, and pass a
       group's `id` as `target_group_id` for attacks, `close`, thrown splash items, and `area` or `hd_budget` spells
-      (such as `fire_ball` and `sleep`). `PlayerView` omits individual `monster_ids` (only
-      `GET /v1/sessions/{session_id}/referee-view` lists them), so `single` and `up_to_n` spells (such as
-      `magic_missile`) can target a monster from a `player` client only after that monster's `"monster-NNNN"` ID
-      appears in a player-visible combat event. To find catalog templates matching a group's `family_id`, search
+      (such as `fire_ball` and `sleep`). Each group also has `members` with individual `"monster-NNNN"` or
+      `"npc-NNNN"` IDs and coarse `status` values. Use an `"alive"` member's `id` in `targets` for a `single` or
+      `up_to_n` spell or scroll. To find catalog templates matching a group's `family_id`, search
       `GET /v1/rules/monsters` with `q` and check `family_id` on `GET /v1/rules/monsters/{monster_id}`.
     - `journal` and `quests`: discovered journal entries and active or completed quests.
     - `town_healing_prices`: gold-piece prices for temple services accepted by `purchase_healing`.
@@ -755,12 +765,13 @@ def get_player_view(request: Request, principal: CurrentPrincipal, session_id: S
     ),
 )
 def get_referee_view(request: Request, principal: RefereePrincipal, session_id: SessionId) -> RefereeView:
-    """Requires a `referee` API key. Return osrlib's `RefereeView` of the session (excluding master seed and RNG).
+    """Requires a `referee` API key. Return osrlib's `RefereeView` of the session.
 
     Acquires the session lock to return a consistent snapshot containing the full embedded adventure, all spawned
     monsters with hit points and group `monster_ids`, active effects, trigger flags, `command_log`, and `event_log`.
-    Use it to power a referee dashboard or choose referee commands for `POST /v1/sessions/{session_id}/commands`. To
-    create a restorable snapshot or export the master seed, call `POST /v1/sessions/{session_id}/saves` and
+    The view omits the master seed, RNG state, and secret feature-handle key. Use it to power a referee dashboard or
+    choose referee commands for `POST /v1/sessions/{session_id}/commands`. To create a restorable snapshot or export
+    the master seed and feature-handle key, call `POST /v1/sessions/{session_id}/saves` and
     `GET /v1/saves/{save_id}/document` instead.
     """
     return _sessions(request).read(principal.client, session_id, build_referee_view)

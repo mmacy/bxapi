@@ -4,8 +4,9 @@
 from an earlier exchange's response as `{name.field}`, like `{create_session.id}`, or to a whole response as `{name}`.
 The tests send each request to a new server, in order, and compare each response with the recorded one. Ids and
 timestamps differ from run to run, so the comparison replaces them with placeholders. The server draws every seed
-from `SEED`, so the dice are the same on every run. Each request has the API key of the client `my-game` with the
-role the example names in `role`, or the player role when it names none.
+from `SEED` and every new session key from `_PLAYER_HANDLE_KEY`, so the dice and opaque feature handles are the same
+on every run. Each request has the API key of the client `my-game` with the role the example names in `role`, or the
+player role when it names none.
 
 Run this module to send the requests and record the responses again:
 
@@ -16,6 +17,7 @@ uv run python -m tests.test_openapi_examples
 
 import json
 import re
+import secrets
 from collections.abc import Iterator
 from importlib import resources
 from pathlib import Path
@@ -40,6 +42,8 @@ from bxapi.settings import ApiKey, Role
 SEED = 4127730658136791
 """The seed the server draws whenever a request has none."""
 
+_PLAYER_HANDLE_KEY = bytes(range(32))
+_REAL_TOKEN_BYTES = secrets.token_bytes
 _KEYS = {Role.PLAYER: "my-game-player-key-0123", Role.REFEREE: "my-game-referee-key-0123"}
 
 _TEMPLATE = re.compile(r"\{([a-z0-9_]+)((?:\.[A-Za-z0-9_]+)*)\}")
@@ -80,11 +84,19 @@ def _settings() -> _FixedSettings:
     return _FixedSettings(database=":memory:", api_keys=keys)
 
 
+def _example_token_bytes(size: int) -> bytes:
+    return _PLAYER_HANDLE_KEY if size == 32 else _REAL_TOKEN_BYTES(size)
+
+
 def _replay() -> Iterator[tuple[dict[str, Any], dict[str, Any]]]:
     """Send every example request to a new server, and yield each example with what the server returned."""
     settings = _settings()
     responses: dict[str, Any] = {}
-    with mock.patch("bxapi.seeds.draw_seed", return_value=SEED), TestClient(create_app(settings)) as client:
+    with (
+        mock.patch("bxapi.seeds.draw_seed", return_value=SEED),
+        mock.patch("bxapi.session_manager.secrets.token_bytes", side_effect=_example_token_bytes),
+        TestClient(create_app(settings)) as client,
+    ):
         for exchange in load_examples():
             request = exchange["request"]
             sent: dict[str, Any] = {"method": request["method"], "path": _resolve(request["path"], responses)}

@@ -20,7 +20,7 @@ Walk through a dungeon-crawl session (one game in progress) of `builtin-barrow`,
    ```json
    {
      "api_version": "0.1.0",
-     "engine_version": "2.5.0",
+     "engine_version": "2.6.0",
      "schema_version": 4,
      "auth_enabled": true,
      "client": "my-game",
@@ -129,7 +129,7 @@ The output blocks below format and abbreviate the server's compact JSON with `..
      "revision": 0,
      "clock": {"rounds": 0, "turns": 0, "days": 0},
      "schema_version": 4,
-     "engine_version": "2.5.0",
+     "engine_version": "2.6.0",
      "created_at": "2026-11-21T05:24:33Z",
      "updated_at": "2026-11-21T05:24:33Z"
    }

@@ -9,7 +9,7 @@ authors = [{ name = "Marsh Macy" }]
 requires-python = ">=3.14"
 dependencies = [
     "fastapi>=0.133",
-    "osrlib>=2.5,<3",
+    "osrlib>=2.6,<3",
     "pydantic>=2.13",
     "pydantic-settings>=2.4",
     "starlette>=1.2",

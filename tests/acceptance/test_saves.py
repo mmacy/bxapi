@@ -1,11 +1,14 @@
 """Acceptance tests for saves, restores, and save documents ("Saves" in docs/spec.md)."""
 
+import json
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 from osrlib.core.events import Visibility
+from osrlib.crawl.views import build_player_view
 from osrlib.persistence import load_game, save_game
+from osrlib.versioning import SCHEMA_VERSION
 from starlette.testclient import TestClient
 
 from bxapi.settings import Settings
@@ -13,11 +16,14 @@ from bxapi.settings import Settings
 from ..conftest import REFEREE_KEY
 from .conftest import (
     ADVENTURE_NAME,
+    ANTECHAMBER_TEXT,
     ENTER,
+    GUARD_ROOM_TEXT,
     PLAYER_SECRETS,
     ROUTE_TO_ENCOUNTER,
     SAVE_INFO_KEYS,
     SEED,
+    SHRINE_TEXT,
     TO_ANTECHAMBER,
     Oracle,
     adventure_document,
@@ -25,6 +31,7 @@ from .conftest import (
     assert_page,
     assert_timestamp,
     battle_round,
+    build_player_view_adventure,
     create_session,
     expect,
     expect_not_found,
@@ -173,6 +180,53 @@ def test_the_document_is_for_referees(player: TestClient, referee: TestClient) -
     assert load_game(document).view(Visibility.PLAYER).model_dump(mode="json") == oracle.view()
 
 
+def test_new_session_handle_key_round_trips_through_a_restore(player: TestClient, referee: TestClient) -> None:
+    session_id = started(referee)
+    created = save(player, session_id)
+    document = expect(referee.get(f"/v1/saves/{created['id']}/document"), 200)
+    encoded_key = document["payload"]["player_handle_key"]
+    assert len(bytes.fromhex(encoded_key)) == 32
+    assert encoded_key not in json.dumps(view(player, session_id))
+    assert "player_handle_key" not in expect(
+        referee.get(f"/v1/sessions/{session_id}/referee-view"),
+        200,
+    )
+
+    restored = restore(player, created["id"])
+    saved_again = save(player, restored["id"])
+    restored_document = expect(referee.get(f"/v1/saves/{saved_again['id']}/document"), 200)
+    assert restored_document["payload"]["player_handle_key"] == encoded_key
+    assert view(player, restored["id"]) == load_game(document).view(Visibility.PLAYER).model_dump(mode="json")
+
+
+def test_a_legacy_save_stays_keyless_and_keeps_its_compatibility_handle(
+    player: TestClient, referee: TestClient
+) -> None:
+    oracle = Oracle.new(adventure=build_player_view_adventure())
+    oracle.run([ENTER, TO_ANTECHAMBER])
+    document = json_copy(save_game(oracle.session))
+    assert document["schema_version"] == SCHEMA_VERSION == 4
+    assert "player_handle_key" not in document["payload"]
+    expected_handle = build_player_view(load_game(document)).explored[0].features[0].id
+
+    imported = expect(referee.post("/v1/saves/import", json=document), 201)
+    imported_document = expect(referee.get(f"/v1/saves/{imported['id']}/document"), 200)
+    assert "player_handle_key" not in imported_document["payload"]
+    restored = restore(player, imported["id"])
+    restored_view = view(player, restored["id"])
+    handle = restored_view["explored"][0]["features"][0]["id"]
+    assert handle == expected_handle
+    assert send(
+        player,
+        restored["id"],
+        {"command_type": "take_treasure", "feature_id": handle},
+    )["accepted"]
+
+    saved_again = save(player, restored["id"])
+    continued_document = expect(referee.get(f"/v1/saves/{saved_again['id']}/document"), 200)
+    assert "player_handle_key" not in continued_document["payload"]
+
+
 def test_a_save_moves_to_another_server(
     player: TestClient,
     referee: TestClient,
@@ -259,7 +313,7 @@ def test_another_client_cannot_read_or_change_a_save(
     assert expect(player.get(f"/v1/saves/{save_id}"), 200) == created
 
 
-def test_a_player_never_sees_the_drawn_seed(player: TestClient, referee: TestClient) -> None:
+def test_a_player_never_sees_the_drawn_seed_or_handle_key(player: TestClient, referee: TestClient) -> None:
     adventure = upload_adventure(referee)
     session = create_session(referee, adventure["id"], seed=None)
     session_id = session["id"]
@@ -297,5 +351,9 @@ def test_a_player_never_sees_the_drawn_seed(player: TestClient, referee: TestCli
     assert isinstance(seed, int)
     text = "\n".join(bodies)
     assert str(seed) not in text, "a response to a player contains the master seed"
+    assert "player_handle_key" not in text
+    assert expect(referee.get(f"/v1/saves/{created['id']}/document"), 200)["payload"]["player_handle_key"] not in text
     leaked = [secret for secret in PLAYER_SECRETS if secret in text]
     assert not leaked, f"a response to a player contains {leaked}"
+    assert ANTECHAMBER_TEXT in text and GUARD_ROOM_TEXT in text
+    assert SHRINE_TEXT not in text, "a response to a player contains an unentered area's prose"

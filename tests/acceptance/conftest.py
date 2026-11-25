@@ -18,19 +18,24 @@ from osrlib.core.alignment import Alignment
 from osrlib.core.character import CHARACTER_CREATION_STREAM, Character, create_character, party_to_document
 from osrlib.core.clock import GameClock
 from osrlib.core.events import Event, Visibility
+from osrlib.core.items import Coins
 from osrlib.core.rng import RngStreams
 from osrlib.core.ruleset import Ruleset
 from osrlib.crawl.adventure import Adventure, TownSpec
 from osrlib.crawl.commands import SessionMode, SetFlag, parse_command
 from osrlib.crawl.dungeon import (
     AreaSpec,
+    Direction,
     DoorSpec,
     DungeonSpec,
     Edge,
     EdgeKind,
+    FeatureSpec,
     KeyedEncounter,
     KeyedMonster,
     LevelSpec,
+    TransitionSpec,
+    ValuableSpec,
     WanderingSpec,
 )
 from osrlib.crawl.interpreter import Interpreter
@@ -86,8 +91,11 @@ ADVENTURE_SECRETS = (
 )
 """Strings from the adventure that adventure info must never contain."""
 
-PLAYER_SECRETS = (TRIGGER_ID, FLAG_KEY, FIRED_TEXT, GUARD_ROOM_TEXT, ANTECHAMBER_TEXT, SHRINE_TEXT)
-"""Strings from the adventure that no response to a player may contain at any point in play."""
+PLAYER_SECRETS = (TRIGGER_ID, FLAG_KEY, FIRED_TEXT)
+"""Strings that no response to a player may contain, including after the party enters an area."""
+
+AREA_TEXTS = (ANTECHAMBER_TEXT, GUARD_ROOM_TEXT, SHRINE_TEXT)
+"""Area prose that PlayerView may show only after the party enters that area."""
 
 ENTER = {"command_type": "enter_dungeon", "dungeon_id": DUNGEON_ID}
 TO_ANTECHAMBER = {"command_type": "move_party", "direction": "east"}
@@ -195,6 +203,68 @@ def build_adventure(*, monster_id: str = MONSTER_ID) -> Adventure:
 
 
 ADVENTURE = build_adventure()
+
+FEATURE_ID = "hidden-antechamber-cache"
+FEATURE_DESCRIPTION = "A copper-bound cache sits beneath the west wall."
+FEATURE_ITEM_ID = "rope"
+FEATURE_VALUABLE_NAME = "The moonstone seal"
+
+
+def build_player_view_adventure() -> Adventure:
+    """Return the test adventure with an actionable cache and a known level transition."""
+    dungeon = ADVENTURE.dungeons[0]
+    first = dungeon.levels[0]
+    areas = tuple(
+        area.model_copy(
+            update={
+                "features": (
+                    FeatureSpec(
+                        id=FEATURE_ID,
+                        kind="treasure_cache",
+                        description=FEATURE_DESCRIPTION,
+                        item_ids=(FEATURE_ITEM_ID,),
+                        coins=Coins(gp=37),
+                        valuables=(ValuableSpec(kind="jewellery", name=FEATURE_VALUABLE_NAME, value_gp=90),),
+                    ),
+                )
+            }
+        )
+        if area.id == "antechamber"
+        else area
+        for area in first.areas
+    )
+    transition = TransitionSpec(
+        kind="stairs_down",
+        position=(0, 0),
+        to_dungeon_id=DUNGEON_ID,
+        to_level_number=2,
+        to_position=(0, 0),
+        to_facing=Direction.NORTH,
+    )
+    updated_first = first.model_copy(update={"areas": areas, "transitions": (transition,)})
+    updated_dungeon = dungeon.model_copy(update={"levels": (updated_first, *dungeon.levels[1:])})
+    return ADVENTURE.model_copy(update={"dungeons": (updated_dungeon,)})
+
+
+def player_action_party_document() -> dict[str, Any]:
+    """Return a party document with a thief for caches and a magic user for battle targets."""
+    stream = RngStreams(master_seed=PARTY_SEED).get(CHARACTER_CREATION_STREAM)
+    thief = create_character(
+        name="Tess",
+        class_id="thief",
+        alignment=Alignment.NEUTRAL,
+        ruleset=Ruleset(),
+        stream=stream,
+    ).character
+    mage = create_character(
+        name="Mira",
+        class_id="magic_user",
+        alignment=Alignment.NEUTRAL,
+        ruleset=Ruleset(),
+        stream=stream,
+        starting_spell_ids=["magic_missile"],
+    ).character
+    return json_copy(party_to_document([thief, mage]))
 
 
 def json_copy[T](value: T) -> T:
