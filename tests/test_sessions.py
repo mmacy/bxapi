@@ -11,10 +11,12 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from osrlib.core.alignment import Alignment
 from osrlib.core.character import CHARACTER_CREATION_STREAM, Character, create_character, party_to_document
+from osrlib.core.classes import ClassDefinition
 from osrlib.core.clock import GameClock
 from osrlib.core.events import Event, Visibility
 from osrlib.core.rng import RngStreams
 from osrlib.core.ruleset import Ruleset
+from osrlib.core.spells import SpellTemplate
 from osrlib.crawl.adventure import Adventure, TownSpec
 from osrlib.crawl.battle import preview_battle_round
 from osrlib.crawl.commands import ALL_COMMAND_CLASSES, BattleDeclaration, SessionMode, SetFlag, parse_command
@@ -23,6 +25,7 @@ from osrlib.crawl.interpreter import Interpreter
 from osrlib.crawl.party import Party
 from osrlib.crawl.session import GameSession
 from osrlib.crawl.triggers import AreaEnteredPattern, TriggerSpec
+from osrlib.data import load_classes, load_spells
 from osrlib.messages import format_message
 from osrlib.persistence import load_game
 from osrlib.versioning import SCHEMA_VERSION, engine_version
@@ -589,6 +592,81 @@ def test_a_malformed_preview_is_a_validation_error(referee: TestClient, body: di
     problem(response, 422, "validation_error")
 
 
+# Session rules
+
+
+def bundled_spell(source_id: str, spell_id: str, name: str) -> SpellTemplate:
+    """Return a copy of a built-in spell under a new id and name, as an adventure bundles one."""
+    return load_spells().get(source_id).model_copy(update={"id": spell_id, "name": name})
+
+
+GLIMMER = bundled_spell("magic_missile", "glimmer", "Glimmer")
+BALM = bundled_spell("cure_light_wounds", "balm", "Balm")
+WITCH = load_classes().get("magic_user").model_copy(update={"id": "witch", "name": "Witch"})
+
+
+def start_with_custom_content(referee: TestClient) -> tuple[str, ClassDefinition]:
+    """Start a session whose adventure bundles two spells, with a witch who has one of them in her book.
+
+    Returns the session's id and the definition of the witch's class.
+    """
+    adventure = BARROW.model_copy(update={"spells": (GLIMMER, BALM)})
+    uploaded = ok(referee.post("/v1/adventures", json=adventure_document(adventure)), 201)
+    hex_the_witch = create_character(
+        name="Hex",
+        class_id=WITCH.id,
+        custom_class=WITCH,
+        alignment=Alignment.NEUTRAL,
+        ruleset=Ruleset(),
+        stream=RngStreams(master_seed=8).get(CHARACTER_CREATION_STREAM),
+        spell_catalog=load_spells().model_copy(update={"spells": (*load_spells().spells, GLIMMER)}),
+        starting_spell_ids=[GLIMMER.id],
+    ).character
+    party = party_to_document([*roll_characters(), hex_the_witch])
+    session = start(referee, adventure_id=uploaded["id"], party_document=party)
+    return session["id"], hex_the_witch.definition
+
+
+def test_a_session_serves_the_spells_its_player_view_names(player: TestClient, referee: TestClient) -> None:
+    session_id, _ = start_with_custom_content(referee)
+    names = ok(player.get(f"/v1/sessions/{session_id}/view"))["spell_names"]
+    assert names == {GLIMMER.id: GLIMMER.name}
+    for caller in (player, referee):
+        served = ok(caller.get(f"/v1/sessions/{session_id}/rules/spells/{GLIMMER.id}"))
+        assert served == GLIMMER.model_dump(mode="json")
+    problem(player.get(f"/v1/rules/spells/{GLIMMER.id}"), 404, "not_found")
+    # A spell the view doesn't name gets the same answer whether the adventure bundles it, osrlib has it, or neither.
+    answers = []
+    for spell_id in (BALM.id, "fire_ball", "no_such_spell"):
+        for caller in (player, referee):
+            found = problem(caller.get(f"/v1/sessions/{session_id}/rules/spells/{spell_id}"), 404, "not_found")
+            assert (found["resource"], found["id"]) == ("spell", spell_id)
+            answers.append(found["detail"].replace(spell_id, "<id>"))
+    assert len(set(answers)) == 1
+
+
+def test_a_session_serves_the_classes_of_its_party(player: TestClient, referee: TestClient) -> None:
+    session_id, witch = start_with_custom_content(referee)
+    party = ok(player.get(f"/v1/sessions/{session_id}/view"))["party"]
+    assert [member["class_id"] for member in party] == ["fighter", "cleric", WITCH.id]
+    path = f"/v1/sessions/{session_id}/rules/classes"
+    assert ok(player.get(f"{path}/{WITCH.id}")) == witch.model_dump(mode="json")
+    assert ok(player.get(f"{path}/{WITCH.id}"))["name"] == party[2]["class_name"]
+    assert ok(player.get(f"{path}/cleric")) == ok(player.get("/v1/rules/classes/cleric"))
+    problem(player.get(f"/v1/rules/classes/{WITCH.id}"), 404, "not_found")
+    for class_id in ("thief", "no_such_class"):
+        found = problem(referee.get(f"{path}/{class_id}"), 404, "not_found")
+        assert (found["resource"], found["id"]) == ("class", class_id)
+
+
+def test_session_rules_change_nothing(player: TestClient, referee: TestClient) -> None:
+    session_id, _ = start_with_custom_content(referee)
+    before = state(player, session_id)
+    ok(player.get(f"/v1/sessions/{session_id}/rules/spells/{GLIMMER.id}"))
+    ok(player.get(f"/v1/sessions/{session_id}/rules/classes/{WITCH.id}"))
+    assert state(player, session_id) == before
+
+
 # Views and events
 
 
@@ -705,6 +783,8 @@ def test_another_client_cannot_read_or_change_a_session(referee: TestClient, oth
         other.post(f"/v1/sessions/{session_id}/battle-round/preview", json={"declarations": []}),
         other.get(f"/v1/sessions/{session_id}/view"),
         other.get(f"/v1/sessions/{session_id}/referee-view"),
+        other.get(f"/v1/sessions/{session_id}/rules/spells/sleep"),
+        other.get(f"/v1/sessions/{session_id}/rules/classes/fighter"),
         other.get(f"/v1/sessions/{session_id}/events"),
         other.post(f"/v1/sessions/{session_id}/saves", json={}),
     ):

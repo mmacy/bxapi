@@ -11,9 +11,11 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from fastapi import APIRouter, Body, Path, Query, Request, Response
 from osrlib.core.character import Character, party_from_document
+from osrlib.core.classes import ClassDefinition
 from osrlib.core.clock import GameClock
 from osrlib.core.events import Event, Visibility
 from osrlib.core.ruleset import Ruleset
+from osrlib.core.spells import SpellTemplate
 from osrlib.core.validation import Rejection
 from osrlib.crawl import battle
 from osrlib.crawl.battle import BattleRoundPreview
@@ -825,6 +827,102 @@ def get_player_view(request: Request, principal: CurrentPrincipal, session_id: S
     - `town_healing_prices`: gold-piece prices for temple services accepted by `purchase_healing`.
     """
     return _sessions(request).read(principal.client, session_id, build_player_view)
+
+
+@router.get(
+    "/{session_id}/rules/spells/{spell_id}",
+    summary="Get a spell the player view names",
+    response_description="osrlib's `SpellTemplate`, from the session's spell catalog.",
+    responses=problem_responses(
+        {
+            404: [
+                _NOT_FOUND,
+                "`not_found`: The player view's `spell_names` has no entry for this spell id (`resource` is `spell`). "
+                "Read the ids from `GET /v1/sessions/{session_id}/view`. For a built-in spell the view doesn't name, "
+                "call `GET /v1/rules/spells/{spell_id}`.",
+            ],
+            409: [_BUSY],
+            500: [INTERNAL_ERROR, _UNREADABLE],
+        }
+    ),
+)
+def get_session_spell(
+    request: Request,
+    principal: CurrentPrincipal,
+    session_id: SessionId,
+    spell_id: Annotated[
+        str,
+        Path(description="Spell id from a key of `spell_names` in the player view, such as `magic_missile`."),
+    ],
+) -> SpellTemplate:
+    """Return osrlib's `SpellTemplate` for a spell that the session's player view names in `spell_names`.
+
+    A session's adventure can add spells to the built-in catalog, and `GET /v1/rules/spells/{spell_id}` serves only
+    the built-in ones. This operation reads the session's own catalog, osrlib's `GameSession.effective_spells`, so
+    it also answers for a spell the adventure adds. Use `level` and `spell_list` to place a spell from a member's
+    `spell_book` in a `prepare_spells` dialog, and the `key` of each entry in `modes` as the `mode` of a `cast_spell`
+    command.
+
+    The operation serves the spells in `spell_names` and no others: the ones in a member's `spell_book` or
+    `memorized_spells`, and the ones behind an effect on a member. A spell the view doesn't name gets 404
+    `not_found`, whether or not the session's catalog has it, so the response doesn't reveal a spell on an
+    unidentified scroll or a spell the adventure keeps for its monsters. A player and a referee get the same
+    answer.
+    """
+
+    def read(game: GameSession) -> SpellTemplate:
+        if spell_id not in build_player_view(game).spell_names:
+            raise not_found("spell", spell_id, among="in the session's player view")
+        return game.effective_spells.get(spell_id)
+
+    return _sessions(request).read(principal.client, session_id, read)
+
+
+@router.get(
+    "/{session_id}/rules/classes/{class_id}",
+    summary="Get a party member's class",
+    response_description="osrlib's `ClassDefinition` of the party member's class.",
+    responses=problem_responses(
+        {
+            404: [
+                _NOT_FOUND,
+                "`not_found`: No party member in the player view has this `class_id` (`resource` is `class`). Read "
+                "the ids from `party[i].class_id` on `GET /v1/sessions/{session_id}/view`.",
+            ],
+            409: [_BUSY],
+            500: [INTERNAL_ERROR, _UNREADABLE],
+        }
+    ),
+)
+def get_session_class(
+    request: Request,
+    principal: CurrentPrincipal,
+    session_id: SessionId,
+    class_id: Annotated[
+        str,
+        Path(description="Class id from `party[i].class_id` in the player view, such as `magic_user`."),
+    ],
+) -> ClassDefinition:
+    """Return osrlib's `ClassDefinition` for the class of a party member, including a class the party brought.
+
+    A character can have a custom class that osrlib's catalog doesn't include, and `GET /v1/rules/classes/{class_id}`
+    serves only the built-in classes. This operation returns the definition osrlib uses for the member, read from
+    `Character.definition`. `progression` has one row for each level, with the `spell_slots` a spell dialog needs,
+    `thac0`, `saves`, and the XP the level takes.
+
+    The operation serves the classes of the party's members and no others. When two members have the same
+    `class_id`, it returns the definition of the first in marching order. A class no member has gets 404
+    `not_found`. A player and a referee get the same answer.
+    """
+
+    def read(game: GameSession) -> ClassDefinition:
+        shown = {member.id for member in build_player_view(game).party if member.class_id == class_id}
+        for member in game.party.members:
+            if member.id in shown:
+                return member.definition
+        raise not_found("class", class_id, among="of a member of the session's party")
+
+    return _sessions(request).read(principal.client, session_id, read)
 
 
 @router.get(
