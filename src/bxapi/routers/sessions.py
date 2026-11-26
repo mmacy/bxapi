@@ -688,11 +688,12 @@ def send_command(
       `mode`. Spells and scrolls with `single` or `up_to_n` targeting (such as `magic_missile` with
       `spell_mode: "missiles"`) take individual `"monster-NNNN"` or `"npc-NNNN"` IDs from
       `encounter.groups[i].members` in `targets`. Use an entry whose `status` is `"alive"`.
-    - **Treasure caches (`inspect_treasure`, `remove_treasure_trap`, `take_treasure`):** Pass the opaque
-      `explored[i].features[j].id` as `feature_id` for a feature on the party's current cell. The handle starts with
-      `feature:`. Don't parse it. A player can use the handle without reading the referee view. osrlib also accepts the
-      feature's authored ID from the adventure document, a legacy form for a referee tool, and resolves either form
-      only among the features at the party's location.
+    - **Treasure caches (`inspect_treasure`, `remove_treasure_trap`, `take_treasure`):** Pass a handle from the
+      player view's `features_here` as `feature_id`. The list has the `explored[i].features[j].id` of each treasure
+      cache the party can reach from where it stands. The handle starts with `feature:`. Don't parse it. A referee
+      tool reads the same handle from `feature_handles` in the referee view. osrlib also accepts the feature's
+      authored ID from the adventure document, a legacy form, and resolves either form only among the features at
+      the party's location.
 
     When osrlib refuses a command under the B/X rules, this operation still returns HTTP 200 with `accepted` set to
     `false` and rule `rejections`, leaving the session and `revision` unchanged. When accepted, the server persists
@@ -768,6 +769,10 @@ def preview_battle_round(
     and `front_rank` gives each group's projected front rank, keyed by group ID. The projection leaves out what the
     monsters do, because the session decides that after it rolls initiative.
 
+    `can_hide` lists the declarers who could declare `hide` beside the other planned declarations, and
+    `can_back_stab` lists the declarers who could declare an `attack` with `back_stab`. Use them to offer those two
+    choices only to a member the session would accept them from.
+
     The preview takes the session lock, rolls no dice, passes no game time, and changes nothing: `revision` stays the
     same, so the request takes no `expected_revision` and needs no `Idempotency-Key`.
     """
@@ -814,9 +819,17 @@ def get_player_view(request: Request, principal: CurrentPrincipal, session_id: S
       `travel_to_town` is currently usable from the party's position.
     - `explored`: the party's known map for each level. Each entry includes mapped `cells` and `edges`, entered
       `areas` with their names, descriptions, and walked cells, visible `features` with opaque `feature:` IDs,
-      known `transitions` without destinations or gates, and `entrance` when that cell is known. A feature ID is ready
-      to pass as `feature_id`. Feature cache contents, hidden discoveries, and destinations that the party hasn't
-      learned stay omitted.
+      known `transitions` without destinations or gates, and `entrance` when that cell is known. A feature's
+      `emptied` is `true` once the party has emptied that authored cache, and `trap_state` on a feature or an area
+      is the trap's state as the party knows it. Feature cache contents, hidden discoveries, and destinations that
+      the party hasn't learned stay omitted.
+    - `features_here`: the feature IDs that `inspect_treasure`, `remove_treasure_trap`, and `take_treasure` accept as
+      `feature_id` from where the party stands. It's empty outside `exploring` mode.
+    - `spell_names`, `reversed_spell_names`, and `spell_levels`: the name and level of every spell ID the view
+      shows. Each member's `spell_slots`, `preparable_spells`, and `learnable_spells` give what a `prepare_spells` or
+      `learn_spell` dialog offers that member.
+    - `item_names` and `item_names_plural`: what to call each item ID the view shows, in a member's `inventory` or
+      in the `contents` of a pile in `piles`.
     - `encounter`: active encounter state, or `null`. Pass `declarers` to build `resolve_battle_round`, and pass a
       group's `id` as `target_group_id` for attacks, `close`, thrown splash items, and `area` or `hd_budget` spells
       (such as `fire_ball` and `sleep`). Each group also has `members` with individual `"monster-NNNN"` or
@@ -863,10 +876,11 @@ def get_session_spell(
     `spell_book` in a `prepare_spells` dialog, and the `key` of each entry in `modes` as the `mode` of a `cast_spell`
     command.
 
-    The operation serves the spells in `spell_names` and no others: the ones in a member's `spell_book` or
-    `memorized_spells`, and the ones behind an effect on a member. A spell the view doesn't name gets 404
-    `not_found`, whether or not the session's catalog has it, so the response doesn't reveal a spell on an
-    unidentified scroll or a spell the adventure keeps for its monsters. A player and a referee get the same
+    The operation serves the spells in `spell_names` and no others: the ones in a member's `spell_book`,
+    `memorized_spells`, `preparable_spells`, or `learnable_spells`, and the ones behind an effect on a member. So it
+    answers for a spell the adventure adds as soon as a member could prepare or learn it. A spell the view doesn't
+    name gets 404 `not_found`, whether or not the session's catalog has it, so the response doesn't reveal a spell
+    on an unidentified scroll or a spell the adventure keeps for its monsters. A player and a referee get the same
     answer.
     """
 
@@ -946,7 +960,9 @@ def get_referee_view(request: Request, principal: RefereePrincipal, session_id: 
 
     Acquires the session lock to return a consistent snapshot containing the full embedded adventure, all spawned
     monsters with hit points and group `monster_ids`, active effects, trigger flags, `command_log`, and `event_log`.
-    The view omits the master seed, RNG state, and secret feature-handle key. Use it to power a referee dashboard or
+    The view omits the master seed, RNG state, and secret feature-handle key. `feature_handles` maps each feature
+    to the `feature:` ID the player view shows for it, keyed `"{dungeon}:{level}:{feature id}"` for an authored
+    feature and by cache ID for a generated cache. Use the view to power a referee dashboard or
     choose referee commands for `POST /v1/sessions/{session_id}/commands`. To create a restorable snapshot or export
     the master seed and feature-handle key, call `POST /v1/sessions/{session_id}/saves` and
     `GET /v1/saves/{save_id}/document` instead.

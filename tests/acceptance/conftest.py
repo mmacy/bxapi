@@ -575,6 +575,19 @@ def referee_view(client: TestClient, session_id: str) -> dict[str, Any]:
     return expect(client.get(f"/v1/sessions/{session_id}/referee-view"), 200)
 
 
+def split_handles(referee: dict[str, Any]) -> tuple[dict[str, Any], set[str]]:
+    """Return a referee view without `feature_handles`, and the feature references that have a handle.
+
+    The server gives each session a random handle key, so its handles differ from the handles of an
+    oracle that starts with the same seed. Everything else in the two views is equal.
+    """
+    rest = {key: value for key, value in referee.items() if key != "feature_handles"}
+    handles = referee["feature_handles"]
+    assert all(handle.startswith("feature:") for handle in handles.values())
+    assert len(set(handles.values())) == len(handles)
+    return rest, set(handles)
+
+
 def info(client: TestClient, session_id: str) -> dict[str, Any]:
     """Return a session's info."""
     return expect(client.get(f"/v1/sessions/{session_id}"), 200)

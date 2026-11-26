@@ -30,7 +30,7 @@
       "status": 200,
       "response": {
         "api_version": "0.1.0",
-        "engine_version": "2.7.0",
+        "engine_version": "2.8.0",
         "schema_version": 4,
         "auth_enabled": true,
         "client": "my-game",
@@ -977,6 +977,8 @@
         "item_type": "weapon",
         "id": "sword",
         "name": "Sword",
+        "display_name": "sword",
+        "display_name_plural": "swords",
         "cost_gp": 10,
         "weight_coins": 60,
         "damage": "1d8",
@@ -1048,6 +1050,8 @@
       "response": {
         "id": "potion_of_healing",
         "name": "Potion of Healing",
+        "display_name": "potion of healing",
+        "display_name_plural": "potions of healing",
         "category": "potion",
         "base_item_id": null,
         "attack_bonus": 0,
@@ -1938,6 +1942,8 @@
                       "item_type": "ammunition",
                       "id": "sling_stones",
                       "name": "Sling stones",
+                      "display_name": "sling stone",
+                      "display_name_plural": "sling stones",
                       "cost_gp": 0,
                       "lot_size": 1,
                       "weight_coins": 0,
@@ -1952,6 +1958,8 @@
                       "item_type": "gear",
                       "id": "rations_standard",
                       "name": "Rations (standard, 7 days)",
+                      "display_name": "standard ration",
+                      "display_name_plural": "standard rations",
                       "cost_gp": 5,
                       "lot_size": 7,
                       "capacity_coins": null,
@@ -1959,7 +1967,10 @@
                       "params": {
                         "ration": true
                       },
-                      "overrides_applied": []
+                      "overrides_applied": [
+                        "display_name",
+                        "display_name_plural"
+                      ]
                     },
                     "quantity": 7
                   },
@@ -1969,6 +1980,8 @@
                       "item_type": "gear",
                       "id": "waterskin",
                       "name": "Waterskin",
+                      "display_name": "waterskin",
+                      "display_name_plural": "waterskins",
                       "cost_gp": 1,
                       "lot_size": 1,
                       "capacity_coins": null,
@@ -1986,6 +1999,8 @@
                       "item_type": "gear",
                       "id": "torch",
                       "name": "Torches (6)",
+                      "display_name": "torch",
+                      "display_name_plural": "torches",
                       "cost_gp": 1,
                       "lot_size": 6,
                       "capacity_coins": null,
@@ -2001,7 +2016,10 @@
                         "burn_turns": 6,
                         "light_radius_feet": 30
                       },
-                      "overrides_applied": []
+                      "overrides_applied": [
+                        "display_name",
+                        "display_name_plural"
+                      ]
                     },
                     "quantity": 6
                   }
@@ -2020,13 +2038,18 @@
                     "item_type": "armour",
                     "id": "leather",
                     "name": "Leather",
+                    "display_name": "suit of leather armour",
+                    "display_name_plural": "suits of leather armour",
                     "cost_gp": 20,
                     "weight_coins": 200,
                     "ac": 7,
                     "ac_ascending": 12,
                     "ac_bonus": null,
                     "category": "light",
-                    "overrides_applied": []
+                    "overrides_applied": [
+                      "display_name",
+                      "display_name_plural"
+                    ]
                   },
                   "quantity": 1
                 },
@@ -2036,6 +2059,8 @@
                     "item_type": "armour",
                     "id": "shield",
                     "name": "Shield",
+                    "display_name": "shield",
+                    "display_name_plural": "shields",
                     "cost_gp": 10,
                     "weight_coins": 100,
                     "ac": null,
@@ -2053,6 +2078,8 @@
                       "item_type": "weapon",
                       "id": "sword",
                       "name": "Sword",
+                      "display_name": "sword",
+                      "display_name_plural": "swords",
                       "cost_gp": 10,
                       "weight_coins": 60,
                       "damage": "1d8",
@@ -2071,6 +2098,8 @@
                       "item_type": "weapon",
                       "id": "sling",
                       "name": "Sling",
+                      "display_name": "sling",
+                      "display_name_plural": "slings",
                       "cost_gp": 2,
                       "weight_coins": 20,
                       "damage": "1d4",
@@ -2135,6 +2164,8 @@
                       "item_type": "ammunition",
                       "id": "arrows",
                       "name": "Arrows (quiver of 20)",
+                      "display_name": "arrow",
+                      "display_name_plural": "arrows",
                       "cost_gp": 5,
                       "lot_size": 20,
                       "weight_coins": 0,
@@ -2149,6 +2180,8 @@
                       "item_type": "gear",
                       "id": "rations_standard",
                       "name": "Rations (standard, 7 days)",
+                      "display_name": "standard ration",
+                      "display_name_plural": "standard rations",
                       "cost_gp": 5,
                       "lot_size": 7,
                       "capacity_coins": null,
@@ -2156,7 +2189,10 @@
                       "params": {
                         "ration": true
                       },
-                      "overrides_applied": []
+                      "overrides_applied": [
+                        "display_name",
+                        "display_name_plural"
+                      ]
                     },
                     "quantity": 7
                   },
@@ -2166,6 +2202,8 @@
                       "item_type": "gear",
                       "id": "waterskin",
                       "name": "Waterskin",
+                      "display_name": "waterskin",
+                      "display_name_plural": "waterskins",
                       "cost_gp": 1,
                       "lot_size": 1,
                       "capacity_coins": null,
@@ -2183,6 +2221,8 @@
                       "item_type": "gear",
                       "id": "torch",
                       "name": "Torches (6)",
+                      "display_name": "torch",
+                      "display_name_plural": "torches",
                       "cost_gp": 1,
                       "lot_size": 6,
                       "capacity_coins": null,
@@ -2198,7 +2238,10 @@
                         "burn_turns": 6,
                         "light_radius_feet": 30
                       },
-                      "overrides_applied": []
+                      "overrides_applied": [
+                        "display_name",
+                        "display_name_plural"
+                      ]
                     },
                     "quantity": 6
                   }
@@ -2217,6 +2260,8 @@
                     "item_type": "armour",
                     "id": "chainmail",
                     "name": "Chainmail",
+                    "display_name": "suit of chainmail",
+                    "display_name_plural": "suits of chainmail",
                     "cost_gp": 40,
                     "weight_coins": 400,
                     "ac": 5,
@@ -2235,6 +2280,8 @@
                       "item_type": "weapon",
                       "id": "sword",
                       "name": "Sword",
+                      "display_name": "sword",
+                      "display_name_plural": "swords",
                       "cost_gp": 10,
                       "weight_coins": 60,
                       "damage": "1d8",
@@ -2253,6 +2300,8 @@
                       "item_type": "weapon",
                       "id": "long_bow",
                       "name": "Long bow",
+                      "display_name": "long bow",
+                      "display_name_plural": "long bows",
                       "cost_gp": 40,
                       "weight_coins": 30,
                       "damage": "1d6",
@@ -2637,13 +2686,18 @@
                 "item_type": "armour",
                 "id": "leather",
                 "name": "Leather",
+                "display_name": "suit of leather armour",
+                "display_name_plural": "suits of leather armour",
                 "cost_gp": 20,
                 "weight_coins": 200,
                 "ac": 7,
                 "ac_ascending": 12,
                 "ac_bonus": null,
                 "category": "light",
-                "overrides_applied": []
+                "overrides_applied": [
+                  "display_name",
+                  "display_name_plural"
+                ]
               },
               "quantity": 1
             },
@@ -2655,6 +2709,8 @@
                   "item_type": "weapon",
                   "id": "mace",
                   "name": "Mace",
+                  "display_name": "mace",
+                  "display_name_plural": "maces",
                   "cost_gp": 5,
                   "weight_coins": 30,
                   "damage": "1d6",
@@ -2780,7 +2836,7 @@
       "path": "/v1/ability-rolls",
       "status": 201,
       "response": {
-        "id": "rol_bHpXF_EADd-tE7Uwy8CxRg",
+        "id": "rol_Pfv-H-JCQgGteRhjgB12_Q",
         "scores": {
           "str": 9,
           "int": 9,
@@ -2841,7 +2897,7 @@
           "thief"
         ],
         "used": false,
-        "created_at": "2026-11-26T04:04:00Z"
+        "created_at": "2026-11-26T07:22:46Z"
       }
     }
   },
@@ -2865,7 +2921,7 @@
       },
       "status": 201,
       "response": {
-        "id": "rol_VXSGtMQUjM2q4p-Xgae9Tg",
+        "id": "rol__56m_rJli6jZdgVDBfx7Fw",
         "scores": {
           "str": 4,
           "int": 10,
@@ -2926,7 +2982,7 @@
           "thief"
         ],
         "used": false,
-        "created_at": "2026-11-26T04:04:00Z"
+        "created_at": "2026-11-26T07:22:46Z"
       }
     }
   },
@@ -2940,10 +2996,10 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/ability-rolls/rol_bHpXF_EADd-tE7Uwy8CxRg",
+      "path": "/v1/ability-rolls/rol_Pfv-H-JCQgGteRhjgB12_Q",
       "status": 200,
       "response": {
-        "id": "rol_bHpXF_EADd-tE7Uwy8CxRg",
+        "id": "rol_Pfv-H-JCQgGteRhjgB12_Q",
         "scores": {
           "str": 9,
           "int": 9,
@@ -3004,7 +3060,7 @@
           "thief"
         ],
         "used": false,
-        "created_at": "2026-11-26T04:04:00Z"
+        "created_at": "2026-11-26T07:22:46Z"
       }
     }
   },
@@ -3035,7 +3091,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/ability-rolls/rol_bHpXF_EADd-tE7Uwy8CxRg/preview",
+      "path": "/v1/ability-rolls/rol_Pfv-H-JCQgGteRhjgB12_Q/preview",
       "body": {
         "name": "Aldric",
         "class_id": "fighter",
@@ -3092,13 +3148,18 @@
                 "item_type": "armour",
                 "id": "leather",
                 "name": "Leather",
+                "display_name": "suit of leather armour",
+                "display_name_plural": "suits of leather armour",
                 "cost_gp": 20,
                 "weight_coins": 200,
                 "ac": 7,
                 "ac_ascending": 12,
                 "ac_bonus": null,
                 "category": "light",
-                "overrides_applied": []
+                "overrides_applied": [
+                  "display_name",
+                  "display_name_plural"
+                ]
               },
               "quantity": 1
             },
@@ -3110,6 +3171,8 @@
                   "item_type": "weapon",
                   "id": "sword",
                   "name": "Sword",
+                  "display_name": "sword",
+                  "display_name_plural": "swords",
                   "cost_gp": 10,
                   "weight_coins": 60,
                   "damage": "1d8",
@@ -3242,7 +3305,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/ability-rolls/rol_bHpXF_EADd-tE7Uwy8CxRg/preview",
+      "path": "/v1/ability-rolls/rol_Pfv-H-JCQgGteRhjgB12_Q/preview",
       "body": {
         "name": "Aldric",
         "class_id": "fighter",
@@ -3261,7 +3324,7 @@
         "status": 422,
         "detail": "The starting gold doesn't cover the purchases.",
         "code": "character_invalid",
-        "request_id": "req_aiY9PWvq8vBkU1U8OWnuHw",
+        "request_id": "req_DRDRjvXNve6FIL9pFCpW6g",
         "rejections": [
           {
             "code": "items.purchase.insufficient_funds",
@@ -3295,7 +3358,7 @@
         "name": "Wren",
         "class_id": "magic_user",
         "alignment": "neutral",
-        "ability_roll_id": "rol_bHpXF_EADd-tE7Uwy8CxRg"
+        "ability_roll_id": "rol_Pfv-H-JCQgGteRhjgB12_Q"
       },
       "status": 422,
       "response": {
@@ -3304,7 +3367,7 @@
         "status": 422,
         "detail": "The starting spells don't fit the class's first spell book.",
         "code": "character_invalid",
-        "request_id": "req_QZAZ62uw0kVJWcZtB9X97A",
+        "request_id": "req_5hHxBURE8seNtixeaKY4yg",
         "rejections": [
           {
             "code": "magic.book.capacity_mismatch",
@@ -3351,7 +3414,7 @@
         "name": "Aldric",
         "class_id": "fighter",
         "alignment": "lawful",
-        "ability_roll_id": "rol_bHpXF_EADd-tE7Uwy8CxRg",
+        "ability_roll_id": "rol_Pfv-H-JCQgGteRhjgB12_Q",
         "purchases": [
           {
             "item_id": "sword"
@@ -3367,11 +3430,11 @@
       },
       "status": 201,
       "response": {
-        "id": "chr_3wPigTmEsnua1hrmkpgUSA",
+        "id": "chr_JzTc4KhrfNxAIBEllYv_OA",
         "name": "Aldric",
         "class_id": "fighter",
         "level": 1,
-        "created_at": "2026-11-26T04:04:00Z",
+        "created_at": "2026-11-26T07:22:46Z",
         "character": {
           "id": null,
           "name": "Aldric",
@@ -3409,13 +3472,18 @@
                 "item_type": "armour",
                 "id": "leather",
                 "name": "Leather",
+                "display_name": "suit of leather armour",
+                "display_name_plural": "suits of leather armour",
                 "cost_gp": 20,
                 "weight_coins": 200,
                 "ac": 7,
                 "ac_ascending": 12,
                 "ac_bonus": null,
                 "category": "light",
-                "overrides_applied": []
+                "overrides_applied": [
+                  "display_name",
+                  "display_name_plural"
+                ]
               },
               "quantity": 1
             },
@@ -3427,6 +3495,8 @@
                   "item_type": "weapon",
                   "id": "sword",
                   "name": "Sword",
+                  "display_name": "sword",
+                  "display_name_plural": "swords",
                   "cost_gp": 10,
                   "weight_coins": 60,
                   "damage": "1d8",
@@ -3499,16 +3569,16 @@
         "name": "Aldric",
         "class_id": "fighter",
         "alignment": "lawful",
-        "ability_roll_id": "rol_bHpXF_EADd-tE7Uwy8CxRg"
+        "ability_roll_id": "rol_Pfv-H-JCQgGteRhjgB12_Q"
       },
       "status": 409,
       "response": {
         "type": "about:blank",
         "title": "Conflict",
         "status": 409,
-        "detail": "A character was already created from the ability roll 'rol_bHpXF_EADd-tE7Uwy8CxRg'.",
+        "detail": "A character was already created from the ability roll 'rol_Pfv-H-JCQgGteRhjgB12_Q'.",
         "code": "ability_roll_used",
-        "request_id": "req_NFt2psryW9HVUoMaB4knYw"
+        "request_id": "req_L-ltx5oDKW-9W68LhRr9ag"
       }
     }
   },
@@ -3527,7 +3597,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/ability-rolls/rol_bHpXF_EADd-tE7Uwy8CxRg/preview",
+      "path": "/v1/ability-rolls/rol_Pfv-H-JCQgGteRhjgB12_Q/preview",
       "body": {
         "name": "Aldric",
         "class_id": "fighter",
@@ -3538,9 +3608,9 @@
         "type": "about:blank",
         "title": "Conflict",
         "status": 409,
-        "detail": "A character was already created from the ability roll 'rol_bHpXF_EADd-tE7Uwy8CxRg'.",
+        "detail": "A character was already created from the ability roll 'rol_Pfv-H-JCQgGteRhjgB12_Q'.",
         "code": "ability_roll_used",
-        "request_id": "req__1sPJOgJPI7rExACSsCDLg"
+        "request_id": "req_WxLG0bqFvWhGnEu5BR-_CQ"
       }
     }
   },
@@ -3559,12 +3629,12 @@
       "response": {
         "items": [
           {
-            "id": "chr_3wPigTmEsnua1hrmkpgUSA",
+            "id": "chr_JzTc4KhrfNxAIBEllYv_OA",
             "name": "Aldric",
             "class_id": "fighter",
             "level": 1,
             "max_hp": 8,
-            "created_at": "2026-11-26T04:04:00Z"
+            "created_at": "2026-11-26T07:22:46Z"
           }
         ],
         "total": 1,
@@ -3583,14 +3653,14 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/characters/chr_3wPigTmEsnua1hrmkpgUSA",
+      "path": "/v1/characters/chr_JzTc4KhrfNxAIBEllYv_OA",
       "status": 200,
       "response": {
-        "id": "chr_3wPigTmEsnua1hrmkpgUSA",
+        "id": "chr_JzTc4KhrfNxAIBEllYv_OA",
         "name": "Aldric",
         "class_id": "fighter",
         "level": 1,
-        "created_at": "2026-11-26T04:04:00Z",
+        "created_at": "2026-11-26T07:22:46Z",
         "character": {
           "id": null,
           "name": "Aldric",
@@ -3628,13 +3698,18 @@
                 "item_type": "armour",
                 "id": "leather",
                 "name": "Leather",
+                "display_name": "suit of leather armour",
+                "display_name_plural": "suits of leather armour",
                 "cost_gp": 20,
                 "weight_coins": 200,
                 "ac": 7,
                 "ac_ascending": 12,
                 "ac_bonus": null,
                 "category": "light",
-                "overrides_applied": []
+                "overrides_applied": [
+                  "display_name",
+                  "display_name_plural"
+                ]
               },
               "quantity": 1
             },
@@ -3646,6 +3721,8 @@
                   "item_type": "weapon",
                   "id": "sword",
                   "name": "Sword",
+                  "display_name": "sword",
+                  "display_name_plural": "swords",
                   "cost_gp": 10,
                   "weight_coins": 60,
                   "damage": "1d8",
@@ -3718,7 +3795,7 @@
       "body": {
         "kind": "character",
         "schema_version": 4,
-        "engine_version": "2.7.0",
+        "engine_version": "2.8.0",
         "payload": {
           "id": null,
           "name": "Aldric",
@@ -3756,13 +3833,18 @@
                 "item_type": "armour",
                 "id": "leather",
                 "name": "Leather",
+                "display_name": "suit of leather armour",
+                "display_name_plural": "suits of leather armour",
                 "cost_gp": 20,
                 "weight_coins": 200,
                 "ac": 7,
                 "ac_ascending": 12,
                 "ac_bonus": null,
                 "category": "light",
-                "overrides_applied": []
+                "overrides_applied": [
+                  "display_name",
+                  "display_name_plural"
+                ]
               },
               "quantity": 1
             },
@@ -3774,6 +3856,8 @@
                   "item_type": "weapon",
                   "id": "sword",
                   "name": "Sword",
+                  "display_name": "sword",
+                  "display_name_plural": "swords",
                   "cost_gp": 10,
                   "weight_coins": 60,
                   "damage": "1d8",
@@ -3798,11 +3882,11 @@
       },
       "status": 201,
       "response": {
-        "id": "chr_hq07CM7CSpW3mc-W9EzA_Q",
+        "id": "chr_QD14MyADuolRiCh-Yqln-A",
         "name": "Aldric",
         "class_id": "fighter",
         "level": 1,
-        "created_at": "2026-11-26T04:04:00Z",
+        "created_at": "2026-11-26T07:22:46Z",
         "character": {
           "id": null,
           "name": "Aldric",
@@ -3840,13 +3924,18 @@
                 "item_type": "armour",
                 "id": "leather",
                 "name": "Leather",
+                "display_name": "suit of leather armour",
+                "display_name_plural": "suits of leather armour",
                 "cost_gp": 20,
                 "weight_coins": 200,
                 "ac": 7,
                 "ac_ascending": 12,
                 "ac_bonus": null,
                 "category": "light",
-                "overrides_applied": []
+                "overrides_applied": [
+                  "display_name",
+                  "display_name_plural"
+                ]
               },
               "quantity": 1
             },
@@ -3858,6 +3947,8 @@
                   "item_type": "weapon",
                   "id": "sword",
                   "name": "Sword",
+                  "display_name": "sword",
+                  "display_name_plural": "swords",
                   "cost_gp": 10,
                   "weight_coins": 60,
                   "damage": "1d8",
@@ -4988,9 +5079,9 @@
             "name": "The Old Well"
           }
         ],
-        "id": "adv_JJYbUjMeRHPnrs2bBMXSSA",
+        "id": "adv_-7UzqxoKdIOM47P8dpHWdA",
         "builtin": false,
-        "created_at": "2026-11-26T04:04:00Z"
+        "created_at": "2026-11-26T07:22:46Z"
       }
     }
   },
@@ -5014,12 +5105,12 @@
       "body": {
         "adventure_id": "builtin-barrow",
         "character_ids": [
-          "chr_3wPigTmEsnua1hrmkpgUSA"
+          "chr_JzTc4KhrfNxAIBEllYv_OA"
         ]
       },
       "status": 201,
       "response": {
-        "id": "ses_HWLX7gSzckk5DHAihPgF8A",
+        "id": "ses_BR-L1nYNBCdDo9nF0zx32A",
         "name": "The Barrow of the Forgotten King",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
@@ -5032,9 +5123,9 @@
           "days": 0
         },
         "schema_version": 4,
-        "engine_version": "2.7.0",
-        "created_at": "2026-11-26T04:04:00Z",
-        "updated_at": "2026-11-26T04:04:00Z"
+        "engine_version": "2.8.0",
+        "created_at": "2026-11-26T07:22:46Z",
+        "updated_at": "2026-11-26T07:22:46Z"
       }
     }
   },
@@ -5053,7 +5144,7 @@
       "response": {
         "items": [
           {
-            "id": "ses_HWLX7gSzckk5DHAihPgF8A",
+            "id": "ses_BR-L1nYNBCdDo9nF0zx32A",
             "name": "The Barrow of the Forgotten King",
             "adventure_id": "builtin-barrow",
             "adventure_name": "The Barrow of the Forgotten King",
@@ -5066,9 +5157,9 @@
               "days": 0
             },
             "schema_version": 4,
-            "engine_version": "2.7.0",
-            "created_at": "2026-11-26T04:04:00Z",
-            "updated_at": "2026-11-26T04:04:00Z"
+            "engine_version": "2.8.0",
+            "created_at": "2026-11-26T07:22:46Z",
+            "updated_at": "2026-11-26T07:22:46Z"
           }
         ],
         "total": 1,
@@ -5087,10 +5178,10 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A",
+      "path": "/v1/sessions/ses_BR-L1nYNBCdDo9nF0zx32A",
       "status": 200,
       "response": {
-        "id": "ses_HWLX7gSzckk5DHAihPgF8A",
+        "id": "ses_BR-L1nYNBCdDo9nF0zx32A",
         "name": "The Barrow of the Forgotten King",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
@@ -5103,9 +5194,9 @@
           "days": 0
         },
         "schema_version": 4,
-        "engine_version": "2.7.0",
-        "created_at": "2026-11-26T04:04:00Z",
-        "updated_at": "2026-11-26T04:04:00Z"
+        "engine_version": "2.8.0",
+        "created_at": "2026-11-26T07:22:46Z",
+        "updated_at": "2026-11-26T07:22:46Z"
       }
     }
   },
@@ -5122,13 +5213,13 @@
     },
     "recorded": {
       "method": "PATCH",
-      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A",
+      "path": "/v1/sessions/ses_BR-L1nYNBCdDo9nF0zx32A",
       "body": {
         "name": "Aldric's first delve"
       },
       "status": 200,
       "response": {
-        "id": "ses_HWLX7gSzckk5DHAihPgF8A",
+        "id": "ses_BR-L1nYNBCdDo9nF0zx32A",
         "name": "Aldric's first delve",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
@@ -5141,9 +5232,9 @@
           "days": 0
         },
         "schema_version": 4,
-        "engine_version": "2.7.0",
-        "created_at": "2026-11-26T04:04:00Z",
-        "updated_at": "2026-11-26T04:04:00Z"
+        "engine_version": "2.8.0",
+        "created_at": "2026-11-26T07:22:46Z",
+        "updated_at": "2026-11-26T07:22:46Z"
       }
     }
   },
@@ -5157,7 +5248,7 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A/commands",
+      "path": "/v1/sessions/ses_BR-L1nYNBCdDo9nF0zx32A/commands",
       "status": 200,
       "response": {
         "mode": "town",
@@ -5240,7 +5331,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A/commands",
+      "path": "/v1/sessions/ses_BR-L1nYNBCdDo9nF0zx32A/commands",
       "query": {
         "expected_revision": 0
       },
@@ -5301,7 +5392,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A/commands",
+      "path": "/v1/sessions/ses_BR-L1nYNBCdDo9nF0zx32A/commands",
       "query": {
         "expected_revision": 1
       },
@@ -5345,7 +5436,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A/commands",
+      "path": "/v1/sessions/ses_BR-L1nYNBCdDo9nF0zx32A/commands",
       "query": {
         "expected_revision": 1
       },
@@ -5394,7 +5485,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A/commands",
+      "path": "/v1/sessions/ses_BR-L1nYNBCdDo9nF0zx32A/commands",
       "query": {
         "expected_revision": 1
       },
@@ -5409,7 +5500,7 @@
         "status": 409,
         "detail": "The session is at revision 2, not 1. Read the view and decide whether to send the command again.",
         "code": "revision_conflict",
-        "request_id": "req_Ko57-xgkNLyuQ_AuRoCKtg",
+        "request_id": "req_CGgpqFM95Sc2OnhhJxFpAw",
         "revision": 2
       }
     }
@@ -5424,7 +5515,7 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A/view",
+      "path": "/v1/sessions/ses_BR-L1nYNBCdDo9nF0zx32A/view",
       "status": 200,
       "response": {
         "adventure_name": "The Barrow of the Forgotten King",
@@ -5470,13 +5561,18 @@
                   "item_type": "armour",
                   "id": "leather",
                   "name": "Leather",
+                  "display_name": "suit of leather armour",
+                  "display_name_plural": "suits of leather armour",
                   "cost_gp": 20,
                   "weight_coins": 200,
                   "ac": 7,
                   "ac_ascending": 12,
                   "ac_bonus": null,
                   "category": "light",
-                  "overrides_applied": []
+                  "overrides_applied": [
+                    "display_name",
+                    "display_name_plural"
+                  ]
                 },
                 "quantity": 1
               },
@@ -5488,6 +5584,8 @@
                     "item_type": "weapon",
                     "id": "sword",
                     "name": "Sword",
+                    "display_name": "sword",
+                    "display_name_plural": "swords",
                     "cost_gp": 10,
                     "weight_coins": 60,
                     "damage": "1d8",
@@ -5543,6 +5641,9 @@
               "common"
             ],
             "spell_book": [],
+            "spell_slots": [],
+            "preparable_spells": [],
+            "learnable_spells": [],
             "thief_skills": {}
           }
         ],
@@ -5625,11 +5726,21 @@
           }
         ],
         "can_travel_to_town": false,
+        "features_here": [],
         "piles": {},
         "emptied_caches": [],
         "effects": [],
         "spell_names": {},
         "reversed_spell_names": {},
+        "spell_levels": {},
+        "item_names": {
+          "leather": "suit of leather armour",
+          "sword": "sword"
+        },
+        "item_names_plural": {
+          "leather": "suits of leather armour",
+          "sword": "swords"
+        },
         "fatigued": false,
         "exhausted": false,
         "deprivation": {},
@@ -5674,7 +5785,7 @@
     "role": "referee",
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A/referee-view",
+      "path": "/v1/sessions/ses_BR-L1nYNBCdDo9nF0zx32A/referee-view",
       "status": 200,
       "response": {
         "ruleset": {
@@ -5732,13 +5843,18 @@
                     "item_type": "armour",
                     "id": "leather",
                     "name": "Leather",
+                    "display_name": "suit of leather armour",
+                    "display_name_plural": "suits of leather armour",
                     "cost_gp": 20,
                     "weight_coins": 200,
                     "ac": 7,
                     "ac_ascending": 12,
                     "ac_bonus": null,
                     "category": "light",
-                    "overrides_applied": []
+                    "overrides_applied": [
+                      "display_name",
+                      "display_name_plural"
+                    ]
                   },
                   "quantity": 1
                 },
@@ -5750,6 +5866,8 @@
                       "item_type": "weapon",
                       "id": "sword",
                       "name": "Sword",
+                      "display_name": "sword",
+                      "display_name_plural": "swords",
                       "cost_gp": 10,
                       "weight_coins": 60,
                       "damage": "1d8",
@@ -5868,6 +5986,7 @@
                           "id": "idol_shrine",
                           "kind": "treasure_cache",
                           "description": "The idol rests in a hollow under the altar stone.",
+                          "referee_notes": "",
                           "cell": [
                             4,
                             0
@@ -6199,6 +6318,8 @@
               "item_type": "gear",
               "id": "jade-idol",
               "name": "Jade Idol of the Barrow King",
+              "display_name": "Jade Idol of the Barrow King",
+              "display_name_plural": "Jade Idols of the Barrow King",
               "cost_gp": 0,
               "lot_size": 1,
               "capacity_coins": null,
@@ -6460,7 +6581,10 @@
             "facing": "east",
             "narrative": null
           }
-        ]
+        ],
+        "feature_handles": {
+          "barrow:1:idol_shrine": "feature:dad1d891f1fffc814f1d4daee844ae14c6f4d6467ccdf1f116543d0172f3041a"
+        }
       }
     }
   },
@@ -6474,7 +6598,7 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A/events",
+      "path": "/v1/sessions/ses_BR-L1nYNBCdDo9nF0zx32A/events",
       "status": 200,
       "response": {
         "events": [
@@ -6531,14 +6655,14 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A/saves",
+      "path": "/v1/sessions/ses_BR-L1nYNBCdDo9nF0zx32A/saves",
       "body": {
         "label": "Inside the barrow"
       },
       "status": 201,
       "response": {
-        "id": "sav_Ygtmxn_x-Myx-3ySshSbjg",
-        "session_id": "ses_HWLX7gSzckk5DHAihPgF8A",
+        "id": "sav_NhvTxVRV05DzDcMZfREc3A",
+        "session_id": "ses_BR-L1nYNBCdDo9nF0zx32A",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
         "label": "Inside the barrow",
@@ -6548,7 +6672,7 @@
           "turns": 2,
           "days": 0
         },
-        "created_at": "2026-11-26T04:04:00Z"
+        "created_at": "2026-11-26T07:22:46Z"
       }
     }
   },
@@ -6567,14 +6691,14 @@
       "method": "GET",
       "path": "/v1/saves",
       "query": {
-        "session_id": "ses_HWLX7gSzckk5DHAihPgF8A"
+        "session_id": "ses_BR-L1nYNBCdDo9nF0zx32A"
       },
       "status": 200,
       "response": {
         "items": [
           {
-            "id": "sav_Ygtmxn_x-Myx-3ySshSbjg",
-            "session_id": "ses_HWLX7gSzckk5DHAihPgF8A",
+            "id": "sav_NhvTxVRV05DzDcMZfREc3A",
+            "session_id": "ses_BR-L1nYNBCdDo9nF0zx32A",
             "adventure_id": "builtin-barrow",
             "adventure_name": "The Barrow of the Forgotten King",
             "label": "Inside the barrow",
@@ -6584,7 +6708,7 @@
               "turns": 2,
               "days": 0
             },
-            "created_at": "2026-11-26T04:04:00Z"
+            "created_at": "2026-11-26T07:22:46Z"
           }
         ],
         "total": 1,
@@ -6603,11 +6727,11 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/saves/sav_Ygtmxn_x-Myx-3ySshSbjg",
+      "path": "/v1/saves/sav_NhvTxVRV05DzDcMZfREc3A",
       "status": 200,
       "response": {
-        "id": "sav_Ygtmxn_x-Myx-3ySshSbjg",
-        "session_id": "ses_HWLX7gSzckk5DHAihPgF8A",
+        "id": "sav_NhvTxVRV05DzDcMZfREc3A",
+        "session_id": "ses_BR-L1nYNBCdDo9nF0zx32A",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
         "label": "Inside the barrow",
@@ -6617,7 +6741,7 @@
           "turns": 2,
           "days": 0
         },
-        "created_at": "2026-11-26T04:04:00Z"
+        "created_at": "2026-11-26T07:22:46Z"
       }
     }
   },
@@ -6634,14 +6758,14 @@
     },
     "recorded": {
       "method": "PATCH",
-      "path": "/v1/saves/sav_Ygtmxn_x-Myx-3ySshSbjg",
+      "path": "/v1/saves/sav_NhvTxVRV05DzDcMZfREc3A",
       "body": {
         "label": "Past the first door"
       },
       "status": 200,
       "response": {
-        "id": "sav_Ygtmxn_x-Myx-3ySshSbjg",
-        "session_id": "ses_HWLX7gSzckk5DHAihPgF8A",
+        "id": "sav_NhvTxVRV05DzDcMZfREc3A",
+        "session_id": "ses_BR-L1nYNBCdDo9nF0zx32A",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
         "label": "Past the first door",
@@ -6651,7 +6775,7 @@
           "turns": 2,
           "days": 0
         },
-        "created_at": "2026-11-26T04:04:00Z"
+        "created_at": "2026-11-26T07:22:46Z"
       }
     }
   },
@@ -6666,12 +6790,12 @@
     "role": "referee",
     "recorded": {
       "method": "GET",
-      "path": "/v1/saves/sav_Ygtmxn_x-Myx-3ySshSbjg/document",
+      "path": "/v1/saves/sav_NhvTxVRV05DzDcMZfREc3A/document",
       "status": 200,
       "response": {
         "kind": "save",
         "schema_version": 4,
-        "engine_version": "2.7.0",
+        "engine_version": "2.8.0",
         "payload": {
           "master_seed": 4127730658136791,
           "ruleset": {
@@ -6729,13 +6853,18 @@
                       "item_type": "armour",
                       "id": "leather",
                       "name": "Leather",
+                      "display_name": "suit of leather armour",
+                      "display_name_plural": "suits of leather armour",
                       "cost_gp": 20,
                       "weight_coins": 200,
                       "ac": 7,
                       "ac_ascending": 12,
                       "ac_bonus": null,
                       "category": "light",
-                      "overrides_applied": []
+                      "overrides_applied": [
+                        "display_name",
+                        "display_name_plural"
+                      ]
                     },
                     "quantity": 1
                   },
@@ -6747,6 +6876,8 @@
                         "item_type": "weapon",
                         "id": "sword",
                         "name": "Sword",
+                        "display_name": "sword",
+                        "display_name_plural": "swords",
                         "cost_gp": 10,
                         "weight_coins": 60,
                         "damage": "1d8",
@@ -6865,6 +6996,7 @@
                             "id": "idol_shrine",
                             "kind": "treasure_cache",
                             "description": "The idol rests in a hollow under the altar stone.",
+                            "referee_notes": "",
                             "cell": [
                               4,
                               0
@@ -7196,6 +7328,8 @@
                 "item_type": "gear",
                 "id": "jade-idol",
                 "name": "Jade Idol of the Barrow King",
+                "display_name": "Jade Idol of the Barrow King",
+                "display_name_plural": "Jade Idols of the Barrow King",
                 "cost_gp": 0,
                 "lot_size": 1,
                 "capacity_coins": null,
@@ -7485,7 +7619,7 @@
       "body": {
         "kind": "save",
         "schema_version": 4,
-        "engine_version": "2.7.0",
+        "engine_version": "2.8.0",
         "payload": {
           "master_seed": 4127730658136791,
           "ruleset": {
@@ -7543,13 +7677,18 @@
                       "item_type": "armour",
                       "id": "leather",
                       "name": "Leather",
+                      "display_name": "suit of leather armour",
+                      "display_name_plural": "suits of leather armour",
                       "cost_gp": 20,
                       "weight_coins": 200,
                       "ac": 7,
                       "ac_ascending": 12,
                       "ac_bonus": null,
                       "category": "light",
-                      "overrides_applied": []
+                      "overrides_applied": [
+                        "display_name",
+                        "display_name_plural"
+                      ]
                     },
                     "quantity": 1
                   },
@@ -7561,6 +7700,8 @@
                         "item_type": "weapon",
                         "id": "sword",
                         "name": "Sword",
+                        "display_name": "sword",
+                        "display_name_plural": "swords",
                         "cost_gp": 10,
                         "weight_coins": 60,
                         "damage": "1d8",
@@ -7679,6 +7820,7 @@
                             "id": "idol_shrine",
                             "kind": "treasure_cache",
                             "description": "The idol rests in a hollow under the altar stone.",
+                            "referee_notes": "",
                             "cell": [
                               4,
                               0
@@ -8010,6 +8152,8 @@
                 "item_type": "gear",
                 "id": "jade-idol",
                 "name": "Jade Idol of the Barrow King",
+                "display_name": "Jade Idol of the Barrow King",
+                "display_name_plural": "Jade Idols of the Barrow King",
                 "cost_gp": 0,
                 "lot_size": 1,
                 "capacity_coins": null,
@@ -8283,7 +8427,7 @@
       },
       "status": 201,
       "response": {
-        "id": "sav_npEaDs5r2zcp-qcvSfYSsw",
+        "id": "sav_p9ai8olDJoYZ4kw6X96xAw",
         "session_id": null,
         "adventure_id": null,
         "adventure_name": "The Barrow of the Forgotten King",
@@ -8294,7 +8438,7 @@
           "turns": 2,
           "days": 0
         },
-        "created_at": "2026-11-26T04:04:00Z"
+        "created_at": "2026-11-26T07:22:46Z"
       }
     }
   },
@@ -8311,13 +8455,13 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/saves/sav_Ygtmxn_x-Myx-3ySshSbjg/restore",
+      "path": "/v1/saves/sav_NhvTxVRV05DzDcMZfREc3A/restore",
       "body": {
         "name": "Aldric, second try"
       },
       "status": 201,
       "response": {
-        "id": "ses_GwKe8439OaUR2fNiDGO9Lg",
+        "id": "ses_ES2EnIfO1Jyn6LaVaY-oyg",
         "name": "Aldric, second try",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
@@ -8330,9 +8474,9 @@
           "days": 0
         },
         "schema_version": 4,
-        "engine_version": "2.7.0",
-        "created_at": "2026-11-26T04:04:00Z",
-        "updated_at": "2026-11-26T04:04:00Z"
+        "engine_version": "2.8.0",
+        "created_at": "2026-11-26T07:22:46Z",
+        "updated_at": "2026-11-26T07:22:46Z"
       }
     }
   },
@@ -8346,7 +8490,7 @@
     },
     "recorded": {
       "method": "DELETE",
-      "path": "/v1/saves/sav_npEaDs5r2zcp-qcvSfYSsw",
+      "path": "/v1/saves/sav_p9ai8olDJoYZ4kw6X96xAw",
       "status": 204,
       "response": null
     }
@@ -8368,7 +8512,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_GwKe8439OaUR2fNiDGO9Lg/commands",
+      "path": "/v1/sessions/ses_ES2EnIfO1Jyn6LaVaY-oyg/commands",
       "query": {
         "include": "view"
       },
@@ -8528,13 +8672,18 @@
                     "item_type": "armour",
                     "id": "leather",
                     "name": "Leather",
+                    "display_name": "suit of leather armour",
+                    "display_name_plural": "suits of leather armour",
                     "cost_gp": 20,
                     "weight_coins": 200,
                     "ac": 7,
                     "ac_ascending": 12,
                     "ac_bonus": null,
                     "category": "light",
-                    "overrides_applied": []
+                    "overrides_applied": [
+                      "display_name",
+                      "display_name_plural"
+                    ]
                   },
                   "quantity": 1
                 },
@@ -8546,6 +8695,8 @@
                       "item_type": "weapon",
                       "id": "sword",
                       "name": "Sword",
+                      "display_name": "sword",
+                      "display_name_plural": "swords",
                       "cost_gp": 10,
                       "weight_coins": 60,
                       "damage": "1d8",
@@ -8601,6 +8752,9 @@
                 "common"
               ],
               "spell_book": [],
+              "spell_slots": [],
+              "preparable_spells": [],
+              "learnable_spells": [],
               "thief_skills": {}
             }
           ],
@@ -8696,7 +8850,8 @@
                       2,
                       0
                     ]
-                  ]
+                  ],
+                  "trap_state": null
                 }
               ],
               "features": [],
@@ -8714,11 +8869,21 @@
             }
           ],
           "can_travel_to_town": false,
+          "features_here": [],
           "piles": {},
           "emptied_caches": [],
           "effects": [],
           "spell_names": {},
           "reversed_spell_names": {},
+          "spell_levels": {},
+          "item_names": {
+            "leather": "suit of leather armour",
+            "sword": "sword"
+          },
+          "item_names_plural": {
+            "leather": "suits of leather armour",
+            "sword": "swords"
+          },
           "fatigued": false,
           "exhausted": false,
           "deprivation": {},
@@ -8798,6 +8963,7 @@
             "reloading": [],
             "can_hide": [],
             "hiding": [],
+            "can_back_stab": [],
             "advance_feet": {
               "character-0001": 0
             },
@@ -8827,7 +8993,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_GwKe8439OaUR2fNiDGO9Lg/battle-round/preview",
+      "path": "/v1/sessions/ses_ES2EnIfO1Jyn6LaVaY-oyg/battle-round/preview",
       "body": {
         "declarations": [
           {
@@ -8849,7 +9015,9 @@
           "group-0001": [
             "character-0001"
           ]
-        }
+        },
+        "can_hide": [],
+        "can_back_stab": []
       }
     }
   },
@@ -8872,7 +9040,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_GwKe8439OaUR2fNiDGO9Lg/battle-round/preview",
+      "path": "/v1/sessions/ses_ES2EnIfO1Jyn6LaVaY-oyg/battle-round/preview",
       "body": {
         "declarations": [
           {
@@ -8901,7 +9069,9 @@
           "group-0001": [
             "character-0001"
           ]
-        }
+        },
+        "can_hide": [],
+        "can_back_stab": []
       }
     }
   },
@@ -8923,7 +9093,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_GwKe8439OaUR2fNiDGO9Lg/battle-round/preview",
+      "path": "/v1/sessions/ses_ES2EnIfO1Jyn6LaVaY-oyg/battle-round/preview",
       "body": {
         "declarations": [
           {
@@ -8939,7 +9109,7 @@
         "status": 422,
         "detail": "osrlib refused the declarations: 'character-0009' isn't one of this round's declarers",
         "code": "declaration_invalid",
-        "request_id": "req_aToa4dFGQJcslwWf1H7pZA"
+        "request_id": "req_2BxolD2pXCnt8zYaaSn_hQ"
       }
     }
   },
@@ -9041,7 +9211,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_GwKe8439OaUR2fNiDGO9Lg/battle-round/preview",
+      "path": "/v1/sessions/ses_ES2EnIfO1Jyn6LaVaY-oyg/battle-round/preview",
       "body": {
         "declarations": [
           {
@@ -9137,7 +9307,7 @@
         "status": 422,
         "detail": "The request failed validation. See `errors` for each field.",
         "code": "validation_error",
-        "request_id": "req_6Nt8uT-2tIjV3yhDLRbuUg",
+        "request_id": "req_6g75JbOlDpqlwVI_dkOy1Q",
         "errors": [
           {
             "loc": [
@@ -9165,7 +9335,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A/battle-round/preview",
+      "path": "/v1/sessions/ses_BR-L1nYNBCdDo9nF0zx32A/battle-round/preview",
       "body": {
         "declarations": []
       },
@@ -9176,7 +9346,7 @@
         "status": 409,
         "detail": "The session is in 'exploring' mode, not 'battle'.",
         "code": "not_in_battle",
-        "request_id": "req_7Kc4gB6sGkXmBmY5aB8_KQ",
+        "request_id": "req_Si0rC97Ew03hvj4kIeA0xw",
         "mode": "exploring"
       }
     }
@@ -9201,7 +9371,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_GwKe8439OaUR2fNiDGO9Lg/commands",
+      "path": "/v1/sessions/ses_ES2EnIfO1Jyn6LaVaY-oyg/commands",
       "body": {
         "command_type": "resolve_battle_round",
         "declarations": [
@@ -9350,7 +9520,7 @@
     },
     "recorded": {
       "method": "DELETE",
-      "path": "/v1/sessions/ses_GwKe8439OaUR2fNiDGO9Lg",
+      "path": "/v1/sessions/ses_ES2EnIfO1Jyn6LaVaY-oyg",
       "status": 204,
       "response": null
     }
@@ -9365,7 +9535,7 @@
     },
     "recorded": {
       "method": "DELETE",
-      "path": "/v1/adventures/adv_JJYbUjMeRHPnrs2bBMXSSA",
+      "path": "/v1/adventures/adv_-7UzqxoKdIOM47P8dpHWdA",
       "status": 204,
       "response": null
     }
@@ -9380,7 +9550,7 @@
     },
     "recorded": {
       "method": "DELETE",
-      "path": "/v1/characters/chr_hq07CM7CSpW3mc-W9EzA_Q",
+      "path": "/v1/characters/chr_QD14MyADuolRiCh-Yqln-A",
       "status": 204,
       "response": null
     }
@@ -9403,7 +9573,7 @@
         "status": 404,
         "detail": "No class has the id 'paladin'.",
         "code": "not_found",
-        "request_id": "req_D6P0l9WqwmUSOLAto3fvyA",
+        "request_id": "req_-oR9MCdSzhzzRecuNbRSYw",
         "resource": "class",
         "id": "paladin"
       }
@@ -9427,7 +9597,7 @@
         "status": 404,
         "detail": "No monster has the id 'tarrasque'.",
         "code": "not_found",
-        "request_id": "req_M3aGqm5EX8NXShEce0nJAQ",
+        "request_id": "req_5YyrwbRbE3e6KiXePpJoiQ",
         "resource": "monster",
         "id": "tarrasque"
       }
@@ -9457,7 +9627,7 @@
         "status": 404,
         "detail": "No class has the id 'paladin'.",
         "code": "not_found",
-        "request_id": "req_8DYTyBTFpWh4LCp_HivZMg",
+        "request_id": "req_aXW6OKxCe3j3HYwgvXexuA",
         "resource": "class",
         "id": "paladin"
       }
@@ -9481,7 +9651,7 @@
         "status": 404,
         "detail": "No spell has the id 'wish'.",
         "code": "not_found",
-        "request_id": "req_vqIsPZvvkhgpWDX8lDiS1w",
+        "request_id": "req_KnTi2lYh49AKzqRzN60SLw",
         "resource": "spell",
         "id": "wish"
       }
@@ -9505,7 +9675,7 @@
         "status": 404,
         "detail": "No equipment item has the id 'musket'.",
         "code": "not_found",
-        "request_id": "req_VrJO6m6PdH5eSeydbaQSuA",
+        "request_id": "req_tlkW50DEsDy39kZJh5cuzw",
         "resource": "equipment item",
         "id": "musket"
       }
@@ -9529,7 +9699,7 @@
         "status": 404,
         "detail": "No magic item has the id 'vorpal_sword'.",
         "code": "not_found",
-        "request_id": "req_UWXQT-LAKn9O1f2WD1ku9w",
+        "request_id": "req_0d_ioi39J9kgoUqeKAhshw",
         "resource": "magic item",
         "id": "vorpal_sword"
       }
@@ -9553,7 +9723,7 @@
         "status": 404,
         "detail": "No table has the id 'weather'.",
         "code": "not_found",
-        "request_id": "req__ibpyUXlAYNYPoXcuCQ6Yg",
+        "request_id": "req_Y_ilaOILNp7BLImYfJ0OCQ",
         "resource": "table",
         "id": "weather"
       }
@@ -9577,7 +9747,7 @@
         "status": 404,
         "detail": "No command has the id 'teleport'.",
         "code": "not_found",
-        "request_id": "req_nBnupIpJkfV5vBW5N-rX6w",
+        "request_id": "req_Q9F99aXg4B3dzwciSQgGQQ",
         "resource": "command",
         "id": "teleport"
       }
@@ -9607,7 +9777,7 @@
         "status": 422,
         "detail": "die size must be one of [2, 3, 4, 6, 8, 10, 12, 20, 100]: '3d7'",
         "code": "content_invalid",
-        "request_id": "req_jwNTla3kHJW09wuhWFFWfQ"
+        "request_id": "req_sj0KPgsaO_1imP1vlZcyCA"
       }
     }
   },
@@ -9637,7 +9807,7 @@
         "status": 422,
         "detail": "unknown treasure type 'Z'",
         "code": "content_invalid",
-        "request_id": "req_lgoUmq-twRBe5Y9Ymb0_Xw"
+        "request_id": "req_7_kjJvmf2Ezp9uGvQd6I-g"
       }
     }
   },
@@ -9667,7 +9837,7 @@
         "status": 422,
         "detail": "unknown monster id 'tarrasque'",
         "code": "content_invalid",
-        "request_id": "req_tePkQwo-PYxek49GHhuLZQ"
+        "request_id": "req_ZWsPj_475aS4VEpHdoz9zw"
       }
     }
   },
@@ -9705,7 +9875,7 @@
         "status": 422,
         "detail": "The purchases don't include 'sword'.",
         "code": "character_invalid",
-        "request_id": "req_BFliAWCsS9phyO8IkFxoug",
+        "request_id": "req_TsxQbp2p8tS7p478U-HbpQ",
         "id": "sword",
         "field": "equip_item_ids",
         "index": 0
@@ -9736,7 +9906,7 @@
         "status": 403,
         "detail": "Only an API key with the referee role can choose a seed.",
         "code": "referee_required",
-        "request_id": "req_NhlO1GNp136T__k4KrlcQA"
+        "request_id": "req_eRcBosR-AXWgN0RAu7yk8g"
       }
     }
   },
@@ -9758,7 +9928,7 @@
         "status": 404,
         "detail": "No ability roll has the id 'rol_5mJq0nY2bXr8TzW4cH1eKd'.",
         "code": "not_found",
-        "request_id": "req_EGOdqY4MwJkl5eQhmP7ndw",
+        "request_id": "req_mVf0j_UzzWSi4HAaiHr7xg",
         "resource": "ability roll",
         "id": "rol_5mJq0nY2bXr8TzW4cH1eKd"
       }
@@ -9794,7 +9964,7 @@
         "status": 403,
         "detail": "Only an API key with the referee role can choose a seed.",
         "code": "referee_required",
-        "request_id": "req_jmDytjeCc_swEmSdvOD7kg"
+        "request_id": "req_Pq5PK_rU_WXqawYuOWzTiA"
       }
     }
   },
@@ -9828,7 +9998,7 @@
         "status": 404,
         "detail": "No ability roll has the id 'rol_5mJq0nY2bXr8TzW4cH1eKd'.",
         "code": "not_found",
-        "request_id": "req_j_EdP8OzzqGkG6SyXyPhzA",
+        "request_id": "req_IA3i-CYdsaw7WdZVGUI6yA",
         "resource": "ability roll",
         "id": "rol_5mJq0nY2bXr8TzW4cH1eKd"
       }
@@ -9862,7 +10032,7 @@
         "status": 404,
         "detail": "No ability roll has the id 'rol_5mJq0nY2bXr8TzW4cH1eKd'.",
         "code": "not_found",
-        "request_id": "req_n2xkUmBborgndAAW0fyACw",
+        "request_id": "req_wjvZzBeu4qbwnhFVuYjyeA",
         "resource": "ability roll",
         "id": "rol_5mJq0nY2bXr8TzW4cH1eKd"
       }
@@ -9884,7 +10054,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/ability-rolls/rol_bHpXF_EADd-tE7Uwy8CxRg/preview",
+      "path": "/v1/ability-rolls/rol_Pfv-H-JCQgGteRhjgB12_Q/preview",
       "body": {
         "name": "Wren",
         "class_id": "fighter",
@@ -9898,7 +10068,7 @@
         "status": 422,
         "detail": "The request failed validation. See `errors` for each field.",
         "code": "validation_error",
-        "request_id": "req_GD7nupOiOepSQ33P-1qQoQ",
+        "request_id": "req_188sP_XTItohCPHohazL8Q",
         "errors": [
           {
             "loc": [
@@ -9933,7 +10103,7 @@
       "body": {
         "kind": "character",
         "schema_version": 4,
-        "engine_version": "2.7.0",
+        "engine_version": "2.8.0",
         "payload": {
           "id": null,
           "name": "Aldric",
@@ -9971,13 +10141,18 @@
                 "item_type": "armour",
                 "id": "leather",
                 "name": "Leather",
+                "display_name": "suit of leather armour",
+                "display_name_plural": "suits of leather armour",
                 "cost_gp": 20,
                 "weight_coins": 200,
                 "ac": 7,
                 "ac_ascending": 12,
                 "ac_bonus": null,
                 "category": "light",
-                "overrides_applied": []
+                "overrides_applied": [
+                  "display_name",
+                  "display_name_plural"
+                ]
               },
               "quantity": 1
             },
@@ -9989,6 +10164,8 @@
                   "item_type": "weapon",
                   "id": "sword",
                   "name": "Sword",
+                  "display_name": "sword",
+                  "display_name_plural": "swords",
                   "cost_gp": 10,
                   "weight_coins": 60,
                   "damage": "1d8",
@@ -10018,7 +10195,7 @@
         "status": 403,
         "detail": "This request needs an API key with the referee role.",
         "code": "referee_required",
-        "request_id": "req_XwdDO_mQ_zk4RGubTuSXiQ"
+        "request_id": "req_1R_1vp6CtYir68sFiJNuvQ"
       }
     }
   },
@@ -10043,7 +10220,7 @@
       "body": {
         "kind": "adventure",
         "schema_version": 4,
-        "engine_version": "2.7.0",
+        "engine_version": "2.8.0",
         "payload": {
           "id": null,
           "name": "Aldric",
@@ -10081,13 +10258,18 @@
                 "item_type": "armour",
                 "id": "leather",
                 "name": "Leather",
+                "display_name": "suit of leather armour",
+                "display_name_plural": "suits of leather armour",
                 "cost_gp": 20,
                 "weight_coins": 200,
                 "ac": 7,
                 "ac_ascending": 12,
                 "ac_bonus": null,
                 "category": "light",
-                "overrides_applied": []
+                "overrides_applied": [
+                  "display_name",
+                  "display_name_plural"
+                ]
               },
               "quantity": 1
             },
@@ -10099,6 +10281,8 @@
                   "item_type": "weapon",
                   "id": "sword",
                   "name": "Sword",
+                  "display_name": "sword",
+                  "display_name_plural": "swords",
                   "cost_gp": 10,
                   "weight_coins": 60,
                   "damage": "1d8",
@@ -10128,7 +10312,7 @@
         "status": 422,
         "detail": "expected a 'character' document, got kind 'adventure'",
         "code": "content_invalid",
-        "request_id": "req__mvqVqY-fem4IFhXyw8HMA"
+        "request_id": "req_VdC-Br62BPtKdmDFvZ2eBw"
       }
     }
   },
@@ -10153,7 +10337,7 @@
       "body": {
         "kind": "character",
         "schema_version": 99,
-        "engine_version": "2.7.0",
+        "engine_version": "2.8.0",
         "payload": {
           "id": null,
           "name": "Aldric",
@@ -10191,13 +10375,18 @@
                 "item_type": "armour",
                 "id": "leather",
                 "name": "Leather",
+                "display_name": "suit of leather armour",
+                "display_name_plural": "suits of leather armour",
                 "cost_gp": 20,
                 "weight_coins": 200,
                 "ac": 7,
                 "ac_ascending": 12,
                 "ac_bonus": null,
                 "category": "light",
-                "overrides_applied": []
+                "overrides_applied": [
+                  "display_name",
+                  "display_name_plural"
+                ]
               },
               "quantity": 1
             },
@@ -10209,6 +10398,8 @@
                   "item_type": "weapon",
                   "id": "sword",
                   "name": "Sword",
+                  "display_name": "sword",
+                  "display_name_plural": "swords",
                   "cost_gp": 10,
                   "weight_coins": 60,
                   "damage": "1d8",
@@ -10238,7 +10429,7 @@
         "status": 409,
         "detail": "document schema_version 99 is newer than the supported 4",
         "code": "version_unsupported",
-        "request_id": "req_J4-irAUQ9Bem2fCT5W5qPQ"
+        "request_id": "req_quzLCqqDoyRZ9iyad2G3Qg"
       }
     }
   },
@@ -10252,17 +10443,17 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/characters/chr_hq07CM7CSpW3mc-W9EzA_Q",
+      "path": "/v1/characters/chr_QD14MyADuolRiCh-Yqln-A",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No character has the id 'chr_hq07CM7CSpW3mc-W9EzA_Q'.",
+        "detail": "No character has the id 'chr_QD14MyADuolRiCh-Yqln-A'.",
         "code": "not_found",
-        "request_id": "req_X-3qNNbwGek87XShYoLLQg",
+        "request_id": "req_d1RqH7Fl-GN1kYe31Hrb_g",
         "resource": "character",
-        "id": "chr_hq07CM7CSpW3mc-W9EzA_Q"
+        "id": "chr_QD14MyADuolRiCh-Yqln-A"
       }
     }
   },
@@ -10276,17 +10467,17 @@
     },
     "recorded": {
       "method": "DELETE",
-      "path": "/v1/characters/chr_hq07CM7CSpW3mc-W9EzA_Q",
+      "path": "/v1/characters/chr_QD14MyADuolRiCh-Yqln-A",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No character has the id 'chr_hq07CM7CSpW3mc-W9EzA_Q'.",
+        "detail": "No character has the id 'chr_QD14MyADuolRiCh-Yqln-A'.",
         "code": "not_found",
-        "request_id": "req_GLtoIGsvDDxfXN-wjsakPA",
+        "request_id": "req_Vro20L54r1lWzwwn2XG8IA",
         "resource": "character",
-        "id": "chr_hq07CM7CSpW3mc-W9EzA_Q"
+        "id": "chr_QD14MyADuolRiCh-Yqln-A"
       }
     }
   },
@@ -10426,7 +10617,7 @@
         "status": 422,
         "detail": "adventure validation failed:\nwell level 1: area 'cistern' references unknown monster 'rat_giant'",
         "code": "content_invalid",
-        "request_id": "req_ZZ-IIpjn7C_5aUFS4mkMZw"
+        "request_id": "req_c5qjfD-69QqWp8UHVHzqfw"
       }
     }
   },
@@ -10450,7 +10641,7 @@
       "body": {
         "kind": "adventure",
         "schema_version": 99,
-        "engine_version": "2.7.0",
+        "engine_version": "2.8.0",
         "payload": {}
       },
       "status": 409,
@@ -10460,7 +10651,7 @@
         "status": 409,
         "detail": "document schema_version 99 is newer than the supported 4",
         "code": "version_unsupported",
-        "request_id": "req_V_th3H3DY4qVuQSxlOHaHg"
+        "request_id": "req_tpYvTKLu7uNBQpv-4zJI2Q"
       }
     }
   },
@@ -10474,17 +10665,17 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/adventures/adv_JJYbUjMeRHPnrs2bBMXSSA",
+      "path": "/v1/adventures/adv_-7UzqxoKdIOM47P8dpHWdA",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No adventure has the id 'adv_JJYbUjMeRHPnrs2bBMXSSA'.",
+        "detail": "No adventure has the id 'adv_-7UzqxoKdIOM47P8dpHWdA'.",
         "code": "not_found",
-        "request_id": "req_qiqCPwyBAJJEHlsQFkmP-A",
+        "request_id": "req_dGKoSWGg1boVm6VttuYWPQ",
         "resource": "adventure",
-        "id": "adv_JJYbUjMeRHPnrs2bBMXSSA"
+        "id": "adv_-7UzqxoKdIOM47P8dpHWdA"
       }
     }
   },
@@ -10506,7 +10697,7 @@
         "status": 403,
         "detail": "The adventure 'builtin-barrow' comes with the server.",
         "code": "adventure_read_only",
-        "request_id": "req_nuDigZQMAFUJR2Vlz8IYXQ"
+        "request_id": "req_Y1VRggdO6SggofkTai7t2Q"
       }
     }
   },
@@ -10520,17 +10711,17 @@
     },
     "recorded": {
       "method": "DELETE",
-      "path": "/v1/adventures/adv_JJYbUjMeRHPnrs2bBMXSSA",
+      "path": "/v1/adventures/adv_-7UzqxoKdIOM47P8dpHWdA",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No adventure has the id 'adv_JJYbUjMeRHPnrs2bBMXSSA'.",
+        "detail": "No adventure has the id 'adv_-7UzqxoKdIOM47P8dpHWdA'.",
         "code": "not_found",
-        "request_id": "req__fr7cs6pPp_tHGztB31auA",
+        "request_id": "req_sPm0XQ4kiVvxTnb0fR9DyQ",
         "resource": "adventure",
-        "id": "adv_JJYbUjMeRHPnrs2bBMXSSA"
+        "id": "adv_-7UzqxoKdIOM47P8dpHWdA"
       }
     }
   },
@@ -10552,7 +10743,7 @@
         "status": 403,
         "detail": "This request needs an API key with the referee role.",
         "code": "referee_required",
-        "request_id": "req_6r1ZGyOjdWmefM0nMixWyA"
+        "request_id": "req_Ddg7CsxqXL2AdmZ5XNEbMg"
       }
     }
   },
@@ -10567,17 +10758,17 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/adventures/adv_JJYbUjMeRHPnrs2bBMXSSA/document",
+      "path": "/v1/adventures/adv_-7UzqxoKdIOM47P8dpHWdA/document",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No adventure has the id 'adv_JJYbUjMeRHPnrs2bBMXSSA'.",
+        "detail": "No adventure has the id 'adv_-7UzqxoKdIOM47P8dpHWdA'.",
         "code": "not_found",
-        "request_id": "req_tNWxjjycFU6BEWmu2HhaEg",
+        "request_id": "req_ScaT0miRmp-2GHSM7jcQDw",
         "resource": "adventure",
-        "id": "adv_JJYbUjMeRHPnrs2bBMXSSA"
+        "id": "adv_-7UzqxoKdIOM47P8dpHWdA"
       }
     }
   },
@@ -10607,7 +10798,7 @@
         "status": 422,
         "detail": "The characters can't form a party. List should have at least 1 item after validation, not 0",
         "code": "party_invalid",
-        "request_id": "req_8gun-0vvrbzYJE7PF5ekqA"
+        "request_id": "req_LHTysgDlk6DHfLTdlViINA"
       }
     }
   },
@@ -10637,7 +10828,7 @@
         "party_document": {
           "kind": "character",
           "schema_version": 4,
-          "engine_version": "2.7.0",
+          "engine_version": "2.8.0",
           "payload": {
             "id": null,
             "name": "Aldric",
@@ -10675,13 +10866,18 @@
                   "item_type": "armour",
                   "id": "leather",
                   "name": "Leather",
+                  "display_name": "suit of leather armour",
+                  "display_name_plural": "suits of leather armour",
                   "cost_gp": 20,
                   "weight_coins": 200,
                   "ac": 7,
                   "ac_ascending": 12,
                   "ac_bonus": null,
                   "category": "light",
-                  "overrides_applied": []
+                  "overrides_applied": [
+                    "display_name",
+                    "display_name_plural"
+                  ]
                 },
                 "quantity": 1
               },
@@ -10693,6 +10889,8 @@
                     "item_type": "weapon",
                     "id": "sword",
                     "name": "Sword",
+                    "display_name": "sword",
+                    "display_name_plural": "swords",
                     "cost_gp": 10,
                     "weight_coins": 60,
                     "damage": "1d8",
@@ -10723,7 +10921,7 @@
         "status": 422,
         "detail": "expected a 'party' document, got kind 'character'",
         "code": "content_invalid",
-        "request_id": "req_VQE2OtJ1V9xtbZiG3N_dpQ"
+        "request_id": "req_SKtB3XU1duI-AgZCnJiNaw"
       }
     }
   },
@@ -10748,7 +10946,7 @@
       "body": {
         "adventure_id": "builtin-barrow",
         "character_ids": [
-          "chr_3wPigTmEsnua1hrmkpgUSA"
+          "chr_JzTc4KhrfNxAIBEllYv_OA"
         ],
         "seed": 20261120
       },
@@ -10759,7 +10957,7 @@
         "status": 403,
         "detail": "Only an API key with the referee role can choose a seed.",
         "code": "referee_required",
-        "request_id": "req_JaGAdQ3BjUOAQqnkCgdmjA"
+        "request_id": "req_-c0aG8abBve0cRUirrMUOQ"
       }
     }
   },
@@ -10783,7 +10981,7 @@
       "body": {
         "adventure_id": "builtin-barrow",
         "character_ids": [
-          "chr_hq07CM7CSpW3mc-W9EzA_Q"
+          "chr_QD14MyADuolRiCh-Yqln-A"
         ]
       },
       "status": 404,
@@ -10791,11 +10989,11 @@
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No character has the id 'chr_hq07CM7CSpW3mc-W9EzA_Q'.",
+        "detail": "No character has the id 'chr_QD14MyADuolRiCh-Yqln-A'.",
         "code": "not_found",
-        "request_id": "req_IcKz3ofqQmnBF8alM98Q3Q",
+        "request_id": "req_bf7PxNjG7XB_chMQDXOYPg",
         "resource": "character",
-        "id": "chr_hq07CM7CSpW3mc-W9EzA_Q"
+        "id": "chr_QD14MyADuolRiCh-Yqln-A"
       }
     }
   },
@@ -10809,17 +11007,17 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_GwKe8439OaUR2fNiDGO9Lg",
+      "path": "/v1/sessions/ses_ES2EnIfO1Jyn6LaVaY-oyg",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No session has the id 'ses_GwKe8439OaUR2fNiDGO9Lg'.",
+        "detail": "No session has the id 'ses_ES2EnIfO1Jyn6LaVaY-oyg'.",
         "code": "not_found",
-        "request_id": "req_07JSi9nIOjF4W2QKRJrieA",
+        "request_id": "req_0r629e00_fnEahZGvDGetw",
         "resource": "session",
-        "id": "ses_GwKe8439OaUR2fNiDGO9Lg"
+        "id": "ses_ES2EnIfO1Jyn6LaVaY-oyg"
       }
     }
   },
@@ -10836,7 +11034,7 @@
     },
     "recorded": {
       "method": "PATCH",
-      "path": "/v1/sessions/ses_GwKe8439OaUR2fNiDGO9Lg",
+      "path": "/v1/sessions/ses_ES2EnIfO1Jyn6LaVaY-oyg",
       "body": {
         "name": "Aldric, third try"
       },
@@ -10845,11 +11043,11 @@
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No session has the id 'ses_GwKe8439OaUR2fNiDGO9Lg'.",
+        "detail": "No session has the id 'ses_ES2EnIfO1Jyn6LaVaY-oyg'.",
         "code": "not_found",
-        "request_id": "req_JzBFrHZemm49QvHcvFVAwA",
+        "request_id": "req_XuWa06sXHzmuSy-kT-nAFQ",
         "resource": "session",
-        "id": "ses_GwKe8439OaUR2fNiDGO9Lg"
+        "id": "ses_ES2EnIfO1Jyn6LaVaY-oyg"
       }
     }
   },
@@ -10863,17 +11061,17 @@
     },
     "recorded": {
       "method": "DELETE",
-      "path": "/v1/sessions/ses_GwKe8439OaUR2fNiDGO9Lg",
+      "path": "/v1/sessions/ses_ES2EnIfO1Jyn6LaVaY-oyg",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No session has the id 'ses_GwKe8439OaUR2fNiDGO9Lg'.",
+        "detail": "No session has the id 'ses_ES2EnIfO1Jyn6LaVaY-oyg'.",
         "code": "not_found",
-        "request_id": "req_7Fz8vHupzMLTc7s0Rhg9kg",
+        "request_id": "req_pw1xJxiycMIEG5Kxm2TZxw",
         "resource": "session",
-        "id": "ses_GwKe8439OaUR2fNiDGO9Lg"
+        "id": "ses_ES2EnIfO1Jyn6LaVaY-oyg"
       }
     }
   },
@@ -10887,17 +11085,17 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_GwKe8439OaUR2fNiDGO9Lg/commands",
+      "path": "/v1/sessions/ses_ES2EnIfO1Jyn6LaVaY-oyg/commands",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No session has the id 'ses_GwKe8439OaUR2fNiDGO9Lg'.",
+        "detail": "No session has the id 'ses_ES2EnIfO1Jyn6LaVaY-oyg'.",
         "code": "not_found",
-        "request_id": "req_SNJg7pRD8SI7j850aX4P_w",
+        "request_id": "req_0vm9Ybyl2_D67Lsa_NHa_w",
         "resource": "session",
-        "id": "ses_GwKe8439OaUR2fNiDGO9Lg"
+        "id": "ses_ES2EnIfO1Jyn6LaVaY-oyg"
       }
     }
   },
@@ -10918,7 +11116,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A/commands",
+      "path": "/v1/sessions/ses_BR-L1nYNBCdDo9nF0zx32A/commands",
       "body": {
         "command_type": "grant_coins",
         "character_id": "character-0001",
@@ -10933,7 +11131,7 @@
         "status": 403,
         "detail": "Only an API key with the referee role can send 'grant_coins'.",
         "code": "referee_command",
-        "request_id": "req_Qr5y04jlI1ZsN2IhWE29MA",
+        "request_id": "req_liZTx5LPOXiqswc_XdomEA",
         "command_type": "grant_coins"
       }
     }
@@ -10953,7 +11151,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A/commands",
+      "path": "/v1/sessions/ses_BR-L1nYNBCdDo9nF0zx32A/commands",
       "body": {
         "command_type": "move_party",
         "direction": "east",
@@ -10966,7 +11164,7 @@
         "status": 403,
         "detail": "Only an API key with the referee role can set a command's source.",
         "code": "referee_required",
-        "request_id": "req_Ec_byU6ERNpjSOsHUjfotw"
+        "request_id": "req_tE-vopesGDP5XFQvffJsHw"
       }
     }
   },
@@ -10984,7 +11182,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_GwKe8439OaUR2fNiDGO9Lg/commands",
+      "path": "/v1/sessions/ses_ES2EnIfO1Jyn6LaVaY-oyg/commands",
       "body": {
         "command_type": "move_party",
         "direction": "east"
@@ -10994,11 +11192,11 @@
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No session has the id 'ses_GwKe8439OaUR2fNiDGO9Lg'.",
+        "detail": "No session has the id 'ses_ES2EnIfO1Jyn6LaVaY-oyg'.",
         "code": "not_found",
-        "request_id": "req_ej4EVE8piptoZjIio3IvYA",
+        "request_id": "req_79ZpI-pXmVgn5vl2ibl64A",
         "resource": "session",
-        "id": "ses_GwKe8439OaUR2fNiDGO9Lg"
+        "id": "ses_ES2EnIfO1Jyn6LaVaY-oyg"
       }
     }
   },
@@ -11015,7 +11213,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_GwKe8439OaUR2fNiDGO9Lg/battle-round/preview",
+      "path": "/v1/sessions/ses_ES2EnIfO1Jyn6LaVaY-oyg/battle-round/preview",
       "body": {
         "declarations": []
       },
@@ -11024,11 +11222,11 @@
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No session has the id 'ses_GwKe8439OaUR2fNiDGO9Lg'.",
+        "detail": "No session has the id 'ses_ES2EnIfO1Jyn6LaVaY-oyg'.",
         "code": "not_found",
-        "request_id": "req_UlDW1uc6Fq6xNErUES-NmQ",
+        "request_id": "req_bCNP6wlstMbLyGU5f5watg",
         "resource": "session",
-        "id": "ses_GwKe8439OaUR2fNiDGO9Lg"
+        "id": "ses_ES2EnIfO1Jyn6LaVaY-oyg"
       }
     }
   },
@@ -11042,17 +11240,17 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_GwKe8439OaUR2fNiDGO9Lg/view",
+      "path": "/v1/sessions/ses_ES2EnIfO1Jyn6LaVaY-oyg/view",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No session has the id 'ses_GwKe8439OaUR2fNiDGO9Lg'.",
+        "detail": "No session has the id 'ses_ES2EnIfO1Jyn6LaVaY-oyg'.",
         "code": "not_found",
-        "request_id": "req_SwHIKP4mMk5rjMyyaV0K7A",
+        "request_id": "req_Zu2wQtG3g8Wczh4bF_HEoQ",
         "resource": "session",
-        "id": "ses_GwKe8439OaUR2fNiDGO9Lg"
+        "id": "ses_ES2EnIfO1Jyn6LaVaY-oyg"
       }
     }
   },
@@ -11066,7 +11264,7 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A/referee-view",
+      "path": "/v1/sessions/ses_BR-L1nYNBCdDo9nF0zx32A/referee-view",
       "status": 403,
       "response": {
         "type": "about:blank",
@@ -11074,7 +11272,7 @@
         "status": 403,
         "detail": "This request needs an API key with the referee role.",
         "code": "referee_required",
-        "request_id": "req_2ZeFkFsAqrXP85BJE2JWNA"
+        "request_id": "req_Btm_S0F2NNLeRKKza2aiUA"
       }
     }
   },
@@ -11089,17 +11287,17 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_GwKe8439OaUR2fNiDGO9Lg/referee-view",
+      "path": "/v1/sessions/ses_ES2EnIfO1Jyn6LaVaY-oyg/referee-view",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No session has the id 'ses_GwKe8439OaUR2fNiDGO9Lg'.",
+        "detail": "No session has the id 'ses_ES2EnIfO1Jyn6LaVaY-oyg'.",
         "code": "not_found",
-        "request_id": "req_-JZYLjUncQuK1ESyiX5yvQ",
+        "request_id": "req_BrFKKjHr4pmcb0q_Y3NQdQ",
         "resource": "session",
-        "id": "ses_GwKe8439OaUR2fNiDGO9Lg"
+        "id": "ses_ES2EnIfO1Jyn6LaVaY-oyg"
       }
     }
   },
@@ -11116,7 +11314,7 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A/events",
+      "path": "/v1/sessions/ses_BR-L1nYNBCdDo9nF0zx32A/events",
       "query": {
         "visibility": "referee"
       },
@@ -11127,7 +11325,7 @@
         "status": 403,
         "detail": "Only an API key with the referee role can read referee events.",
         "code": "referee_required",
-        "request_id": "req_Kwhf2qts-OsykaP4gLbwcg"
+        "request_id": "req_Ta_0lUkK_Zo4zpnUlcpOwg"
       }
     }
   },
@@ -11141,17 +11339,17 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_GwKe8439OaUR2fNiDGO9Lg/events",
+      "path": "/v1/sessions/ses_ES2EnIfO1Jyn6LaVaY-oyg/events",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No session has the id 'ses_GwKe8439OaUR2fNiDGO9Lg'.",
+        "detail": "No session has the id 'ses_ES2EnIfO1Jyn6LaVaY-oyg'.",
         "code": "not_found",
-        "request_id": "req_mN1xoi6rJErc9kB6kBkmog",
+        "request_id": "req_izToBzgnwkDb-LLWbPsauw",
         "resource": "session",
-        "id": "ses_GwKe8439OaUR2fNiDGO9Lg"
+        "id": "ses_ES2EnIfO1Jyn6LaVaY-oyg"
       }
     }
   },
@@ -11168,7 +11366,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_GwKe8439OaUR2fNiDGO9Lg/saves",
+      "path": "/v1/sessions/ses_ES2EnIfO1Jyn6LaVaY-oyg/saves",
       "body": {
         "label": "Too late"
       },
@@ -11177,11 +11375,11 @@
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No session has the id 'ses_GwKe8439OaUR2fNiDGO9Lg'.",
+        "detail": "No session has the id 'ses_ES2EnIfO1Jyn6LaVaY-oyg'.",
         "code": "not_found",
-        "request_id": "req_6kY8mb000FNgro4am58yMw",
+        "request_id": "req_1kEWpcqxWfO57Lj_nyvbzg",
         "resource": "session",
-        "id": "ses_GwKe8439OaUR2fNiDGO9Lg"
+        "id": "ses_ES2EnIfO1Jyn6LaVaY-oyg"
       }
     }
   },
@@ -11200,7 +11398,7 @@
       "body": {
         "kind": "save",
         "schema_version": 4,
-        "engine_version": "2.7.0",
+        "engine_version": "2.8.0",
         "payload": {
           "master_seed": 4127730658136791,
           "ruleset": {
@@ -11258,13 +11456,18 @@
                       "item_type": "armour",
                       "id": "leather",
                       "name": "Leather",
+                      "display_name": "suit of leather armour",
+                      "display_name_plural": "suits of leather armour",
                       "cost_gp": 20,
                       "weight_coins": 200,
                       "ac": 7,
                       "ac_ascending": 12,
                       "ac_bonus": null,
                       "category": "light",
-                      "overrides_applied": []
+                      "overrides_applied": [
+                        "display_name",
+                        "display_name_plural"
+                      ]
                     },
                     "quantity": 1
                   },
@@ -11276,6 +11479,8 @@
                         "item_type": "weapon",
                         "id": "sword",
                         "name": "Sword",
+                        "display_name": "sword",
+                        "display_name_plural": "swords",
                         "cost_gp": 10,
                         "weight_coins": 60,
                         "damage": "1d8",
@@ -11394,6 +11599,7 @@
                             "id": "idol_shrine",
                             "kind": "treasure_cache",
                             "description": "The idol rests in a hollow under the altar stone.",
+                            "referee_notes": "",
                             "cell": [
                               4,
                               0
@@ -11725,6 +11931,8 @@
                 "item_type": "gear",
                 "id": "jade-idol",
                 "name": "Jade Idol of the Barrow King",
+                "display_name": "Jade Idol of the Barrow King",
+                "display_name_plural": "Jade Idols of the Barrow King",
                 "cost_gp": 0,
                 "lot_size": 1,
                 "capacity_coins": null,
@@ -12003,7 +12211,7 @@
         "status": 403,
         "detail": "This request needs an API key with the referee role.",
         "code": "referee_required",
-        "request_id": "req_ydRxWp_we0O0S-_2HVkcAA"
+        "request_id": "req_2DPa4sa3cQF4f-LQob1f-g"
       }
     }
   },
@@ -12028,7 +12236,7 @@
       "body": {
         "kind": "character",
         "schema_version": 4,
-        "engine_version": "2.7.0",
+        "engine_version": "2.8.0",
         "payload": {
           "id": null,
           "name": "Aldric",
@@ -12066,13 +12274,18 @@
                 "item_type": "armour",
                 "id": "leather",
                 "name": "Leather",
+                "display_name": "suit of leather armour",
+                "display_name_plural": "suits of leather armour",
                 "cost_gp": 20,
                 "weight_coins": 200,
                 "ac": 7,
                 "ac_ascending": 12,
                 "ac_bonus": null,
                 "category": "light",
-                "overrides_applied": []
+                "overrides_applied": [
+                  "display_name",
+                  "display_name_plural"
+                ]
               },
               "quantity": 1
             },
@@ -12084,6 +12297,8 @@
                   "item_type": "weapon",
                   "id": "sword",
                   "name": "Sword",
+                  "display_name": "sword",
+                  "display_name_plural": "swords",
                   "cost_gp": 10,
                   "weight_coins": 60,
                   "damage": "1d8",
@@ -12113,7 +12328,7 @@
         "status": 422,
         "detail": "expected a 'save' document, got kind 'character'",
         "code": "content_invalid",
-        "request_id": "req_qnugRjU4ij7esi5-r2W_YA"
+        "request_id": "req_y-DBAdYN3B2hGnsR4YaHmQ"
       }
     }
   },
@@ -12138,7 +12353,7 @@
       "body": {
         "kind": "save",
         "schema_version": 99,
-        "engine_version": "2.7.0",
+        "engine_version": "2.8.0",
         "payload": {}
       },
       "status": 409,
@@ -12148,7 +12363,7 @@
         "status": 409,
         "detail": "document schema_version 99 is newer than the supported 4",
         "code": "version_unsupported",
-        "request_id": "req_meL7C8ymJwke3xbvH3SnJw"
+        "request_id": "req_Te5itnFXKlvL1KIQRBnTBA"
       }
     }
   },
@@ -12162,17 +12377,17 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/saves/sav_npEaDs5r2zcp-qcvSfYSsw",
+      "path": "/v1/saves/sav_p9ai8olDJoYZ4kw6X96xAw",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No save has the id 'sav_npEaDs5r2zcp-qcvSfYSsw'.",
+        "detail": "No save has the id 'sav_p9ai8olDJoYZ4kw6X96xAw'.",
         "code": "not_found",
-        "request_id": "req_dbzDhxYdUlW1HHFsM_AV0w",
+        "request_id": "req_fSDlb2FKNMRs87o4938aUQ",
         "resource": "save",
-        "id": "sav_npEaDs5r2zcp-qcvSfYSsw"
+        "id": "sav_p9ai8olDJoYZ4kw6X96xAw"
       }
     }
   },
@@ -12189,7 +12404,7 @@
     },
     "recorded": {
       "method": "PATCH",
-      "path": "/v1/saves/sav_npEaDs5r2zcp-qcvSfYSsw",
+      "path": "/v1/saves/sav_p9ai8olDJoYZ4kw6X96xAw",
       "body": {
         "label": "Gone"
       },
@@ -12198,11 +12413,11 @@
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No save has the id 'sav_npEaDs5r2zcp-qcvSfYSsw'.",
+        "detail": "No save has the id 'sav_p9ai8olDJoYZ4kw6X96xAw'.",
         "code": "not_found",
-        "request_id": "req_APUSasfpGMUBtN1jUfcKiw",
+        "request_id": "req_1qALWcA4829W4HUPX8tYMg",
         "resource": "save",
-        "id": "sav_npEaDs5r2zcp-qcvSfYSsw"
+        "id": "sav_p9ai8olDJoYZ4kw6X96xAw"
       }
     }
   },
@@ -12216,17 +12431,17 @@
     },
     "recorded": {
       "method": "DELETE",
-      "path": "/v1/saves/sav_npEaDs5r2zcp-qcvSfYSsw",
+      "path": "/v1/saves/sav_p9ai8olDJoYZ4kw6X96xAw",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No save has the id 'sav_npEaDs5r2zcp-qcvSfYSsw'.",
+        "detail": "No save has the id 'sav_p9ai8olDJoYZ4kw6X96xAw'.",
         "code": "not_found",
-        "request_id": "req_AiCrx22TCivB2Xc94AZ7RA",
+        "request_id": "req_AFVFX5H0cgfWOj411lLOsA",
         "resource": "save",
-        "id": "sav_npEaDs5r2zcp-qcvSfYSsw"
+        "id": "sav_p9ai8olDJoYZ4kw6X96xAw"
       }
     }
   },
@@ -12241,18 +12456,18 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/saves/sav_npEaDs5r2zcp-qcvSfYSsw/restore",
+      "path": "/v1/saves/sav_p9ai8olDJoYZ4kw6X96xAw/restore",
       "body": {},
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No save has the id 'sav_npEaDs5r2zcp-qcvSfYSsw'.",
+        "detail": "No save has the id 'sav_p9ai8olDJoYZ4kw6X96xAw'.",
         "code": "not_found",
-        "request_id": "req__QXALqvycnErqxAaX4l1hQ",
+        "request_id": "req_DEJZarUx9IMEb-8ouijSpQ",
         "resource": "save",
-        "id": "sav_npEaDs5r2zcp-qcvSfYSsw"
+        "id": "sav_p9ai8olDJoYZ4kw6X96xAw"
       }
     }
   },
@@ -12266,7 +12481,7 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/saves/sav_Ygtmxn_x-Myx-3ySshSbjg/document",
+      "path": "/v1/saves/sav_NhvTxVRV05DzDcMZfREc3A/document",
       "status": 403,
       "response": {
         "type": "about:blank",
@@ -12274,7 +12489,7 @@
         "status": 403,
         "detail": "This request needs an API key with the referee role.",
         "code": "referee_required",
-        "request_id": "req_zk0BNrR-VIf4rquzmhS5WA"
+        "request_id": "req_piVNKHJtjWSLANnl6uuejw"
       }
     }
   },
@@ -12289,17 +12504,17 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/saves/sav_npEaDs5r2zcp-qcvSfYSsw/document",
+      "path": "/v1/saves/sav_p9ai8olDJoYZ4kw6X96xAw/document",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No save has the id 'sav_npEaDs5r2zcp-qcvSfYSsw'.",
+        "detail": "No save has the id 'sav_p9ai8olDJoYZ4kw6X96xAw'.",
         "code": "not_found",
-        "request_id": "req_pItY9Icgm8_1PmcgdEoZvg",
+        "request_id": "req_pMFhDiZwDC_Oe9tFk6_eCA",
         "resource": "save",
-        "id": "sav_npEaDs5r2zcp-qcvSfYSsw"
+        "id": "sav_p9ai8olDJoYZ4kw6X96xAw"
       }
     }
   },
@@ -12320,7 +12535,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A/commands",
+      "path": "/v1/sessions/ses_BR-L1nYNBCdDo9nF0zx32A/commands",
       "query": {
         "include": "view"
       },
@@ -12393,13 +12608,18 @@
                     "item_type": "armour",
                     "id": "leather",
                     "name": "Leather",
+                    "display_name": "suit of leather armour",
+                    "display_name_plural": "suits of leather armour",
                     "cost_gp": 20,
                     "weight_coins": 200,
                     "ac": 7,
                     "ac_ascending": 12,
                     "ac_bonus": null,
                     "category": "light",
-                    "overrides_applied": []
+                    "overrides_applied": [
+                      "display_name",
+                      "display_name_plural"
+                    ]
                   },
                   "quantity": 1
                 },
@@ -12411,6 +12631,8 @@
                       "item_type": "weapon",
                       "id": "sword",
                       "name": "Sword",
+                      "display_name": "sword",
+                      "display_name_plural": "swords",
                       "cost_gp": 10,
                       "weight_coins": 60,
                       "damage": "1d8",
@@ -12466,6 +12688,9 @@
                 "common"
               ],
               "spell_book": [],
+              "spell_slots": [],
+              "preparable_spells": [],
+              "learnable_spells": [],
               "thief_skills": {}
             }
           ],
@@ -12548,11 +12773,21 @@
             }
           ],
           "can_travel_to_town": true,
+          "features_here": [],
           "piles": {},
           "emptied_caches": [],
           "effects": [],
           "spell_names": {},
           "reversed_spell_names": {},
+          "spell_levels": {},
+          "item_names": {
+            "leather": "suit of leather armour",
+            "sword": "sword"
+          },
+          "item_names_plural": {
+            "leather": "suits of leather armour",
+            "sword": "swords"
+          },
           "fatigued": false,
           "exhausted": false,
           "deprivation": {},
@@ -12600,7 +12835,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A/commands",
+      "path": "/v1/sessions/ses_BR-L1nYNBCdDo9nF0zx32A/commands",
       "body": {
         "command_type": "travel_to_town"
       },
@@ -12649,7 +12884,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A/commands",
+      "path": "/v1/sessions/ses_BR-L1nYNBCdDo9nF0zx32A/commands",
       "body": {
         "command_type": "purchase_equipment",
         "character_id": "character-0001",
@@ -12721,11 +12956,11 @@
       },
       "status": 201,
       "response": {
-        "id": "chr_wWEduAnx5EefSLMuF7Dusw",
+        "id": "chr_YXjKOZnK9uBeQ4cDvLvAyA",
         "name": "Wren",
         "class_id": "magic_user",
         "level": 1,
-        "created_at": "2026-11-26T04:04:00Z",
+        "created_at": "2026-11-26T07:22:46Z",
         "character": {
           "id": null,
           "name": "Wren",
@@ -12820,12 +13055,12 @@
       "body": {
         "adventure_id": "builtin-barrow",
         "character_ids": [
-          "chr_wWEduAnx5EefSLMuF7Dusw"
+          "chr_YXjKOZnK9uBeQ4cDvLvAyA"
         ]
       },
       "status": 201,
       "response": {
-        "id": "ses_2Ve3iFVQSaghptQYb43yTg",
+        "id": "ses_dYiLq9eO2EF8umJaoy_QKA",
         "name": "The Barrow of the Forgotten King",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
@@ -12838,9 +13073,9 @@
           "days": 0
         },
         "schema_version": 4,
-        "engine_version": "2.7.0",
-        "created_at": "2026-11-26T04:04:00Z",
-        "updated_at": "2026-11-26T04:04:00Z"
+        "engine_version": "2.8.0",
+        "created_at": "2026-11-26T07:22:46Z",
+        "updated_at": "2026-11-26T07:22:46Z"
       }
     }
   },
@@ -12854,7 +13089,7 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_2Ve3iFVQSaghptQYb43yTg/rules/spells/sleep",
+      "path": "/v1/sessions/ses_dYiLq9eO2EF8umJaoy_QKA/rules/spells/sleep",
       "status": 200,
       "response": {
         "id": "sleep",
@@ -12952,7 +13187,7 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_2Ve3iFVQSaghptQYb43yTg/rules/spells/fire_ball",
+      "path": "/v1/sessions/ses_dYiLq9eO2EF8umJaoy_QKA/rules/spells/fire_ball",
       "status": 404,
       "response": {
         "type": "about:blank",
@@ -12960,7 +13195,7 @@
         "status": 404,
         "detail": "No spell in the session's player view has the id 'fire_ball'.",
         "code": "not_found",
-        "request_id": "req_jT8bLfx81UKX-LnNMC0SLA",
+        "request_id": "req_ZGAJmpjmDm2FFU1kt6HW1Q",
         "resource": "spell",
         "id": "fire_ball"
       }
@@ -12976,7 +13211,7 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_2Ve3iFVQSaghptQYb43yTg/rules/classes/magic_user",
+      "path": "/v1/sessions/ses_dYiLq9eO2EF8umJaoy_QKA/rules/classes/magic_user",
       "status": 200,
       "response": {
         "id": "magic_user",
@@ -13452,7 +13687,7 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_2Ve3iFVQSaghptQYb43yTg/rules/classes/thief",
+      "path": "/v1/sessions/ses_dYiLq9eO2EF8umJaoy_QKA/rules/classes/thief",
       "status": 404,
       "response": {
         "type": "about:blank",
@@ -13460,7 +13695,7 @@
         "status": 404,
         "detail": "No class of a member of the session's party has the id 'thief'.",
         "code": "not_found",
-        "request_id": "req_8hTSvrw29kjD0O68J_-VTw",
+        "request_id": "req_fFQpe3yRMNIrXCVOUB8b1Q",
         "resource": "class",
         "id": "thief"
       }

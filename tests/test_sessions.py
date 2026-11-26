@@ -176,6 +176,19 @@ def send(client: TestClient, session_id: str, command: dict[str, Any], **params:
     return ok(client.post(f"/v1/sessions/{session_id}/commands", json=command, params=params))
 
 
+def split_handles(referee: dict[str, Any]) -> tuple[dict[str, Any], set[str]]:
+    """Return a referee view without `feature_handles`, and the feature references that have a handle.
+
+    The server gives each session a random handle key, so its handles differ from the handles of an
+    oracle that starts with the same seed. Everything else in the two views is equal.
+    """
+    rest = {key: value for key, value in referee.items() if key != "feature_handles"}
+    handles = referee["feature_handles"]
+    assert all(handle.startswith("feature:") for handle in handles.values())
+    assert len(set(handles.values())) == len(handles)
+    return rest, set(handles)
+
+
 def state(client: TestClient, session_id: str) -> dict[str, Any]:
     """Return what a refused request must leave as it was."""
     return {
@@ -210,7 +223,9 @@ def test_a_session_from_stored_characters_plays_as_osrlib_does(player: TestClien
     assert [member["name"] for member in oracle.view()["party"]] == ["Bree", "Ash"]
     for command in [*ROUTE, NORTH]:
         assert send(player, session["id"], command) == oracle.execute(command)
-    assert ok(referee.get(f"/v1/sessions/{session['id']}/referee-view")) == oracle.view(Visibility.REFEREE)
+    assert split_handles(ok(referee.get(f"/v1/sessions/{session['id']}/referee-view"))) == split_handles(
+        oracle.view(Visibility.REFEREE)
+    )
 
 
 def test_a_player_session_draws_its_seed(player: TestClient) -> None:
@@ -645,6 +660,29 @@ def test_a_session_serves_the_spells_its_player_view_names(player: TestClient, r
     assert len(set(answers)) == 1
 
 
+def test_a_session_serves_a_bundled_spell_once_a_member_could_prepare_it(
+    player: TestClient, referee: TestClient
+) -> None:
+    session_id, _ = start_with_custom_content(referee)
+    path = f"/v1/sessions/{session_id}/rules/spells/{BALM.id}"
+    before = ok(player.get(f"/v1/sessions/{session_id}/view"))
+    cleric = next(member for member in before["party"] if member["class_id"] == "cleric")
+    assert cleric["preparable_spells"] == [] and BALM.id not in before["spell_names"]
+    problem(player.get(path), 404, "not_found")
+    # A cleric gets a first spell slot at 2nd level, and osrlib then lists the spells the cleric could prepare.
+    award = {"command_type": "award_xp", "character_id": cleric["id"], "amount": 2500}
+    assert send(referee, session_id, award)["accepted"]
+    after = ok(player.get(f"/v1/sessions/{session_id}/view"))
+    cleric = next(member for member in after["party"] if member["class_id"] == "cleric")
+    assert cleric["level"] == 2 and BALM.id in cleric["preparable_spells"]
+    assert after["spell_names"][BALM.id] == BALM.name and after["spell_levels"][BALM.id] == BALM.level
+    assert set(cleric["preparable_spells"]) <= set(after["spell_names"])
+    for caller in (player, referee):
+        assert ok(caller.get(path)) == BALM.model_dump(mode="json")
+    for spell_id in cleric["preparable_spells"]:
+        ok(player.get(f"/v1/sessions/{session_id}/rules/spells/{spell_id}"))
+
+
 def test_a_session_serves_the_classes_of_its_party(player: TestClient, referee: TestClient) -> None:
     session_id, witch = start_with_custom_content(referee)
     party = ok(player.get(f"/v1/sessions/{session_id}/view"))["party"]
@@ -678,7 +716,9 @@ def test_the_views_equal_osrlib_and_the_referee_view_is_for_referees(player: Tes
         oracle.execute(command)
         assert ok(player.get(f"/v1/sessions/{session['id']}/view")) == oracle.view()
     problem(player.get(f"/v1/sessions/{session['id']}/referee-view"), 403, "referee_required")
-    assert ok(referee.get(f"/v1/sessions/{session['id']}/referee-view")) == oracle.view(Visibility.REFEREE)
+    assert split_handles(ok(referee.get(f"/v1/sessions/{session['id']}/referee-view"))) == split_handles(
+        oracle.view(Visibility.REFEREE)
+    )
 
 
 def test_the_event_log_pages_by_visibility(player: TestClient, referee: TestClient) -> None:
@@ -743,7 +783,9 @@ def test_a_rebuilt_application_continues_every_session(keyed_settings: Settings)
         assert ok(after.get(f"/v1/sessions/{session['id']}/view")) == oracle.view()
         for command in ROUTE[3:]:
             assert send(after, session["id"], command) == oracle.execute(command)
-        assert ok(after.get(f"/v1/sessions/{session['id']}/referee-view")) == oracle.view(Visibility.REFEREE)
+        assert split_handles(ok(after.get(f"/v1/sessions/{session['id']}/referee-view"))) == split_handles(
+            oracle.view(Visibility.REFEREE)
+        )
 
 
 def test_a_cache_of_one_alternates_sessions(keyed_settings: Settings, make_client: Callable[..., TestClient]) -> None:
@@ -754,7 +796,9 @@ def test_a_cache_of_one_alternates_sessions(keyed_settings: Settings, make_clien
         for session_id, oracle in oracles.items():
             assert send(client, session_id, command) == oracle.execute(command)
     for session_id, oracle in oracles.items():
-        assert ok(client.get(f"/v1/sessions/{session_id}/referee-view")) == oracle.view(Visibility.REFEREE)
+        assert split_handles(ok(client.get(f"/v1/sessions/{session_id}/referee-view"))) == split_handles(
+            oracle.view(Visibility.REFEREE)
+        )
 
 
 def test_two_applications_take_turns(player: TestClient, referee: TestClient) -> None:
