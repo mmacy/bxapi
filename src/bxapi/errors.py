@@ -256,7 +256,7 @@ class ApiError(Exception):
         )
 
 
-def not_found(resource: str, resource_id: str) -> ApiError:
+def not_found(resource: str, resource_id: str, *, among: str = "") -> ApiError:
     """Build the 404 for an identifier that matches nothing the caller can read.
 
     Use it for a resource that belongs to another client too, so a caller can't learn that the
@@ -266,12 +266,24 @@ def not_found(resource: str, resource_id: str) -> ApiError:
         resource: The kind of resource, like `"session"`.
         resource_id: The identifier the caller sent. The response repeats at most its first 128
             characters.
+        among: Where the server looked, when it's narrower than everything of that kind, like
+            `"in the session's player view"`. The detail states it after the resource.
 
     Returns:
         An [`ApiError`][bxapi.errors.ApiError] with the code `not_found`.
+
+    Examples:
+        ```python
+        from bxapi.errors import not_found
+
+        error = not_found("spell", "fire_ball", among="in the session's player view")
+        assert error.detail == "No spell in the session's player view has the id 'fire_ball'."
+        assert error.extras == {"resource": "spell", "id": "fire_ball"}
+        ```
     """
     shown = resource_id if len(resource_id) <= _MAX_TEXT_SHOWN else resource_id[:_MAX_TEXT_SHOWN] + "..."
-    return ApiError(404, "not_found", f"No {resource} has the id {shown!r}.", resource=resource, id=shown)
+    where = f" {among}" if among else ""
+    return ApiError(404, "not_found", f"No {resource}{where} has the id {shown!r}.", resource=resource, id=shown)
 
 
 def forbidden(code: str, detail: str, **extras: Any) -> ApiError:

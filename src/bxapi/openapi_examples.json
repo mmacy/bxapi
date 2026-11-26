@@ -2780,7 +2780,7 @@
       "path": "/v1/ability-rolls",
       "status": 201,
       "response": {
-        "id": "rol_h8dqeLx4gcw5GR9hWrqoGg",
+        "id": "rol_bHpXF_EADd-tE7Uwy8CxRg",
         "scores": {
           "str": 9,
           "int": 9,
@@ -2841,7 +2841,7 @@
           "thief"
         ],
         "used": false,
-        "created_at": "2026-11-26T02:46:01Z"
+        "created_at": "2026-11-26T04:04:00Z"
       }
     }
   },
@@ -2865,7 +2865,7 @@
       },
       "status": 201,
       "response": {
-        "id": "rol_F7jn9GhXbG8Ckn27Mk1S1Q",
+        "id": "rol_VXSGtMQUjM2q4p-Xgae9Tg",
         "scores": {
           "str": 4,
           "int": 10,
@@ -2926,7 +2926,7 @@
           "thief"
         ],
         "used": false,
-        "created_at": "2026-11-26T02:46:01Z"
+        "created_at": "2026-11-26T04:04:00Z"
       }
     }
   },
@@ -2940,10 +2940,10 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/ability-rolls/rol_h8dqeLx4gcw5GR9hWrqoGg",
+      "path": "/v1/ability-rolls/rol_bHpXF_EADd-tE7Uwy8CxRg",
       "status": 200,
       "response": {
-        "id": "rol_h8dqeLx4gcw5GR9hWrqoGg",
+        "id": "rol_bHpXF_EADd-tE7Uwy8CxRg",
         "scores": {
           "str": 9,
           "int": 9,
@@ -3004,7 +3004,7 @@
           "thief"
         ],
         "used": false,
-        "created_at": "2026-11-26T02:46:01Z"
+        "created_at": "2026-11-26T04:04:00Z"
       }
     }
   },
@@ -3035,7 +3035,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/ability-rolls/rol_h8dqeLx4gcw5GR9hWrqoGg/preview",
+      "path": "/v1/ability-rolls/rol_bHpXF_EADd-tE7Uwy8CxRg/preview",
       "body": {
         "name": "Aldric",
         "class_id": "fighter",
@@ -3242,7 +3242,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/ability-rolls/rol_h8dqeLx4gcw5GR9hWrqoGg/preview",
+      "path": "/v1/ability-rolls/rol_bHpXF_EADd-tE7Uwy8CxRg/preview",
       "body": {
         "name": "Aldric",
         "class_id": "fighter",
@@ -3261,7 +3261,7 @@
         "status": 422,
         "detail": "The starting gold doesn't cover the purchases.",
         "code": "character_invalid",
-        "request_id": "req_8HaklYK9I80eExmR4fquTQ",
+        "request_id": "req_aiY9PWvq8vBkU1U8OWnuHw",
         "rejections": [
           {
             "code": "items.purchase.insufficient_funds",
@@ -3295,7 +3295,7 @@
         "name": "Wren",
         "class_id": "magic_user",
         "alignment": "neutral",
-        "ability_roll_id": "rol_h8dqeLx4gcw5GR9hWrqoGg"
+        "ability_roll_id": "rol_bHpXF_EADd-tE7Uwy8CxRg"
       },
       "status": 422,
       "response": {
@@ -3304,7 +3304,7 @@
         "status": 422,
         "detail": "The starting spells don't fit the class's first spell book.",
         "code": "character_invalid",
-        "request_id": "req_qZdL4uXD_u05e0632_R0LQ",
+        "request_id": "req_QZAZ62uw0kVJWcZtB9X97A",
         "rejections": [
           {
             "code": "magic.book.capacity_mismatch",
@@ -3351,7 +3351,7 @@
         "name": "Aldric",
         "class_id": "fighter",
         "alignment": "lawful",
-        "ability_roll_id": "rol_h8dqeLx4gcw5GR9hWrqoGg",
+        "ability_roll_id": "rol_bHpXF_EADd-tE7Uwy8CxRg",
         "purchases": [
           {
             "item_id": "sword"
@@ -3367,11 +3367,11 @@
       },
       "status": 201,
       "response": {
-        "id": "chr_I3qsOHKZxs4fB_zcQOO9JQ",
+        "id": "chr_3wPigTmEsnua1hrmkpgUSA",
         "name": "Aldric",
         "class_id": "fighter",
         "level": 1,
-        "created_at": "2026-11-26T02:46:01Z",
+        "created_at": "2026-11-26T04:04:00Z",
         "character": {
           "id": null,
           "name": "Aldric",
@@ -3499,16 +3499,16 @@
         "name": "Aldric",
         "class_id": "fighter",
         "alignment": "lawful",
-        "ability_roll_id": "rol_h8dqeLx4gcw5GR9hWrqoGg"
+        "ability_roll_id": "rol_bHpXF_EADd-tE7Uwy8CxRg"
       },
       "status": 409,
       "response": {
         "type": "about:blank",
         "title": "Conflict",
         "status": 409,
-        "detail": "A character was already created from the ability roll 'rol_h8dqeLx4gcw5GR9hWrqoGg'.",
+        "detail": "A character was already created from the ability roll 'rol_bHpXF_EADd-tE7Uwy8CxRg'.",
         "code": "ability_roll_used",
-        "request_id": "req_bSEuOsrBGjlN4T1iTj6BvA"
+        "request_id": "req_NFt2psryW9HVUoMaB4knYw"
       }
     }
   },
@@ -3527,7 +3527,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/ability-rolls/rol_h8dqeLx4gcw5GR9hWrqoGg/preview",
+      "path": "/v1/ability-rolls/rol_bHpXF_EADd-tE7Uwy8CxRg/preview",
       "body": {
         "name": "Aldric",
         "class_id": "fighter",
@@ -3538,9 +3538,9 @@
         "type": "about:blank",
         "title": "Conflict",
         "status": 409,
-        "detail": "A character was already created from the ability roll 'rol_h8dqeLx4gcw5GR9hWrqoGg'.",
+        "detail": "A character was already created from the ability roll 'rol_bHpXF_EADd-tE7Uwy8CxRg'.",
         "code": "ability_roll_used",
-        "request_id": "req_csqzY0cfXONW-Xmi9Ldn1w"
+        "request_id": "req__1sPJOgJPI7rExACSsCDLg"
       }
     }
   },
@@ -3559,12 +3559,12 @@
       "response": {
         "items": [
           {
-            "id": "chr_I3qsOHKZxs4fB_zcQOO9JQ",
+            "id": "chr_3wPigTmEsnua1hrmkpgUSA",
             "name": "Aldric",
             "class_id": "fighter",
             "level": 1,
             "max_hp": 8,
-            "created_at": "2026-11-26T02:46:01Z"
+            "created_at": "2026-11-26T04:04:00Z"
           }
         ],
         "total": 1,
@@ -3583,14 +3583,14 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/characters/chr_I3qsOHKZxs4fB_zcQOO9JQ",
+      "path": "/v1/characters/chr_3wPigTmEsnua1hrmkpgUSA",
       "status": 200,
       "response": {
-        "id": "chr_I3qsOHKZxs4fB_zcQOO9JQ",
+        "id": "chr_3wPigTmEsnua1hrmkpgUSA",
         "name": "Aldric",
         "class_id": "fighter",
         "level": 1,
-        "created_at": "2026-11-26T02:46:01Z",
+        "created_at": "2026-11-26T04:04:00Z",
         "character": {
           "id": null,
           "name": "Aldric",
@@ -3798,11 +3798,11 @@
       },
       "status": 201,
       "response": {
-        "id": "chr_9oUwODRXMRsvOEFrCtbrEQ",
+        "id": "chr_hq07CM7CSpW3mc-W9EzA_Q",
         "name": "Aldric",
         "class_id": "fighter",
         "level": 1,
-        "created_at": "2026-11-26T02:46:01Z",
+        "created_at": "2026-11-26T04:04:00Z",
         "character": {
           "id": null,
           "name": "Aldric",
@@ -4988,9 +4988,9 @@
             "name": "The Old Well"
           }
         ],
-        "id": "adv_VJ5hVIUapoW8Xf46FqZ6Ng",
+        "id": "adv_JJYbUjMeRHPnrs2bBMXSSA",
         "builtin": false,
-        "created_at": "2026-11-26T02:46:01Z"
+        "created_at": "2026-11-26T04:04:00Z"
       }
     }
   },
@@ -5014,12 +5014,12 @@
       "body": {
         "adventure_id": "builtin-barrow",
         "character_ids": [
-          "chr_I3qsOHKZxs4fB_zcQOO9JQ"
+          "chr_3wPigTmEsnua1hrmkpgUSA"
         ]
       },
       "status": 201,
       "response": {
-        "id": "ses_dxAFWyVsMyHVEMoXdUvfQA",
+        "id": "ses_HWLX7gSzckk5DHAihPgF8A",
         "name": "The Barrow of the Forgotten King",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
@@ -5033,8 +5033,8 @@
         },
         "schema_version": 4,
         "engine_version": "2.7.0",
-        "created_at": "2026-11-26T02:46:01Z",
-        "updated_at": "2026-11-26T02:46:01Z"
+        "created_at": "2026-11-26T04:04:00Z",
+        "updated_at": "2026-11-26T04:04:00Z"
       }
     }
   },
@@ -5053,7 +5053,7 @@
       "response": {
         "items": [
           {
-            "id": "ses_dxAFWyVsMyHVEMoXdUvfQA",
+            "id": "ses_HWLX7gSzckk5DHAihPgF8A",
             "name": "The Barrow of the Forgotten King",
             "adventure_id": "builtin-barrow",
             "adventure_name": "The Barrow of the Forgotten King",
@@ -5067,8 +5067,8 @@
             },
             "schema_version": 4,
             "engine_version": "2.7.0",
-            "created_at": "2026-11-26T02:46:01Z",
-            "updated_at": "2026-11-26T02:46:01Z"
+            "created_at": "2026-11-26T04:04:00Z",
+            "updated_at": "2026-11-26T04:04:00Z"
           }
         ],
         "total": 1,
@@ -5087,10 +5087,10 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_dxAFWyVsMyHVEMoXdUvfQA",
+      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A",
       "status": 200,
       "response": {
-        "id": "ses_dxAFWyVsMyHVEMoXdUvfQA",
+        "id": "ses_HWLX7gSzckk5DHAihPgF8A",
         "name": "The Barrow of the Forgotten King",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
@@ -5104,8 +5104,8 @@
         },
         "schema_version": 4,
         "engine_version": "2.7.0",
-        "created_at": "2026-11-26T02:46:01Z",
-        "updated_at": "2026-11-26T02:46:01Z"
+        "created_at": "2026-11-26T04:04:00Z",
+        "updated_at": "2026-11-26T04:04:00Z"
       }
     }
   },
@@ -5122,13 +5122,13 @@
     },
     "recorded": {
       "method": "PATCH",
-      "path": "/v1/sessions/ses_dxAFWyVsMyHVEMoXdUvfQA",
+      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A",
       "body": {
         "name": "Aldric's first delve"
       },
       "status": 200,
       "response": {
-        "id": "ses_dxAFWyVsMyHVEMoXdUvfQA",
+        "id": "ses_HWLX7gSzckk5DHAihPgF8A",
         "name": "Aldric's first delve",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
@@ -5142,8 +5142,8 @@
         },
         "schema_version": 4,
         "engine_version": "2.7.0",
-        "created_at": "2026-11-26T02:46:01Z",
-        "updated_at": "2026-11-26T02:46:01Z"
+        "created_at": "2026-11-26T04:04:00Z",
+        "updated_at": "2026-11-26T04:04:00Z"
       }
     }
   },
@@ -5157,7 +5157,7 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_dxAFWyVsMyHVEMoXdUvfQA/commands",
+      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A/commands",
       "status": 200,
       "response": {
         "mode": "town",
@@ -5240,7 +5240,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_dxAFWyVsMyHVEMoXdUvfQA/commands",
+      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A/commands",
       "query": {
         "expected_revision": 0
       },
@@ -5301,7 +5301,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_dxAFWyVsMyHVEMoXdUvfQA/commands",
+      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A/commands",
       "query": {
         "expected_revision": 1
       },
@@ -5345,7 +5345,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_dxAFWyVsMyHVEMoXdUvfQA/commands",
+      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A/commands",
       "query": {
         "expected_revision": 1
       },
@@ -5394,7 +5394,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_dxAFWyVsMyHVEMoXdUvfQA/commands",
+      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A/commands",
       "query": {
         "expected_revision": 1
       },
@@ -5409,7 +5409,7 @@
         "status": 409,
         "detail": "The session is at revision 2, not 1. Read the view and decide whether to send the command again.",
         "code": "revision_conflict",
-        "request_id": "req_LJ0VwqlNRzkXg7nFrkBRPg",
+        "request_id": "req_Ko57-xgkNLyuQ_AuRoCKtg",
         "revision": 2
       }
     }
@@ -5424,7 +5424,7 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_dxAFWyVsMyHVEMoXdUvfQA/view",
+      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A/view",
       "status": 200,
       "response": {
         "adventure_name": "The Barrow of the Forgotten King",
@@ -5674,7 +5674,7 @@
     "role": "referee",
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_dxAFWyVsMyHVEMoXdUvfQA/referee-view",
+      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A/referee-view",
       "status": 200,
       "response": {
         "ruleset": {
@@ -6474,7 +6474,7 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_dxAFWyVsMyHVEMoXdUvfQA/events",
+      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A/events",
       "status": 200,
       "response": {
         "events": [
@@ -6531,14 +6531,14 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_dxAFWyVsMyHVEMoXdUvfQA/saves",
+      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A/saves",
       "body": {
         "label": "Inside the barrow"
       },
       "status": 201,
       "response": {
-        "id": "sav_6XAOOMPGn0x9vjnJeKY--A",
-        "session_id": "ses_dxAFWyVsMyHVEMoXdUvfQA",
+        "id": "sav_Ygtmxn_x-Myx-3ySshSbjg",
+        "session_id": "ses_HWLX7gSzckk5DHAihPgF8A",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
         "label": "Inside the barrow",
@@ -6548,7 +6548,7 @@
           "turns": 2,
           "days": 0
         },
-        "created_at": "2026-11-26T02:46:01Z"
+        "created_at": "2026-11-26T04:04:00Z"
       }
     }
   },
@@ -6567,14 +6567,14 @@
       "method": "GET",
       "path": "/v1/saves",
       "query": {
-        "session_id": "ses_dxAFWyVsMyHVEMoXdUvfQA"
+        "session_id": "ses_HWLX7gSzckk5DHAihPgF8A"
       },
       "status": 200,
       "response": {
         "items": [
           {
-            "id": "sav_6XAOOMPGn0x9vjnJeKY--A",
-            "session_id": "ses_dxAFWyVsMyHVEMoXdUvfQA",
+            "id": "sav_Ygtmxn_x-Myx-3ySshSbjg",
+            "session_id": "ses_HWLX7gSzckk5DHAihPgF8A",
             "adventure_id": "builtin-barrow",
             "adventure_name": "The Barrow of the Forgotten King",
             "label": "Inside the barrow",
@@ -6584,7 +6584,7 @@
               "turns": 2,
               "days": 0
             },
-            "created_at": "2026-11-26T02:46:01Z"
+            "created_at": "2026-11-26T04:04:00Z"
           }
         ],
         "total": 1,
@@ -6603,11 +6603,11 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/saves/sav_6XAOOMPGn0x9vjnJeKY--A",
+      "path": "/v1/saves/sav_Ygtmxn_x-Myx-3ySshSbjg",
       "status": 200,
       "response": {
-        "id": "sav_6XAOOMPGn0x9vjnJeKY--A",
-        "session_id": "ses_dxAFWyVsMyHVEMoXdUvfQA",
+        "id": "sav_Ygtmxn_x-Myx-3ySshSbjg",
+        "session_id": "ses_HWLX7gSzckk5DHAihPgF8A",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
         "label": "Inside the barrow",
@@ -6617,7 +6617,7 @@
           "turns": 2,
           "days": 0
         },
-        "created_at": "2026-11-26T02:46:01Z"
+        "created_at": "2026-11-26T04:04:00Z"
       }
     }
   },
@@ -6634,14 +6634,14 @@
     },
     "recorded": {
       "method": "PATCH",
-      "path": "/v1/saves/sav_6XAOOMPGn0x9vjnJeKY--A",
+      "path": "/v1/saves/sav_Ygtmxn_x-Myx-3ySshSbjg",
       "body": {
         "label": "Past the first door"
       },
       "status": 200,
       "response": {
-        "id": "sav_6XAOOMPGn0x9vjnJeKY--A",
-        "session_id": "ses_dxAFWyVsMyHVEMoXdUvfQA",
+        "id": "sav_Ygtmxn_x-Myx-3ySshSbjg",
+        "session_id": "ses_HWLX7gSzckk5DHAihPgF8A",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
         "label": "Past the first door",
@@ -6651,7 +6651,7 @@
           "turns": 2,
           "days": 0
         },
-        "created_at": "2026-11-26T02:46:01Z"
+        "created_at": "2026-11-26T04:04:00Z"
       }
     }
   },
@@ -6666,7 +6666,7 @@
     "role": "referee",
     "recorded": {
       "method": "GET",
-      "path": "/v1/saves/sav_6XAOOMPGn0x9vjnJeKY--A/document",
+      "path": "/v1/saves/sav_Ygtmxn_x-Myx-3ySshSbjg/document",
       "status": 200,
       "response": {
         "kind": "save",
@@ -8283,7 +8283,7 @@
       },
       "status": 201,
       "response": {
-        "id": "sav_5n2xdUD1PKgSYJ7-UiEq4Q",
+        "id": "sav_npEaDs5r2zcp-qcvSfYSsw",
         "session_id": null,
         "adventure_id": null,
         "adventure_name": "The Barrow of the Forgotten King",
@@ -8294,7 +8294,7 @@
           "turns": 2,
           "days": 0
         },
-        "created_at": "2026-11-26T02:46:01Z"
+        "created_at": "2026-11-26T04:04:00Z"
       }
     }
   },
@@ -8311,13 +8311,13 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/saves/sav_6XAOOMPGn0x9vjnJeKY--A/restore",
+      "path": "/v1/saves/sav_Ygtmxn_x-Myx-3ySshSbjg/restore",
       "body": {
         "name": "Aldric, second try"
       },
       "status": 201,
       "response": {
-        "id": "ses_8mW38F1nTOJJnMe1i-_r3g",
+        "id": "ses_GwKe8439OaUR2fNiDGO9Lg",
         "name": "Aldric, second try",
         "adventure_id": "builtin-barrow",
         "adventure_name": "The Barrow of the Forgotten King",
@@ -8331,8 +8331,8 @@
         },
         "schema_version": 4,
         "engine_version": "2.7.0",
-        "created_at": "2026-11-26T02:46:01Z",
-        "updated_at": "2026-11-26T02:46:01Z"
+        "created_at": "2026-11-26T04:04:00Z",
+        "updated_at": "2026-11-26T04:04:00Z"
       }
     }
   },
@@ -8346,7 +8346,7 @@
     },
     "recorded": {
       "method": "DELETE",
-      "path": "/v1/saves/sav_5n2xdUD1PKgSYJ7-UiEq4Q",
+      "path": "/v1/saves/sav_npEaDs5r2zcp-qcvSfYSsw",
       "status": 204,
       "response": null
     }
@@ -8368,7 +8368,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_8mW38F1nTOJJnMe1i-_r3g/commands",
+      "path": "/v1/sessions/ses_GwKe8439OaUR2fNiDGO9Lg/commands",
       "query": {
         "include": "view"
       },
@@ -8827,7 +8827,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_8mW38F1nTOJJnMe1i-_r3g/battle-round/preview",
+      "path": "/v1/sessions/ses_GwKe8439OaUR2fNiDGO9Lg/battle-round/preview",
       "body": {
         "declarations": [
           {
@@ -8872,7 +8872,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_8mW38F1nTOJJnMe1i-_r3g/battle-round/preview",
+      "path": "/v1/sessions/ses_GwKe8439OaUR2fNiDGO9Lg/battle-round/preview",
       "body": {
         "declarations": [
           {
@@ -8923,7 +8923,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_8mW38F1nTOJJnMe1i-_r3g/battle-round/preview",
+      "path": "/v1/sessions/ses_GwKe8439OaUR2fNiDGO9Lg/battle-round/preview",
       "body": {
         "declarations": [
           {
@@ -8939,7 +8939,7 @@
         "status": 422,
         "detail": "osrlib refused the declarations: 'character-0009' isn't one of this round's declarers",
         "code": "declaration_invalid",
-        "request_id": "req_WR6n66QJ3FUyKiJYI1-_mA"
+        "request_id": "req_aToa4dFGQJcslwWf1H7pZA"
       }
     }
   },
@@ -9041,7 +9041,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_8mW38F1nTOJJnMe1i-_r3g/battle-round/preview",
+      "path": "/v1/sessions/ses_GwKe8439OaUR2fNiDGO9Lg/battle-round/preview",
       "body": {
         "declarations": [
           {
@@ -9137,7 +9137,7 @@
         "status": 422,
         "detail": "The request failed validation. See `errors` for each field.",
         "code": "validation_error",
-        "request_id": "req_FfNg2Fca4_cXvSQt1NFOQQ",
+        "request_id": "req_6Nt8uT-2tIjV3yhDLRbuUg",
         "errors": [
           {
             "loc": [
@@ -9165,7 +9165,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_dxAFWyVsMyHVEMoXdUvfQA/battle-round/preview",
+      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A/battle-round/preview",
       "body": {
         "declarations": []
       },
@@ -9176,7 +9176,7 @@
         "status": 409,
         "detail": "The session is in 'exploring' mode, not 'battle'.",
         "code": "not_in_battle",
-        "request_id": "req__x8jzPaSubaO22GrFCAxoQ",
+        "request_id": "req_7Kc4gB6sGkXmBmY5aB8_KQ",
         "mode": "exploring"
       }
     }
@@ -9201,7 +9201,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_8mW38F1nTOJJnMe1i-_r3g/commands",
+      "path": "/v1/sessions/ses_GwKe8439OaUR2fNiDGO9Lg/commands",
       "body": {
         "command_type": "resolve_battle_round",
         "declarations": [
@@ -9350,7 +9350,7 @@
     },
     "recorded": {
       "method": "DELETE",
-      "path": "/v1/sessions/ses_8mW38F1nTOJJnMe1i-_r3g",
+      "path": "/v1/sessions/ses_GwKe8439OaUR2fNiDGO9Lg",
       "status": 204,
       "response": null
     }
@@ -9365,7 +9365,7 @@
     },
     "recorded": {
       "method": "DELETE",
-      "path": "/v1/adventures/adv_VJ5hVIUapoW8Xf46FqZ6Ng",
+      "path": "/v1/adventures/adv_JJYbUjMeRHPnrs2bBMXSSA",
       "status": 204,
       "response": null
     }
@@ -9380,7 +9380,7 @@
     },
     "recorded": {
       "method": "DELETE",
-      "path": "/v1/characters/chr_9oUwODRXMRsvOEFrCtbrEQ",
+      "path": "/v1/characters/chr_hq07CM7CSpW3mc-W9EzA_Q",
       "status": 204,
       "response": null
     }
@@ -9403,7 +9403,7 @@
         "status": 404,
         "detail": "No class has the id 'paladin'.",
         "code": "not_found",
-        "request_id": "req_s5p9oIDtBJs7Jq9wZf5HHA",
+        "request_id": "req_D6P0l9WqwmUSOLAto3fvyA",
         "resource": "class",
         "id": "paladin"
       }
@@ -9427,7 +9427,7 @@
         "status": 404,
         "detail": "No monster has the id 'tarrasque'.",
         "code": "not_found",
-        "request_id": "req_mRAwEwljCyMFswnLy2iIZg",
+        "request_id": "req_M3aGqm5EX8NXShEce0nJAQ",
         "resource": "monster",
         "id": "tarrasque"
       }
@@ -9457,7 +9457,7 @@
         "status": 404,
         "detail": "No class has the id 'paladin'.",
         "code": "not_found",
-        "request_id": "req_pF2zSPKm4hFNdsCtu8QNLQ",
+        "request_id": "req_8DYTyBTFpWh4LCp_HivZMg",
         "resource": "class",
         "id": "paladin"
       }
@@ -9481,7 +9481,7 @@
         "status": 404,
         "detail": "No spell has the id 'wish'.",
         "code": "not_found",
-        "request_id": "req_1kXQjy0FALcIR_XGKsf1aQ",
+        "request_id": "req_vqIsPZvvkhgpWDX8lDiS1w",
         "resource": "spell",
         "id": "wish"
       }
@@ -9505,7 +9505,7 @@
         "status": 404,
         "detail": "No equipment item has the id 'musket'.",
         "code": "not_found",
-        "request_id": "req_dCZioWy4z5xA1uiMHDg22g",
+        "request_id": "req_VrJO6m6PdH5eSeydbaQSuA",
         "resource": "equipment item",
         "id": "musket"
       }
@@ -9529,7 +9529,7 @@
         "status": 404,
         "detail": "No magic item has the id 'vorpal_sword'.",
         "code": "not_found",
-        "request_id": "req_epy56XsWcp-E85Lv9EJ5ig",
+        "request_id": "req_UWXQT-LAKn9O1f2WD1ku9w",
         "resource": "magic item",
         "id": "vorpal_sword"
       }
@@ -9553,7 +9553,7 @@
         "status": 404,
         "detail": "No table has the id 'weather'.",
         "code": "not_found",
-        "request_id": "req_sBrjn_jgaet4Rv9L7_ubDw",
+        "request_id": "req__ibpyUXlAYNYPoXcuCQ6Yg",
         "resource": "table",
         "id": "weather"
       }
@@ -9577,7 +9577,7 @@
         "status": 404,
         "detail": "No command has the id 'teleport'.",
         "code": "not_found",
-        "request_id": "req_bo8qOItKnVcP6cSa3vCjFA",
+        "request_id": "req_nBnupIpJkfV5vBW5N-rX6w",
         "resource": "command",
         "id": "teleport"
       }
@@ -9607,7 +9607,7 @@
         "status": 422,
         "detail": "die size must be one of [2, 3, 4, 6, 8, 10, 12, 20, 100]: '3d7'",
         "code": "content_invalid",
-        "request_id": "req_Zo8oMkeKeBZ930FmcMAl1A"
+        "request_id": "req_jwNTla3kHJW09wuhWFFWfQ"
       }
     }
   },
@@ -9637,7 +9637,7 @@
         "status": 422,
         "detail": "unknown treasure type 'Z'",
         "code": "content_invalid",
-        "request_id": "req_ir0I-cARjbT8uXhtZ13PEg"
+        "request_id": "req_lgoUmq-twRBe5Y9Ymb0_Xw"
       }
     }
   },
@@ -9667,7 +9667,7 @@
         "status": 422,
         "detail": "unknown monster id 'tarrasque'",
         "code": "content_invalid",
-        "request_id": "req_A15xaFZf3s_jrp-AXmg9WA"
+        "request_id": "req_tePkQwo-PYxek49GHhuLZQ"
       }
     }
   },
@@ -9705,7 +9705,7 @@
         "status": 422,
         "detail": "The purchases don't include 'sword'.",
         "code": "character_invalid",
-        "request_id": "req_K7z1Hw1BjwjFIqsaOKYXFg",
+        "request_id": "req_BFliAWCsS9phyO8IkFxoug",
         "id": "sword",
         "field": "equip_item_ids",
         "index": 0
@@ -9736,7 +9736,7 @@
         "status": 403,
         "detail": "Only an API key with the referee role can choose a seed.",
         "code": "referee_required",
-        "request_id": "req_TThQVBBJWxwRy0w8MHZZLg"
+        "request_id": "req_NhlO1GNp136T__k4KrlcQA"
       }
     }
   },
@@ -9758,7 +9758,7 @@
         "status": 404,
         "detail": "No ability roll has the id 'rol_5mJq0nY2bXr8TzW4cH1eKd'.",
         "code": "not_found",
-        "request_id": "req_-jbc1ESyTVTuExQS3WXn8w",
+        "request_id": "req_EGOdqY4MwJkl5eQhmP7ndw",
         "resource": "ability roll",
         "id": "rol_5mJq0nY2bXr8TzW4cH1eKd"
       }
@@ -9794,7 +9794,7 @@
         "status": 403,
         "detail": "Only an API key with the referee role can choose a seed.",
         "code": "referee_required",
-        "request_id": "req_8G9oNyTJM_2Fi1NQOic30A"
+        "request_id": "req_jmDytjeCc_swEmSdvOD7kg"
       }
     }
   },
@@ -9828,7 +9828,7 @@
         "status": 404,
         "detail": "No ability roll has the id 'rol_5mJq0nY2bXr8TzW4cH1eKd'.",
         "code": "not_found",
-        "request_id": "req_5L_gxz5bG4xv9veBA9hKtQ",
+        "request_id": "req_j_EdP8OzzqGkG6SyXyPhzA",
         "resource": "ability roll",
         "id": "rol_5mJq0nY2bXr8TzW4cH1eKd"
       }
@@ -9862,7 +9862,7 @@
         "status": 404,
         "detail": "No ability roll has the id 'rol_5mJq0nY2bXr8TzW4cH1eKd'.",
         "code": "not_found",
-        "request_id": "req_TW2kqAy2rJ4OmPhzoVElGA",
+        "request_id": "req_n2xkUmBborgndAAW0fyACw",
         "resource": "ability roll",
         "id": "rol_5mJq0nY2bXr8TzW4cH1eKd"
       }
@@ -9884,7 +9884,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/ability-rolls/rol_h8dqeLx4gcw5GR9hWrqoGg/preview",
+      "path": "/v1/ability-rolls/rol_bHpXF_EADd-tE7Uwy8CxRg/preview",
       "body": {
         "name": "Wren",
         "class_id": "fighter",
@@ -9898,7 +9898,7 @@
         "status": 422,
         "detail": "The request failed validation. See `errors` for each field.",
         "code": "validation_error",
-        "request_id": "req_X9QCuBNF8mXaLE0HRn7PKw",
+        "request_id": "req_GD7nupOiOepSQ33P-1qQoQ",
         "errors": [
           {
             "loc": [
@@ -10018,7 +10018,7 @@
         "status": 403,
         "detail": "This request needs an API key with the referee role.",
         "code": "referee_required",
-        "request_id": "req_oiCuVfneLUMn7hmIkSxL1w"
+        "request_id": "req_XwdDO_mQ_zk4RGubTuSXiQ"
       }
     }
   },
@@ -10128,7 +10128,7 @@
         "status": 422,
         "detail": "expected a 'character' document, got kind 'adventure'",
         "code": "content_invalid",
-        "request_id": "req_5LImoS7S0wGQAdP24sglbg"
+        "request_id": "req__mvqVqY-fem4IFhXyw8HMA"
       }
     }
   },
@@ -10238,7 +10238,7 @@
         "status": 409,
         "detail": "document schema_version 99 is newer than the supported 4",
         "code": "version_unsupported",
-        "request_id": "req_KoQ7DWX7ASGZxJe9G3kahw"
+        "request_id": "req_J4-irAUQ9Bem2fCT5W5qPQ"
       }
     }
   },
@@ -10252,17 +10252,17 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/characters/chr_9oUwODRXMRsvOEFrCtbrEQ",
+      "path": "/v1/characters/chr_hq07CM7CSpW3mc-W9EzA_Q",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No character has the id 'chr_9oUwODRXMRsvOEFrCtbrEQ'.",
+        "detail": "No character has the id 'chr_hq07CM7CSpW3mc-W9EzA_Q'.",
         "code": "not_found",
-        "request_id": "req_EndHXEDT8TqWEERCufiVng",
+        "request_id": "req_X-3qNNbwGek87XShYoLLQg",
         "resource": "character",
-        "id": "chr_9oUwODRXMRsvOEFrCtbrEQ"
+        "id": "chr_hq07CM7CSpW3mc-W9EzA_Q"
       }
     }
   },
@@ -10276,17 +10276,17 @@
     },
     "recorded": {
       "method": "DELETE",
-      "path": "/v1/characters/chr_9oUwODRXMRsvOEFrCtbrEQ",
+      "path": "/v1/characters/chr_hq07CM7CSpW3mc-W9EzA_Q",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No character has the id 'chr_9oUwODRXMRsvOEFrCtbrEQ'.",
+        "detail": "No character has the id 'chr_hq07CM7CSpW3mc-W9EzA_Q'.",
         "code": "not_found",
-        "request_id": "req_7_H9EVz1MRxDZahroJP_RQ",
+        "request_id": "req_GLtoIGsvDDxfXN-wjsakPA",
         "resource": "character",
-        "id": "chr_9oUwODRXMRsvOEFrCtbrEQ"
+        "id": "chr_hq07CM7CSpW3mc-W9EzA_Q"
       }
     }
   },
@@ -10426,7 +10426,7 @@
         "status": 422,
         "detail": "adventure validation failed:\nwell level 1: area 'cistern' references unknown monster 'rat_giant'",
         "code": "content_invalid",
-        "request_id": "req_xpyknDQvdbXomBKSvvqiZQ"
+        "request_id": "req_ZZ-IIpjn7C_5aUFS4mkMZw"
       }
     }
   },
@@ -10460,7 +10460,7 @@
         "status": 409,
         "detail": "document schema_version 99 is newer than the supported 4",
         "code": "version_unsupported",
-        "request_id": "req_VKE9ntV7SlIgZkTZClBDbw"
+        "request_id": "req_V_th3H3DY4qVuQSxlOHaHg"
       }
     }
   },
@@ -10474,17 +10474,17 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/adventures/adv_VJ5hVIUapoW8Xf46FqZ6Ng",
+      "path": "/v1/adventures/adv_JJYbUjMeRHPnrs2bBMXSSA",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No adventure has the id 'adv_VJ5hVIUapoW8Xf46FqZ6Ng'.",
+        "detail": "No adventure has the id 'adv_JJYbUjMeRHPnrs2bBMXSSA'.",
         "code": "not_found",
-        "request_id": "req_CLqAxMd1ZaZXNjrn-Iko_g",
+        "request_id": "req_qiqCPwyBAJJEHlsQFkmP-A",
         "resource": "adventure",
-        "id": "adv_VJ5hVIUapoW8Xf46FqZ6Ng"
+        "id": "adv_JJYbUjMeRHPnrs2bBMXSSA"
       }
     }
   },
@@ -10506,7 +10506,7 @@
         "status": 403,
         "detail": "The adventure 'builtin-barrow' comes with the server.",
         "code": "adventure_read_only",
-        "request_id": "req_VIpDxLgyQCCdyj8h9eSSsg"
+        "request_id": "req_nuDigZQMAFUJR2Vlz8IYXQ"
       }
     }
   },
@@ -10520,17 +10520,17 @@
     },
     "recorded": {
       "method": "DELETE",
-      "path": "/v1/adventures/adv_VJ5hVIUapoW8Xf46FqZ6Ng",
+      "path": "/v1/adventures/adv_JJYbUjMeRHPnrs2bBMXSSA",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No adventure has the id 'adv_VJ5hVIUapoW8Xf46FqZ6Ng'.",
+        "detail": "No adventure has the id 'adv_JJYbUjMeRHPnrs2bBMXSSA'.",
         "code": "not_found",
-        "request_id": "req_yhzD6zxNBdISDr7Uq1e5oA",
+        "request_id": "req__fr7cs6pPp_tHGztB31auA",
         "resource": "adventure",
-        "id": "adv_VJ5hVIUapoW8Xf46FqZ6Ng"
+        "id": "adv_JJYbUjMeRHPnrs2bBMXSSA"
       }
     }
   },
@@ -10552,7 +10552,7 @@
         "status": 403,
         "detail": "This request needs an API key with the referee role.",
         "code": "referee_required",
-        "request_id": "req_aMJlpbDJ1iGQByFw5yRrow"
+        "request_id": "req_6r1ZGyOjdWmefM0nMixWyA"
       }
     }
   },
@@ -10567,17 +10567,17 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/adventures/adv_VJ5hVIUapoW8Xf46FqZ6Ng/document",
+      "path": "/v1/adventures/adv_JJYbUjMeRHPnrs2bBMXSSA/document",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No adventure has the id 'adv_VJ5hVIUapoW8Xf46FqZ6Ng'.",
+        "detail": "No adventure has the id 'adv_JJYbUjMeRHPnrs2bBMXSSA'.",
         "code": "not_found",
-        "request_id": "req_8Fyv7C36Ss6MgWJAeBpHOQ",
+        "request_id": "req_tNWxjjycFU6BEWmu2HhaEg",
         "resource": "adventure",
-        "id": "adv_VJ5hVIUapoW8Xf46FqZ6Ng"
+        "id": "adv_JJYbUjMeRHPnrs2bBMXSSA"
       }
     }
   },
@@ -10607,7 +10607,7 @@
         "status": 422,
         "detail": "The characters can't form a party. List should have at least 1 item after validation, not 0",
         "code": "party_invalid",
-        "request_id": "req_bQZ-x9eX8WF7hnDAomJcag"
+        "request_id": "req_8gun-0vvrbzYJE7PF5ekqA"
       }
     }
   },
@@ -10723,7 +10723,7 @@
         "status": 422,
         "detail": "expected a 'party' document, got kind 'character'",
         "code": "content_invalid",
-        "request_id": "req_Li8UqQQm9aPvLg8ck2hw6w"
+        "request_id": "req_VQE2OtJ1V9xtbZiG3N_dpQ"
       }
     }
   },
@@ -10748,7 +10748,7 @@
       "body": {
         "adventure_id": "builtin-barrow",
         "character_ids": [
-          "chr_I3qsOHKZxs4fB_zcQOO9JQ"
+          "chr_3wPigTmEsnua1hrmkpgUSA"
         ],
         "seed": 20261120
       },
@@ -10759,7 +10759,7 @@
         "status": 403,
         "detail": "Only an API key with the referee role can choose a seed.",
         "code": "referee_required",
-        "request_id": "req_6m4NQv3hJjg30sQC-wfvEA"
+        "request_id": "req_JaGAdQ3BjUOAQqnkCgdmjA"
       }
     }
   },
@@ -10783,7 +10783,7 @@
       "body": {
         "adventure_id": "builtin-barrow",
         "character_ids": [
-          "chr_9oUwODRXMRsvOEFrCtbrEQ"
+          "chr_hq07CM7CSpW3mc-W9EzA_Q"
         ]
       },
       "status": 404,
@@ -10791,11 +10791,11 @@
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No character has the id 'chr_9oUwODRXMRsvOEFrCtbrEQ'.",
+        "detail": "No character has the id 'chr_hq07CM7CSpW3mc-W9EzA_Q'.",
         "code": "not_found",
-        "request_id": "req_XcjivfVRjgwMBmGBLL1-sQ",
+        "request_id": "req_IcKz3ofqQmnBF8alM98Q3Q",
         "resource": "character",
-        "id": "chr_9oUwODRXMRsvOEFrCtbrEQ"
+        "id": "chr_hq07CM7CSpW3mc-W9EzA_Q"
       }
     }
   },
@@ -10809,17 +10809,17 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_8mW38F1nTOJJnMe1i-_r3g",
+      "path": "/v1/sessions/ses_GwKe8439OaUR2fNiDGO9Lg",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No session has the id 'ses_8mW38F1nTOJJnMe1i-_r3g'.",
+        "detail": "No session has the id 'ses_GwKe8439OaUR2fNiDGO9Lg'.",
         "code": "not_found",
-        "request_id": "req_pAIq3GUwBid0bdVZVxrBTA",
+        "request_id": "req_07JSi9nIOjF4W2QKRJrieA",
         "resource": "session",
-        "id": "ses_8mW38F1nTOJJnMe1i-_r3g"
+        "id": "ses_GwKe8439OaUR2fNiDGO9Lg"
       }
     }
   },
@@ -10836,7 +10836,7 @@
     },
     "recorded": {
       "method": "PATCH",
-      "path": "/v1/sessions/ses_8mW38F1nTOJJnMe1i-_r3g",
+      "path": "/v1/sessions/ses_GwKe8439OaUR2fNiDGO9Lg",
       "body": {
         "name": "Aldric, third try"
       },
@@ -10845,11 +10845,11 @@
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No session has the id 'ses_8mW38F1nTOJJnMe1i-_r3g'.",
+        "detail": "No session has the id 'ses_GwKe8439OaUR2fNiDGO9Lg'.",
         "code": "not_found",
-        "request_id": "req_x1AOPJkZMoAbqWjUipXb0w",
+        "request_id": "req_JzBFrHZemm49QvHcvFVAwA",
         "resource": "session",
-        "id": "ses_8mW38F1nTOJJnMe1i-_r3g"
+        "id": "ses_GwKe8439OaUR2fNiDGO9Lg"
       }
     }
   },
@@ -10863,17 +10863,17 @@
     },
     "recorded": {
       "method": "DELETE",
-      "path": "/v1/sessions/ses_8mW38F1nTOJJnMe1i-_r3g",
+      "path": "/v1/sessions/ses_GwKe8439OaUR2fNiDGO9Lg",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No session has the id 'ses_8mW38F1nTOJJnMe1i-_r3g'.",
+        "detail": "No session has the id 'ses_GwKe8439OaUR2fNiDGO9Lg'.",
         "code": "not_found",
-        "request_id": "req_77jARL0XTxJae-3ue7150A",
+        "request_id": "req_7Fz8vHupzMLTc7s0Rhg9kg",
         "resource": "session",
-        "id": "ses_8mW38F1nTOJJnMe1i-_r3g"
+        "id": "ses_GwKe8439OaUR2fNiDGO9Lg"
       }
     }
   },
@@ -10887,17 +10887,17 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_8mW38F1nTOJJnMe1i-_r3g/commands",
+      "path": "/v1/sessions/ses_GwKe8439OaUR2fNiDGO9Lg/commands",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No session has the id 'ses_8mW38F1nTOJJnMe1i-_r3g'.",
+        "detail": "No session has the id 'ses_GwKe8439OaUR2fNiDGO9Lg'.",
         "code": "not_found",
-        "request_id": "req_ij3JXluv9xxPFq06rPkzJA",
+        "request_id": "req_SNJg7pRD8SI7j850aX4P_w",
         "resource": "session",
-        "id": "ses_8mW38F1nTOJJnMe1i-_r3g"
+        "id": "ses_GwKe8439OaUR2fNiDGO9Lg"
       }
     }
   },
@@ -10918,7 +10918,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_dxAFWyVsMyHVEMoXdUvfQA/commands",
+      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A/commands",
       "body": {
         "command_type": "grant_coins",
         "character_id": "character-0001",
@@ -10933,7 +10933,7 @@
         "status": 403,
         "detail": "Only an API key with the referee role can send 'grant_coins'.",
         "code": "referee_command",
-        "request_id": "req_1hEk9hA2pHgULSV2VVYGNw",
+        "request_id": "req_Qr5y04jlI1ZsN2IhWE29MA",
         "command_type": "grant_coins"
       }
     }
@@ -10953,7 +10953,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_dxAFWyVsMyHVEMoXdUvfQA/commands",
+      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A/commands",
       "body": {
         "command_type": "move_party",
         "direction": "east",
@@ -10966,7 +10966,7 @@
         "status": 403,
         "detail": "Only an API key with the referee role can set a command's source.",
         "code": "referee_required",
-        "request_id": "req__1c34ZkR7elzwc6LP5YMjA"
+        "request_id": "req_Ec_byU6ERNpjSOsHUjfotw"
       }
     }
   },
@@ -10984,7 +10984,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_8mW38F1nTOJJnMe1i-_r3g/commands",
+      "path": "/v1/sessions/ses_GwKe8439OaUR2fNiDGO9Lg/commands",
       "body": {
         "command_type": "move_party",
         "direction": "east"
@@ -10994,11 +10994,11 @@
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No session has the id 'ses_8mW38F1nTOJJnMe1i-_r3g'.",
+        "detail": "No session has the id 'ses_GwKe8439OaUR2fNiDGO9Lg'.",
         "code": "not_found",
-        "request_id": "req_MSHhIiVUp5dS2Avsxr3SHQ",
+        "request_id": "req_ej4EVE8piptoZjIio3IvYA",
         "resource": "session",
-        "id": "ses_8mW38F1nTOJJnMe1i-_r3g"
+        "id": "ses_GwKe8439OaUR2fNiDGO9Lg"
       }
     }
   },
@@ -11015,7 +11015,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_8mW38F1nTOJJnMe1i-_r3g/battle-round/preview",
+      "path": "/v1/sessions/ses_GwKe8439OaUR2fNiDGO9Lg/battle-round/preview",
       "body": {
         "declarations": []
       },
@@ -11024,11 +11024,11 @@
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No session has the id 'ses_8mW38F1nTOJJnMe1i-_r3g'.",
+        "detail": "No session has the id 'ses_GwKe8439OaUR2fNiDGO9Lg'.",
         "code": "not_found",
-        "request_id": "req_p3PwUz0tPkp96A7aUw7zkw",
+        "request_id": "req_UlDW1uc6Fq6xNErUES-NmQ",
         "resource": "session",
-        "id": "ses_8mW38F1nTOJJnMe1i-_r3g"
+        "id": "ses_GwKe8439OaUR2fNiDGO9Lg"
       }
     }
   },
@@ -11042,17 +11042,17 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_8mW38F1nTOJJnMe1i-_r3g/view",
+      "path": "/v1/sessions/ses_GwKe8439OaUR2fNiDGO9Lg/view",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No session has the id 'ses_8mW38F1nTOJJnMe1i-_r3g'.",
+        "detail": "No session has the id 'ses_GwKe8439OaUR2fNiDGO9Lg'.",
         "code": "not_found",
-        "request_id": "req_GowGgMFQdEu-b9IwtCoFQw",
+        "request_id": "req_SwHIKP4mMk5rjMyyaV0K7A",
         "resource": "session",
-        "id": "ses_8mW38F1nTOJJnMe1i-_r3g"
+        "id": "ses_GwKe8439OaUR2fNiDGO9Lg"
       }
     }
   },
@@ -11066,7 +11066,7 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_dxAFWyVsMyHVEMoXdUvfQA/referee-view",
+      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A/referee-view",
       "status": 403,
       "response": {
         "type": "about:blank",
@@ -11074,7 +11074,7 @@
         "status": 403,
         "detail": "This request needs an API key with the referee role.",
         "code": "referee_required",
-        "request_id": "req_aLTeP-fzHin4xuNI7D6Vsg"
+        "request_id": "req_2ZeFkFsAqrXP85BJE2JWNA"
       }
     }
   },
@@ -11089,17 +11089,17 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_8mW38F1nTOJJnMe1i-_r3g/referee-view",
+      "path": "/v1/sessions/ses_GwKe8439OaUR2fNiDGO9Lg/referee-view",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No session has the id 'ses_8mW38F1nTOJJnMe1i-_r3g'.",
+        "detail": "No session has the id 'ses_GwKe8439OaUR2fNiDGO9Lg'.",
         "code": "not_found",
-        "request_id": "req_mVtSmM_CUx2rjY4SrhGtTw",
+        "request_id": "req_-JZYLjUncQuK1ESyiX5yvQ",
         "resource": "session",
-        "id": "ses_8mW38F1nTOJJnMe1i-_r3g"
+        "id": "ses_GwKe8439OaUR2fNiDGO9Lg"
       }
     }
   },
@@ -11116,7 +11116,7 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_dxAFWyVsMyHVEMoXdUvfQA/events",
+      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A/events",
       "query": {
         "visibility": "referee"
       },
@@ -11127,7 +11127,7 @@
         "status": 403,
         "detail": "Only an API key with the referee role can read referee events.",
         "code": "referee_required",
-        "request_id": "req_P03Augk87fXwAT4dVPWs1w"
+        "request_id": "req_Kwhf2qts-OsykaP4gLbwcg"
       }
     }
   },
@@ -11141,17 +11141,17 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/sessions/ses_8mW38F1nTOJJnMe1i-_r3g/events",
+      "path": "/v1/sessions/ses_GwKe8439OaUR2fNiDGO9Lg/events",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No session has the id 'ses_8mW38F1nTOJJnMe1i-_r3g'.",
+        "detail": "No session has the id 'ses_GwKe8439OaUR2fNiDGO9Lg'.",
         "code": "not_found",
-        "request_id": "req_gNY748EltagdJaMW4XLXFA",
+        "request_id": "req_mN1xoi6rJErc9kB6kBkmog",
         "resource": "session",
-        "id": "ses_8mW38F1nTOJJnMe1i-_r3g"
+        "id": "ses_GwKe8439OaUR2fNiDGO9Lg"
       }
     }
   },
@@ -11168,7 +11168,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_8mW38F1nTOJJnMe1i-_r3g/saves",
+      "path": "/v1/sessions/ses_GwKe8439OaUR2fNiDGO9Lg/saves",
       "body": {
         "label": "Too late"
       },
@@ -11177,11 +11177,11 @@
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No session has the id 'ses_8mW38F1nTOJJnMe1i-_r3g'.",
+        "detail": "No session has the id 'ses_GwKe8439OaUR2fNiDGO9Lg'.",
         "code": "not_found",
-        "request_id": "req_YRygDyYweXfHp3iGAoKd-Q",
+        "request_id": "req_6kY8mb000FNgro4am58yMw",
         "resource": "session",
-        "id": "ses_8mW38F1nTOJJnMe1i-_r3g"
+        "id": "ses_GwKe8439OaUR2fNiDGO9Lg"
       }
     }
   },
@@ -12003,7 +12003,7 @@
         "status": 403,
         "detail": "This request needs an API key with the referee role.",
         "code": "referee_required",
-        "request_id": "req_8cXFWdqAg_kmejJDyf2uhg"
+        "request_id": "req_ydRxWp_we0O0S-_2HVkcAA"
       }
     }
   },
@@ -12113,7 +12113,7 @@
         "status": 422,
         "detail": "expected a 'save' document, got kind 'character'",
         "code": "content_invalid",
-        "request_id": "req_wQhSvKrwjwsI3tx4Nt6fXw"
+        "request_id": "req_qnugRjU4ij7esi5-r2W_YA"
       }
     }
   },
@@ -12148,7 +12148,7 @@
         "status": 409,
         "detail": "document schema_version 99 is newer than the supported 4",
         "code": "version_unsupported",
-        "request_id": "req_oDolfFbED3ajr6100HI9pA"
+        "request_id": "req_meL7C8ymJwke3xbvH3SnJw"
       }
     }
   },
@@ -12162,17 +12162,17 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/saves/sav_5n2xdUD1PKgSYJ7-UiEq4Q",
+      "path": "/v1/saves/sav_npEaDs5r2zcp-qcvSfYSsw",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No save has the id 'sav_5n2xdUD1PKgSYJ7-UiEq4Q'.",
+        "detail": "No save has the id 'sav_npEaDs5r2zcp-qcvSfYSsw'.",
         "code": "not_found",
-        "request_id": "req_XEYp9bK_FDKteMGFIutzIw",
+        "request_id": "req_dbzDhxYdUlW1HHFsM_AV0w",
         "resource": "save",
-        "id": "sav_5n2xdUD1PKgSYJ7-UiEq4Q"
+        "id": "sav_npEaDs5r2zcp-qcvSfYSsw"
       }
     }
   },
@@ -12189,7 +12189,7 @@
     },
     "recorded": {
       "method": "PATCH",
-      "path": "/v1/saves/sav_5n2xdUD1PKgSYJ7-UiEq4Q",
+      "path": "/v1/saves/sav_npEaDs5r2zcp-qcvSfYSsw",
       "body": {
         "label": "Gone"
       },
@@ -12198,11 +12198,11 @@
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No save has the id 'sav_5n2xdUD1PKgSYJ7-UiEq4Q'.",
+        "detail": "No save has the id 'sav_npEaDs5r2zcp-qcvSfYSsw'.",
         "code": "not_found",
-        "request_id": "req_853owNLVXsR7gudhOjlrhw",
+        "request_id": "req_APUSasfpGMUBtN1jUfcKiw",
         "resource": "save",
-        "id": "sav_5n2xdUD1PKgSYJ7-UiEq4Q"
+        "id": "sav_npEaDs5r2zcp-qcvSfYSsw"
       }
     }
   },
@@ -12216,17 +12216,17 @@
     },
     "recorded": {
       "method": "DELETE",
-      "path": "/v1/saves/sav_5n2xdUD1PKgSYJ7-UiEq4Q",
+      "path": "/v1/saves/sav_npEaDs5r2zcp-qcvSfYSsw",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No save has the id 'sav_5n2xdUD1PKgSYJ7-UiEq4Q'.",
+        "detail": "No save has the id 'sav_npEaDs5r2zcp-qcvSfYSsw'.",
         "code": "not_found",
-        "request_id": "req_zUUW1-tViq6vi3k-s0WMhQ",
+        "request_id": "req_AiCrx22TCivB2Xc94AZ7RA",
         "resource": "save",
-        "id": "sav_5n2xdUD1PKgSYJ7-UiEq4Q"
+        "id": "sav_npEaDs5r2zcp-qcvSfYSsw"
       }
     }
   },
@@ -12241,18 +12241,18 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/saves/sav_5n2xdUD1PKgSYJ7-UiEq4Q/restore",
+      "path": "/v1/saves/sav_npEaDs5r2zcp-qcvSfYSsw/restore",
       "body": {},
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No save has the id 'sav_5n2xdUD1PKgSYJ7-UiEq4Q'.",
+        "detail": "No save has the id 'sav_npEaDs5r2zcp-qcvSfYSsw'.",
         "code": "not_found",
-        "request_id": "req_QWp46xxyt7Ht7fBnqs24gA",
+        "request_id": "req__QXALqvycnErqxAaX4l1hQ",
         "resource": "save",
-        "id": "sav_5n2xdUD1PKgSYJ7-UiEq4Q"
+        "id": "sav_npEaDs5r2zcp-qcvSfYSsw"
       }
     }
   },
@@ -12266,7 +12266,7 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/saves/sav_6XAOOMPGn0x9vjnJeKY--A/document",
+      "path": "/v1/saves/sav_Ygtmxn_x-Myx-3ySshSbjg/document",
       "status": 403,
       "response": {
         "type": "about:blank",
@@ -12274,7 +12274,7 @@
         "status": 403,
         "detail": "This request needs an API key with the referee role.",
         "code": "referee_required",
-        "request_id": "req__oKDbtoH1izV82LYrMNnNg"
+        "request_id": "req_zk0BNrR-VIf4rquzmhS5WA"
       }
     }
   },
@@ -12289,17 +12289,17 @@
     },
     "recorded": {
       "method": "GET",
-      "path": "/v1/saves/sav_5n2xdUD1PKgSYJ7-UiEq4Q/document",
+      "path": "/v1/saves/sav_npEaDs5r2zcp-qcvSfYSsw/document",
       "status": 404,
       "response": {
         "type": "about:blank",
         "title": "Not Found",
         "status": 404,
-        "detail": "No save has the id 'sav_5n2xdUD1PKgSYJ7-UiEq4Q'.",
+        "detail": "No save has the id 'sav_npEaDs5r2zcp-qcvSfYSsw'.",
         "code": "not_found",
-        "request_id": "req_7g5qLnUtovAhwvh_5h0m7w",
+        "request_id": "req_pItY9Icgm8_1PmcgdEoZvg",
         "resource": "save",
-        "id": "sav_5n2xdUD1PKgSYJ7-UiEq4Q"
+        "id": "sav_npEaDs5r2zcp-qcvSfYSsw"
       }
     }
   },
@@ -12320,7 +12320,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_dxAFWyVsMyHVEMoXdUvfQA/commands",
+      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A/commands",
       "query": {
         "include": "view"
       },
@@ -12600,7 +12600,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_dxAFWyVsMyHVEMoXdUvfQA/commands",
+      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A/commands",
       "body": {
         "command_type": "travel_to_town"
       },
@@ -12649,7 +12649,7 @@
     },
     "recorded": {
       "method": "POST",
-      "path": "/v1/sessions/ses_dxAFWyVsMyHVEMoXdUvfQA/commands",
+      "path": "/v1/sessions/ses_HWLX7gSzckk5DHAihPgF8A/commands",
       "body": {
         "command_type": "purchase_equipment",
         "character_id": "character-0001",
@@ -12689,6 +12689,780 @@
         "mode": "town",
         "ended": false,
         "revision": 5
+      }
+    }
+  },
+  {
+    "name": "mage",
+    "operation": "create_character",
+    "summary": "Create a magic-user with a first spell",
+    "request": {
+      "method": "POST",
+      "path": "/v1/characters",
+      "body": {
+        "name": "Wren",
+        "class_id": "magic_user",
+        "alignment": "neutral",
+        "starting_spell_ids": [
+          "sleep"
+        ]
+      }
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/characters",
+      "body": {
+        "name": "Wren",
+        "class_id": "magic_user",
+        "alignment": "neutral",
+        "starting_spell_ids": [
+          "sleep"
+        ]
+      },
+      "status": 201,
+      "response": {
+        "id": "chr_wWEduAnx5EefSLMuF7Dusw",
+        "name": "Wren",
+        "class_id": "magic_user",
+        "level": 1,
+        "created_at": "2026-11-26T04:04:00Z",
+        "character": {
+          "id": null,
+          "name": "Wren",
+          "class_id": "magic_user",
+          "custom_class": null,
+          "race": "human",
+          "level": 1,
+          "xp": 0,
+          "scores": {
+            "str": 9,
+            "int": 9,
+            "wis": 12,
+            "dex": 15,
+            "con": 12,
+            "cha": 5
+          },
+          "alignment": "neutral",
+          "extra_languages": [],
+          "max_hp": 4,
+          "current_hp": 4,
+          "nonregen_damage": 0,
+          "inventory": {
+            "items": [],
+            "purse": {
+              "pp": 0,
+              "gp": 110,
+              "ep": 0,
+              "sp": 0,
+              "cp": 0
+            },
+            "valuables": [],
+            "worn_armour": null,
+            "shield": null,
+            "wielded": [],
+            "rings": []
+          },
+          "carrying_treasure": false,
+          "conditions": [],
+          "stat_modifiers": [],
+          "spell_book": [
+            "sleep"
+          ],
+          "memorized_spells": []
+        },
+        "derived": {
+          "thac0": 19,
+          "attack_bonus": 0,
+          "armour_class": 8,
+          "armour_class_ascending": 11,
+          "saves": {
+            "death": 13,
+            "wands": 14,
+            "paralysis": 13,
+            "breath": 16,
+            "spells": 15
+          },
+          "melee_modifier": 0,
+          "open_doors_chance": 2,
+          "missile_modifier": 1,
+          "initiative_modifier": 1,
+          "hit_point_modifier": 0,
+          "magic_save_modifier": 0,
+          "npc_reaction_modifier": -1,
+          "xp_modifier_pct": 0,
+          "level_title": "Medium",
+          "alignment_tongue": "alignment_neutral",
+          "languages": [
+            "alignment_neutral",
+            "common"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "mage_session",
+    "operation": "create_session",
+    "summary": "Start a session with a spell caster",
+    "request": {
+      "method": "POST",
+      "path": "/v1/sessions",
+      "body": {
+        "adventure_id": "builtin-barrow",
+        "character_ids": [
+          "{mage.id}"
+        ]
+      }
+    },
+    "recorded": {
+      "method": "POST",
+      "path": "/v1/sessions",
+      "body": {
+        "adventure_id": "builtin-barrow",
+        "character_ids": [
+          "chr_wWEduAnx5EefSLMuF7Dusw"
+        ]
+      },
+      "status": 201,
+      "response": {
+        "id": "ses_2Ve3iFVQSaghptQYb43yTg",
+        "name": "The Barrow of the Forgotten King",
+        "adventure_id": "builtin-barrow",
+        "adventure_name": "The Barrow of the Forgotten King",
+        "mode": "town",
+        "ended": false,
+        "revision": 0,
+        "clock": {
+          "rounds": 0,
+          "turns": 0,
+          "days": 0
+        },
+        "schema_version": 4,
+        "engine_version": "2.7.0",
+        "created_at": "2026-11-26T04:04:00Z",
+        "updated_at": "2026-11-26T04:04:00Z"
+      }
+    }
+  },
+  {
+    "name": "session_spell",
+    "operation": "get_session_spell",
+    "summary": "Read a spell in a member's spell book",
+    "request": {
+      "method": "GET",
+      "path": "/v1/sessions/{mage_session.id}/rules/spells/sleep"
+    },
+    "recorded": {
+      "method": "GET",
+      "path": "/v1/sessions/ses_2Ve3iFVQSaghptQYb43yTg/rules/spells/sleep",
+      "status": 200,
+      "response": {
+        "id": "sleep",
+        "name": "Sleep",
+        "spell_list": "magic_user",
+        "level": 1,
+        "duration": "4d4 turns",
+        "duration_spec": {
+          "kind": "fixed",
+          "unit": "turn",
+          "amount": null,
+          "dice": "4d4",
+          "per_level": 0,
+          "concentration_cap_unit": null,
+          "concentration_cap_amount": null
+        },
+        "range": "240’",
+        "range_spec": {
+          "kind": "feet",
+          "feet": 240,
+          "per_level_feet": null
+        },
+        "reversed_form": null,
+        "modes": [
+          {
+            "key": "single_4_plus",
+            "targeting": {
+              "mode": "single",
+              "count": null,
+              "count_dice": null,
+              "hd_budget_dice": null,
+              "hd_cap": null,
+              "hd_min": null,
+              "shape": null,
+              "dimensions": {}
+            },
+            "save": null,
+            "effect": {
+              "kind": "condition",
+              "condition": "asleep",
+              "cures_conditions": [],
+              "cures_effect_kinds": [],
+              "modifiers": [],
+              "params": {
+                "excludes_undead": true,
+                "hd_bonus_required": true,
+                "hd_count": 4
+              }
+            },
+            "manual": false,
+            "prose": "A single creature with 4+1 Hit Dice (see Hit point modifiers)."
+          },
+          {
+            "key": "hd_budget",
+            "targeting": {
+              "mode": "hd_budget",
+              "count": null,
+              "count_dice": null,
+              "hd_budget_dice": "2d8",
+              "hd_cap": 4,
+              "hd_min": null,
+              "shape": null,
+              "dimensions": {}
+            },
+            "save": null,
+            "effect": {
+              "kind": "condition",
+              "condition": "asleep",
+              "cures_conditions": [],
+              "cures_effect_kinds": [],
+              "modifiers": [],
+              "params": {
+                "excludes_hd_4_plus": true,
+                "excludes_undead": true
+              }
+            },
+            "manual": false,
+            "prose": "A total of 2d8 Hit Dice of creatures of 4 HD or lower each."
+          }
+        ],
+        "intro": "Causes creatures (except undead) to fall into a magical slumber. The spell may target either:",
+        "conjured_monsters": [],
+        "conjured_monster_ids": [],
+        "overrides_applied": []
+      }
+    }
+  },
+  {
+    "name": "session_spell_not_named",
+    "operation": "get_session_spell",
+    "summary": "Read a spell the player view doesn't name",
+    "request": {
+      "method": "GET",
+      "path": "/v1/sessions/{mage_session.id}/rules/spells/fire_ball"
+    },
+    "recorded": {
+      "method": "GET",
+      "path": "/v1/sessions/ses_2Ve3iFVQSaghptQYb43yTg/rules/spells/fire_ball",
+      "status": 404,
+      "response": {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No spell in the session's player view has the id 'fire_ball'.",
+        "code": "not_found",
+        "request_id": "req_jT8bLfx81UKX-LnNMC0SLA",
+        "resource": "spell",
+        "id": "fire_ball"
+      }
+    }
+  },
+  {
+    "name": "session_class",
+    "operation": "get_session_class",
+    "summary": "Read the class of a party member",
+    "request": {
+      "method": "GET",
+      "path": "/v1/sessions/{mage_session.id}/rules/classes/magic_user"
+    },
+    "recorded": {
+      "method": "GET",
+      "path": "/v1/sessions/ses_2Ve3iFVQSaghptQYb43yTg/rules/classes/magic_user",
+      "status": 200,
+      "response": {
+        "id": "magic_user",
+        "name": "Magic-User",
+        "race": "human",
+        "requirements": {},
+        "prime_requisites": [
+          "int"
+        ],
+        "xp_tiers": [
+          {
+            "modifier_pct": 10,
+            "minimums": {
+              "int": 16
+            }
+          },
+          {
+            "modifier_pct": 5,
+            "minimums": {
+              "int": 13
+            }
+          },
+          {
+            "modifier_pct": 0,
+            "minimums": {
+              "int": 9
+            }
+          },
+          {
+            "modifier_pct": -10,
+            "minimums": {
+              "int": 6
+            }
+          },
+          {
+            "modifier_pct": -20,
+            "minimums": {
+              "int": 3
+            }
+          }
+        ],
+        "hit_die": 4,
+        "max_level": 14,
+        "armour": {
+          "kind": "none",
+          "shields_allowed": false
+        },
+        "weapons": {
+          "kind": "allowed",
+          "weapon_ids": [
+            "dagger"
+          ],
+          "manual_notes": []
+        },
+        "languages": [
+          "common"
+        ],
+        "may_not_lower": [],
+        "abilities": [
+          {
+            "tag": "arcane_magic",
+            "name": "Arcane Magic",
+            "prose": "See Spells for full details on arcane magic.\nMagical research: A magic-user of any level may spend time and money on magical research. This allows them to add new spells to their spell book and to research other magical effects. When a magic-user reaches 9th level, they are also able to create magic items.\nSpell casting: Magic-users own spell books containing the formulae for arcane spells. The level progression table (below) shows both the number of spells in the magic-user’s spell book and the number they may memorize, determined by the character’s experience level. Thus, a 1st level magic-user has one spell in their spell book, selected by the referee (who may allow the player to choose). The list of spells available to magic-users is found in Magic-User Spells.\nUsing magic items: As spell casters, magic-users are able to use magic scrolls of spells on their spell list. They can also use items that may only be used by arcane spell casters (e.g. magic wands).",
+            "manual": false,
+            "params": {
+              "spell_list": "magic_user"
+            }
+          }
+        ],
+        "thief_skills": [],
+        "level_titles": [
+          "Medium",
+          "Seer",
+          "Conjurer",
+          "Magician",
+          "Enchanter (Enchantress)",
+          "Warlock (Witch)",
+          "Sorcerer (Sorceress)",
+          "Necromancer",
+          "Wizard"
+        ],
+        "progression": [
+          {
+            "level": 1,
+            "xp": 0,
+            "hit_dice": {
+              "count": 1,
+              "die": 4,
+              "bonus": 0,
+              "con_applies": true
+            },
+            "thac0": 19,
+            "attack_bonus": 0,
+            "saves": {
+              "death": 13,
+              "wands": 14,
+              "paralysis": 13,
+              "breath": 16,
+              "spells": 15
+            },
+            "spell_slots": [
+              1,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "level": 2,
+            "xp": 2500,
+            "hit_dice": {
+              "count": 2,
+              "die": 4,
+              "bonus": 0,
+              "con_applies": true
+            },
+            "thac0": 19,
+            "attack_bonus": 0,
+            "saves": {
+              "death": 13,
+              "wands": 14,
+              "paralysis": 13,
+              "breath": 16,
+              "spells": 15
+            },
+            "spell_slots": [
+              2,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "level": 3,
+            "xp": 5000,
+            "hit_dice": {
+              "count": 3,
+              "die": 4,
+              "bonus": 0,
+              "con_applies": true
+            },
+            "thac0": 19,
+            "attack_bonus": 0,
+            "saves": {
+              "death": 13,
+              "wands": 14,
+              "paralysis": 13,
+              "breath": 16,
+              "spells": 15
+            },
+            "spell_slots": [
+              2,
+              1,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "level": 4,
+            "xp": 10000,
+            "hit_dice": {
+              "count": 4,
+              "die": 4,
+              "bonus": 0,
+              "con_applies": true
+            },
+            "thac0": 19,
+            "attack_bonus": 0,
+            "saves": {
+              "death": 13,
+              "wands": 14,
+              "paralysis": 13,
+              "breath": 16,
+              "spells": 15
+            },
+            "spell_slots": [
+              2,
+              2,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "level": 5,
+            "xp": 20000,
+            "hit_dice": {
+              "count": 5,
+              "die": 4,
+              "bonus": 0,
+              "con_applies": true
+            },
+            "thac0": 19,
+            "attack_bonus": 0,
+            "saves": {
+              "death": 13,
+              "wands": 14,
+              "paralysis": 13,
+              "breath": 16,
+              "spells": 15
+            },
+            "spell_slots": [
+              2,
+              2,
+              1,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "level": 6,
+            "xp": 40000,
+            "hit_dice": {
+              "count": 6,
+              "die": 4,
+              "bonus": 0,
+              "con_applies": true
+            },
+            "thac0": 17,
+            "attack_bonus": 2,
+            "saves": {
+              "death": 11,
+              "wands": 12,
+              "paralysis": 11,
+              "breath": 14,
+              "spells": 12
+            },
+            "spell_slots": [
+              2,
+              2,
+              2,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "level": 7,
+            "xp": 80000,
+            "hit_dice": {
+              "count": 7,
+              "die": 4,
+              "bonus": 0,
+              "con_applies": true
+            },
+            "thac0": 17,
+            "attack_bonus": 2,
+            "saves": {
+              "death": 11,
+              "wands": 12,
+              "paralysis": 11,
+              "breath": 14,
+              "spells": 12
+            },
+            "spell_slots": [
+              3,
+              2,
+              2,
+              1,
+              0,
+              0
+            ]
+          },
+          {
+            "level": 8,
+            "xp": 150000,
+            "hit_dice": {
+              "count": 8,
+              "die": 4,
+              "bonus": 0,
+              "con_applies": true
+            },
+            "thac0": 17,
+            "attack_bonus": 2,
+            "saves": {
+              "death": 11,
+              "wands": 12,
+              "paralysis": 11,
+              "breath": 14,
+              "spells": 12
+            },
+            "spell_slots": [
+              3,
+              3,
+              2,
+              2,
+              0,
+              0
+            ]
+          },
+          {
+            "level": 9,
+            "xp": 300000,
+            "hit_dice": {
+              "count": 9,
+              "die": 4,
+              "bonus": 0,
+              "con_applies": true
+            },
+            "thac0": 17,
+            "attack_bonus": 2,
+            "saves": {
+              "death": 11,
+              "wands": 12,
+              "paralysis": 11,
+              "breath": 14,
+              "spells": 12
+            },
+            "spell_slots": [
+              3,
+              3,
+              3,
+              2,
+              1,
+              0
+            ]
+          },
+          {
+            "level": 10,
+            "xp": 450000,
+            "hit_dice": {
+              "count": 9,
+              "die": 4,
+              "bonus": 1,
+              "con_applies": false
+            },
+            "thac0": 17,
+            "attack_bonus": 2,
+            "saves": {
+              "death": 11,
+              "wands": 12,
+              "paralysis": 11,
+              "breath": 14,
+              "spells": 12
+            },
+            "spell_slots": [
+              3,
+              3,
+              3,
+              3,
+              2,
+              0
+            ]
+          },
+          {
+            "level": 11,
+            "xp": 600000,
+            "hit_dice": {
+              "count": 9,
+              "die": 4,
+              "bonus": 2,
+              "con_applies": false
+            },
+            "thac0": 14,
+            "attack_bonus": 5,
+            "saves": {
+              "death": 8,
+              "wands": 9,
+              "paralysis": 8,
+              "breath": 11,
+              "spells": 8
+            },
+            "spell_slots": [
+              4,
+              3,
+              3,
+              3,
+              2,
+              1
+            ]
+          },
+          {
+            "level": 12,
+            "xp": 750000,
+            "hit_dice": {
+              "count": 9,
+              "die": 4,
+              "bonus": 3,
+              "con_applies": false
+            },
+            "thac0": 14,
+            "attack_bonus": 5,
+            "saves": {
+              "death": 8,
+              "wands": 9,
+              "paralysis": 8,
+              "breath": 11,
+              "spells": 8
+            },
+            "spell_slots": [
+              4,
+              4,
+              3,
+              3,
+              3,
+              2
+            ]
+          },
+          {
+            "level": 13,
+            "xp": 900000,
+            "hit_dice": {
+              "count": 9,
+              "die": 4,
+              "bonus": 4,
+              "con_applies": false
+            },
+            "thac0": 14,
+            "attack_bonus": 5,
+            "saves": {
+              "death": 8,
+              "wands": 9,
+              "paralysis": 8,
+              "breath": 11,
+              "spells": 8
+            },
+            "spell_slots": [
+              4,
+              4,
+              4,
+              3,
+              3,
+              3
+            ]
+          },
+          {
+            "level": 14,
+            "xp": 1050000,
+            "hit_dice": {
+              "count": 9,
+              "die": 4,
+              "bonus": 5,
+              "con_applies": false
+            },
+            "thac0": 14,
+            "attack_bonus": 5,
+            "saves": {
+              "death": 8,
+              "wands": 9,
+              "paralysis": 8,
+              "breath": 11,
+              "spells": 8
+            },
+            "spell_slots": [
+              4,
+              4,
+              4,
+              4,
+              3,
+              3
+            ]
+          }
+        ],
+        "overrides_applied": []
+      }
+    }
+  },
+  {
+    "name": "session_class_no_member",
+    "operation": "get_session_class",
+    "summary": "Read a class no party member has",
+    "request": {
+      "method": "GET",
+      "path": "/v1/sessions/{mage_session.id}/rules/classes/thief"
+    },
+    "recorded": {
+      "method": "GET",
+      "path": "/v1/sessions/ses_2Ve3iFVQSaghptQYb43yTg/rules/classes/thief",
+      "status": 404,
+      "response": {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No class of a member of the session's party has the id 'thief'.",
+        "code": "not_found",
+        "request_id": "req_8hTSvrw29kjD0O68J_-VTw",
+        "resource": "class",
+        "id": "thief"
       }
     }
   }
