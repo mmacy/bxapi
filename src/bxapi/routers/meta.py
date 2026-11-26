@@ -43,7 +43,7 @@ class Meta(ApiModel):
     api_version: str
     """Installed bxapi version string, such as `"0.1.0"`."""
     engine_version: str
-    """Installed osrlib rules engine version string, such as `"2.7.0"`."""
+    """Installed osrlib rules engine version string, such as `"2.8.0"`."""
     schema_version: int
     """osrlib document format version. The server refuses adventure, character, party, and save
     documents stamped with a higher `schema_version` with 409 `version_unsupported`."""

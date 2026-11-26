@@ -57,6 +57,7 @@ from .conftest import (
     read_all_events,
     referee_view,
     send,
+    split_handles,
     upload_adventure,
     view,
 )
@@ -148,7 +149,7 @@ def test_stored_characters_with_a_referee_seed_play_as_osrlib_does(player: TestC
     for command in commands:
         assert send(player, session["id"], command) == oracle.execute(command)
     assert view(player, session["id"]) == oracle.view()
-    assert referee_view(referee, session["id"]) == oracle.view(Visibility.REFEREE)
+    assert split_handles(referee_view(referee, session["id"])) == split_handles(oracle.view(Visibility.REFEREE))
 
 
 def test_a_referee_starts_a_session_from_a_party_document(referee: TestClient) -> None:
@@ -567,10 +568,12 @@ def test_a_player_can_map_features_and_target_individual_encounter_members(
             "name": "Antechamber",
             "description": ANTECHAMBER_TEXT,
             "cells": [[1, 0]],
+            "trap_state": None,
         }
     ]
     [feature] = level["features"]
-    assert set(feature) == {"id", "kind", "description", "cell", "area_id", "trap_state"}
+    assert set(feature) == {"id", "kind", "description", "cell", "area_id", "trap_state", "emptied"}
+    assert feature["emptied"] is False and known["features_here"] == [feature["id"]]
     assert feature["id"].startswith("feature:")
     assert feature["kind"] == "treasure_cache"
     assert feature["description"] == FEATURE_DESCRIPTION
@@ -601,6 +604,11 @@ def test_a_player_can_map_features_and_target_individual_encounter_members(
     assert inspected["accepted"]
     assert FEATURE_ID not in json.dumps(inspected)
     assert send(player, session_id, {"command_type": "take_treasure", "feature_id": handle})["accepted"]
+    taken = view(player, session_id)
+    [emptied] = taken["explored"][0]["features"]
+    assert emptied["id"] == handle and emptied["emptied"] is True
+    assert taken["features_here"] == [handle]
+    assert referee_view(referee, session_id)["feature_handles"][f"{DUNGEON_ID}:1:{FEATURE_ID}"] == handle
 
     assert send(player, session_id, ROUTE_TO_ENCOUNTER[2])["accepted"]
     assert send(player, session_id, TO_GUARD_ROOM)["accepted"]
@@ -666,7 +674,7 @@ def test_the_referee_view_is_for_referees_and_equals_osrlib(player: TestClient, 
     for command in ROUTE_TO_ENCOUNTER:
         send(player, session["id"], command)
     expect(player.get(f"/v1/sessions/{session['id']}/referee-view"), 403, "referee_required")
-    assert referee_view(referee, session["id"]) == oracle.view(Visibility.REFEREE)
+    assert split_handles(referee_view(referee, session["id"])) == split_handles(oracle.view(Visibility.REFEREE))
 
 
 # Events
@@ -752,7 +760,11 @@ def test_same_seed_sessions_match_except_for_independent_feature_handles(
     assert json.dumps(first_view).replace(first_handle, "<feature>") == json.dumps(second_view).replace(
         second_handle, "<feature>"
     )
-    assert referee_view(referee, first["id"]) == referee_view(referee, second["id"])
+    first_referee, second_referee = referee_view(referee, first["id"]), referee_view(referee, second["id"])
+    assert split_handles(first_referee) == split_handles(second_referee)
+    reference = f"{DUNGEON_ID}:1:{FEATURE_ID}"
+    assert first_referee["feature_handles"] == {reference: first_handle}
+    assert second_referee["feature_handles"] == {reference: second_handle}
     keys = []
     for session_id in (first["id"], second["id"]):
         saved = expect(player.post(f"/v1/sessions/{session_id}/saves"), 201)
@@ -783,7 +795,7 @@ def test_a_session_survives_a_new_application(keyed_settings: Settings) -> None:
         assert view(after, session["id"]) == partial.view()
         for command, outcome in zip(commands[4:], expected[4:], strict=True):
             assert send(after, session["id"], command) == outcome
-        assert referee_view(after, session["id"]) == oracle.view(Visibility.REFEREE)
+        assert split_handles(referee_view(after, session["id"])) == split_handles(oracle.view(Visibility.REFEREE))
 
 
 def test_a_feature_handle_survives_a_new_application(keyed_settings: Settings) -> None:

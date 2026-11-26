@@ -244,7 +244,7 @@ The server stores the adventure document as uploaded, and parses it again when a
 
 A session embeds a copy of its adventure, so deleting an adventure doesn't affect a session that already started.
 
-An adventure's author writes some text for players to read during play. osrlib's player view shows an area's `description` once the party enters the area, and each feature's `description`, a treasure cache's included, once the party can see the feature. The view keeps showing a cache's description after the party opens it or takes everything from it. An author writes only what the party sees there, and leaves a cache's contents and traps out of its description.
+An adventure's author writes some text for players to read during play. osrlib's player view shows an area's `description` once the party enters the area, and each feature's `description`, a treasure cache's included, once the party can see the feature. The view keeps showing a cache's description after the party opens it or takes everything from it, and it marks an authored cache the party has emptied with `emptied`. An author writes only what the party sees there, and puts a cache's contents, its traps, and anything else for the referee alone in the feature's `referee_notes`, which the player view never shows.
 
 ### Sessions
 
@@ -309,7 +309,7 @@ A caller sees the events with player visibility. A referee who passes `visibilit
 
 Every command has an optional `source`: a note of who or what issued the command, which osrlib logs with it and never reads. osrlib's `Interpreter` sets it to `trigger:` or `quest:` and an id on the commands it issues for the adventure's triggers and quests, so the command log shows why each one ran. Only a referee may set `source`. A player who sends a command with a `source` gets 403 `referee_required`, and the server doesn't execute the command.
 
-**Feature ids.** `inspect_treasure`, `remove_treasure_trap`, and `take_treasure` take a `feature_id`. Send the opaque `feature:` handle from the player view's `explored[].features[].id`. osrlib also accepts a feature's authored id from the adventure document, which its documentation calls a legacy form, when exactly one feature at the party's location has that id. The server accepts both forms from either role. osrlib resolves both forms against the same features, the ones at the party's location, and the player view already lists each of them, so an authored id gives a player nothing that the handle doesn't. The referee view doesn't include the handles, so a referee tool that works from the adventure document sends authored ids.
+**Feature ids.** `inspect_treasure`, `remove_treasure_trap`, and `take_treasure` take a `feature_id`. Send an opaque `feature:` handle from the player view's `features_here`, which lists the `explored[].features[].id` of each treasure cache the party can reach from where it stands. The list is empty outside `exploring` mode. osrlib also accepts a feature's authored id from the adventure document, which its documentation calls a legacy form, when exactly one feature at the party's location has that id. The server accepts both forms from either role. osrlib resolves both forms against the same features, the ones at the party's location, and the player view already lists each of them, so an authored id gives a player nothing that the handle doesn't. A referee tool that works from the adventure document reads each feature's handle from the referee view's `feature_handles`. The key is `"{dungeon}:{level}:{feature id}"` for an authored feature and the cache's id for a generated cache, and the value is the handle the player view shows for the feature.
 
 **Revisions.** A session's revision starts at 0 and goes up by 1 for each command request that osrlib accepts, whatever commands the adventure's triggers run in response. A refused command leaves it unchanged. The revision and `updated_at` count every accepted command, a referee's too, so a player can tell that something happened without seeing what. A client that might send a request twice, like a retry after a timeout, sends an `Idempotency-Key`, as **Conventions** describes, or passes `expected_revision` as a query parameter. If the session's revision is different, the server executes nothing and returns 409 `revision_conflict` with the current `revision`. The client then reads the view and decides what to do.
 
@@ -324,6 +324,8 @@ The body of `POST /v1/sessions/{session_id}/battle-round/preview` is `{"declarat
 | `rejections` | For each declaration, keyed by the declaring member's id, the rejections that `resolve_battle_round` would return for it. An empty list means the session would accept it. |
 | `advance_feet` | Each living member's projected place on the range track after the declared moves. |
 | `front_rank` | Each group's projected front rank after the declared moves, keyed by group id. |
+| `can_hide` | The declarers who could declare `hide` beside the other declared moves. |
+| `can_back_stab` | The declarers who could declare an `attack` with `back_stab`. |
 
 A client uses the preview to tell each player which of their choices the session would refuse before anyone commits the round, and to check a plan that doesn't have every declarer yet. Each rejection of a declaration, from the preview or from `resolve_battle_round`, also names the declaring member in `params.character`. When the preview has a declaration for every declarer and every list in `rejections` is empty, `resolve_battle_round` accepts the same declarations.
 
@@ -333,12 +335,12 @@ The preview takes the session's lock, takes no random number, and changes nothin
 
 The endpoints under `/v1/rules` serve osrlib's built-in catalog. A session can use content the catalog doesn't have: an adventure can add spells, and a character can have a custom class. The player view names both, in `spell_names` and in a member's `class_name`, and two endpoints serve the rest:
 
-- `GET /v1/sessions/{session_id}/rules/spells/{spell_id}` returns the `SpellTemplate` from the session's spell catalog, osrlib's `GameSession.effective_spells`, for a spell id that is a key of the player view's `spell_names`. Those are the spells in a member's `spell_book` or `memorized_spells`, and the spells behind an effect on a member, built-in ones included.
+- `GET /v1/sessions/{session_id}/rules/spells/{spell_id}` returns the `SpellTemplate` from the session's spell catalog, osrlib's `GameSession.effective_spells`, for a spell id that is a key of the player view's `spell_names`. Those are the spells in a member's `spell_book`, `memorized_spells`, `preparable_spells`, or `learnable_spells`, and the spells behind an effect on a member, built-in ones included.
 - `GET /v1/sessions/{session_id}/rules/classes/{class_id}` returns the `ClassDefinition` that osrlib uses for a party member with that `class_id`, a built-in class or a custom one. When two members have the same `class_id`, it's the definition of the first in marching order.
 
 Both serve only what the player view already shows, and a player and a referee get the same answer. A spell that `spell_names` doesn't have gets 404 `not_found` with `resource` set to `spell`, whether or not the session's catalog has it, so a player can't learn of a spell on an unidentified scroll or a spell the adventure gives only to its monsters. A class that no party member has gets 404 `not_found` with `resource` set to `class`. Both take the session's lock, as the views do.
 
-The player view names a spell only once a member has it. A spell the adventure adds that a divine caster could prepare, or that an arcane caster could learn, has no entry in `spell_names` until then, so neither endpoint serves it.
+The player view names a spell once a member has it, could prepare it, or could learn it. A spell the adventure adds for a spell list that no member casts from, or at a spell level where no member could prepare or learn it, has no entry in `spell_names`, so the spell endpoint doesn't serve it.
 
 #### Events
 

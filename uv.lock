@@ -80,7 +80,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.133" },
-    { name = "osrlib", specifier = ">=2.7,<3" },
+    { name = "osrlib", specifier = ">=2.8,<3" },
     { name = "pydantic", specifier = ">=2.13" },
     { name = "pydantic-settings", specifier = ">=2.4" },
     { name = "starlette", specifier = ">=1.2" },
@@ -229,14 +229,14 @@ wheels = [
 
 [[package]]
 name = "osrlib"
-version = "2.7.0"
+version = "2.8.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8a/78/d39dd1ce05745368fffb6434250b0d87c8652e1e1696b7ec2957f01c3992/osrlib-2.7.0.tar.gz", hash = "sha256:59f737dc63f5dcdaf78a4eda6873f43137e6e7951ca8fd3c6635f1c7059b132f", size = 900654, upload-time = "2026-11-26T02:40:01.947Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7a/00/dc6468a809dc23ef924acac692b4112ba8c0a79c654220b1d87f6e7c1a67/osrlib-2.8.0.tar.gz", hash = "sha256:c576f4a3d379ad152b9d92fdfd9509c3f9bbaf23f4eba2450c125c8d4dff698c", size = 920395, upload-time = "2026-11-26T07:14:10.338Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/01/11/badd5a5757626c62b6c750f2eebfd8aaf18fc2a78b85aca1e34a9bff9ae7/osrlib-2.7.0-py3-none-any.whl", hash = "sha256:11d64a2f25da5461f245232f733087d774db4c0414194b28159a30c5309c281f", size = 947057, upload-time = "2026-11-26T02:40:00.561Z" },
+    { url = "https://files.pythonhosted.org/packages/ce/48/b53c71c1fdab6ab0d86b3b4bed9b7b4e23239a5075249eb231f000043eab/osrlib-2.8.0-py3-none-any.whl", hash = "sha256:a4963760d8f74965222f5088414f729d3e21c4479bb211c4c140fbb39fba7357", size = 966813, upload-time = "2026-11-26T07:14:08.99Z" },
 ]
 
 [[package]]
