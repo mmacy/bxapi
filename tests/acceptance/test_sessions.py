@@ -352,6 +352,26 @@ def test_unknown_session_ids_are_404(referee: TestClient) -> None:
 # Commands
 
 
+def test_an_authored_feature_id_reaches_only_a_feature_the_player_view_lists(
+    player: TestClient, referee: TestClient
+) -> None:
+    adventure = upload_adventure(referee, adventure_document(build_player_view_adventure()))
+    session_id = create_session(referee, adventure["id"])["id"]
+    take = {"command_type": "take_treasure", "feature_id": FEATURE_ID}
+    assert send(player, session_id, ENTER)["accepted"]
+    assert view(player, session_id)["explored"][0]["features"] == []
+    # A real id elsewhere gets the refusal that an id no feature has gets, so a player can't probe for one.
+    refused = send(player, session_id, take)
+    unknown = send(player, session_id, take | {"feature_id": "no-such-feature"})
+    assert refused["accepted"] is unknown["accepted"] is False
+    assert json.dumps(refused).replace(FEATURE_ID, "<id>") == json.dumps(unknown).replace("no-such-feature", "<id>")
+
+    assert send(player, session_id, TO_ANTECHAMBER)["accepted"]
+    [feature] = view(player, session_id)["explored"][0]["features"]
+    assert feature["description"] == FEATURE_DESCRIPTION
+    assert send(player, session_id, take)["accepted"]
+
+
 def test_accepted_commands_return_osrlib_events_and_messages(player: TestClient, referee: TestClient) -> None:
     commands = plan(ROUTE_TO_ENCOUNTER)
     oracle = Oracle.new()

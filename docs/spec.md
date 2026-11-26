@@ -244,6 +244,8 @@ The server stores the adventure document as uploaded, and parses it again when a
 
 A session embeds a copy of its adventure, so deleting an adventure doesn't affect a session that already started.
 
+An adventure's author writes some text for players to read during play. osrlib's player view shows an area's `description` once the party enters the area, and each feature's `description`, a treasure cache's included, once the party can see the feature. The view keeps showing a cache's description after the party opens it or takes everything from it. An author writes only what the party sees there, and leaves a cache's contents and traps out of its description.
+
 ### Sessions
 
 A session is one game in progress. It starts in town and ends in `game_over` or `victory`.
@@ -304,6 +306,8 @@ A request with the query parameter `include=view` gets the player view in the ou
 A caller sees the events with player visibility. A referee who passes `visibility=referee` sees every event. A player who passes it gets 403 `referee_required`, and the server doesn't execute the command. A player who sends a referee command gets 403 `referee_command`, and the server doesn't execute it. The server checks the body against the command's schema before it checks the role, so a referee command that doesn't fit its schema, like a `roll_dice` with the expression `2x7`, gets 422 `validation_error` from a player too. osrlib ignores a field that the command doesn't define.
 
 Every command has an optional `source`: a note of who or what issued the command, which osrlib logs with it and never reads. osrlib's `Interpreter` sets it to `trigger:` or `quest:` and an id on the commands it issues for the adventure's triggers and quests, so the command log shows why each one ran. Only a referee may set `source`. A player who sends a command with a `source` gets 403 `referee_required`, and the server doesn't execute the command.
+
+**Feature ids.** `inspect_treasure`, `remove_treasure_trap`, and `take_treasure` take a `feature_id`. Send the opaque `feature:` handle from the player view's `explored[].features[].id`. osrlib also accepts a feature's authored id from the adventure document, which its documentation calls a legacy form, when exactly one feature at the party's location has that id. The server accepts both forms from either role. osrlib resolves both forms against the same features, the ones at the party's location, and the player view already lists each of them, so an authored id gives a player nothing that the handle doesn't. The referee view doesn't include the handles, so a referee tool that works from the adventure document sends authored ids.
 
 **Revisions.** A session's revision starts at 0 and goes up by 1 for each command request that osrlib accepts, whatever commands the adventure's triggers run in response. A refused command leaves it unchanged. The revision and `updated_at` count every accepted command, a referee's too, so a player can tell that something happened without seeing what. A client that might send a request twice, like a retry after a timeout, sends an `Idempotency-Key`, as **Conventions** describes, or passes `expected_revision` as a query parameter. If the session's revision is different, the server executes nothing and returns 409 `revision_conflict` with the current `revision`. The client then reads the view and decides what to do.
 
