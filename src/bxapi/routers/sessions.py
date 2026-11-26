@@ -827,9 +827,12 @@ def get_player_view(request: Request, principal: CurrentPrincipal, session_id: S
       `feature_id` from where the party stands. It's empty outside `exploring` mode.
     - `spell_names`, `reversed_spell_names`, and `spell_levels`: the name and level of every spell ID the view
       shows. Each member's `spell_slots`, `preparable_spells`, and `learnable_spells` give what a `prepare_spells` or
-      `learn_spell` dialog offers that member.
+      `learn_spell` dialog offers that member. A member's `can_prepare_now` says whether the session accepts a
+      `prepare_spells` from them now, `needs_sleep_to_prepare` says whether they have to sleep first, and
+      `reverses_at` says whether they choose a reversible spell's form at `"memorize"` or at `"cast"`.
     - `item_names` and `item_names_plural`: what to call each item ID the view shows, in a member's `inventory` or
-      in the `contents` of a pile in `piles`.
+      in the `contents` of a pile in `piles`. `valuable_names` has the own name of each gem or piece of jewellery
+      that has one, keyed by its instance ID.
     - `encounter`: active encounter state, or `null`. Pass `declarers` to build `resolve_battle_round`, and pass a
       group's `id` as `target_group_id` for attacks, `close`, thrown splash items, and `area` or `hd_budget` spells
       (such as `fire_ball` and `sleep`). Each group also has `members` with individual `"monster-NNNN"` or
@@ -874,7 +877,7 @@ def get_session_spell(
     the built-in ones. This operation reads the session's own catalog, osrlib's `GameSession.effective_spells`, so
     it also answers for a spell the adventure adds. Use `level` and `spell_list` to place a spell from a member's
     `spell_book` in a `prepare_spells` dialog, and the `key` of each entry in `modes` as the `mode` of a `cast_spell`
-    command.
+    command. Show a mode's `display_name` as its label.
 
     The operation serves the spells in `spell_names` and no others: the ones in a member's `spell_book`,
     `memorized_spells`, `preparable_spells`, or `learnable_spells`, and the ones behind an effect on a member. So it

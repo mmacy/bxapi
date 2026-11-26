@@ -55,7 +55,7 @@ type JsonObject = dict[str, Any]
 BUSY_TIMEOUT_SECONDS = 5.0
 """How long a statement waits for another connection's write lock before it fails."""
 
-LAYOUT_VERSION = 3
+LAYOUT_VERSION = 4
 """The version of the table layout, which the server writes to the file's `PRAGMA user_version`.
 
 A server opens only a file with this version, or an empty file. The server has no migrations, so a
@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS ability_rolls (
     client TEXT NOT NULL,
     scores TEXT NOT NULL,
     seed INTEGER NOT NULL,
+    ability_score_method TEXT NOT NULL,
     used INTEGER NOT NULL,
     created_at TEXT NOT NULL
 ) STRICT;
@@ -290,6 +291,9 @@ class AbilityRollRow:
     seed: int
     """The seed the scores were rolled from. When the server creates a character from the roll, it
     draws the rest of the creation rolls from the same seed. Never return it to a client."""
+    ability_score_method: str
+    """The method the scores were rolled with, a value of osrlib's `Ruleset.ability_score_method`.
+    The server needs it to roll the same dice again from the seed."""
     used: bool
     """Whether a character was created from the roll."""
     created_at: str
@@ -502,7 +506,7 @@ class Database:
         from bxapi.db import Database
 
         db = Database(":memory:")
-        roll = db.insert_ability_roll("local", scores={"str": 12}, seed=7)
+        roll = db.insert_ability_roll("local", scores={"str": 12}, seed=7, ability_score_method="3d6")
         fields = {"name": "Hild", "class_id": "fighter", "level": 1, "max_hp": 8, "document": {}}
         assert db.insert_character_from_ability_roll("local", roll.id, **fields) is not None
         assert db.insert_character_from_ability_roll("local", roll.id, **fields) is None
@@ -608,18 +612,28 @@ class Database:
 
     # Ability rolls
 
-    def insert_ability_roll(self, client: str, *, scores: JsonObject, seed: int) -> AbilityRollRow:
+    def insert_ability_roll(
+        self, client: str, *, scores: JsonObject, seed: int, ability_score_method: str
+    ) -> AbilityRollRow:
         """Store a new, unused ability roll.
 
         Args:
             client: The client the roll belongs to.
             scores: The rolled scores.
             seed: The seed the scores were rolled from.
+            ability_score_method: The method the scores were rolled with.
 
         Returns:
             The stored roll, with a new id.
         """
-        row = AbilityRollRow(id=new_id("rol"), scores=scores, seed=seed, used=False, created_at=utc_now())
+        row = AbilityRollRow(
+            id=new_id("rol"),
+            scores=scores,
+            seed=seed,
+            ability_score_method=ability_score_method,
+            used=False,
+            created_at=utc_now(),
+        )
         values = _values(row) | {"scores": _dumps(scores), "used": 0}
         self._insert("ability_rolls", client, values)
         return row

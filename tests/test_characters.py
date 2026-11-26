@@ -9,10 +9,12 @@ from osrlib.core.abilities import AbilityAdjustment, AbilityScore, apply_adjustm
 from osrlib.core.alignment import Alignment
 from osrlib.core.character import (
     CHARACTER_CREATION_STREAM,
+    AbilityScoreRolls,
     Character,
     CharacterCreationResult,
     create_character,
     roll_ability_scores,
+    scores_are_sub_par,
     validate_class_choice,
 )
 from osrlib.core.classes import ClassDefinition, level_title, xp_modifier_pct
@@ -22,6 +24,7 @@ from osrlib.core.ruleset import Ruleset
 from osrlib.core.spells import caster_profile
 from osrlib.data import load_ability_tables, load_classes, load_equipment, load_languages, load_magic_items, load_spells
 
+from bxapi.creation import AbilityScoreMethod
 from bxapi.db import CharacterDocumentRow, Database
 from bxapi.settings import Settings
 
@@ -31,6 +34,16 @@ FIGHTER = {"name": "Hild", "class_id": "fighter", "alignment": "lawful"}
 CLASS_IDS = [definition.id for definition in load_classes().classes]
 MAX_OFFSET = 2**53 - 1
 GEAR = {"purchases": [{"item_id": "leather", "quantity": 1}, {"item_id": "dagger"}], "equip_item_ids": ["leather"]}
+
+HOUSE_RULES = Ruleset(ability_score_method="4d6_drop_lowest", max_hp_at_first_level=True)
+"""The two creation house rules, as osrlib's example `creation_house_rules.json` has them."""
+RULESETS = [
+    pytest.param(Ruleset(), id="as written"),
+    pytest.param(Ruleset(hp_reroll_at_first_level=True), id="reroll"),
+    pytest.param(HOUSE_RULES, id="house rules"),
+    pytest.param(HOUSE_RULES.model_copy(update={"hp_reroll_at_first_level": True}), id="house rules and reroll"),
+]
+FOUR_D6 = {"ruleset": {"ability_score_method": "4d6_drop_lowest"}}
 
 DERIVED_KEYS = {
     "thac0",
@@ -74,13 +87,13 @@ def expected_derived(character: Character) -> dict[str, Any]:
 
 
 def osrlib_character(
-    seed: int, class_id: str = "fighter", *, hp_reroll: bool = False, **choices: Any
+    seed: int, class_id: str = "fighter", *, ruleset: Ruleset | None = None, **choices: Any
 ) -> CharacterCreationResult:
     return create_character(
         name="Hild",
         class_id=class_id,
         alignment=Alignment.LAWFUL,
-        ruleset=Ruleset(hp_reroll_at_first_level=hp_reroll),
+        ruleset=ruleset or Ruleset(),
         stream=RngStreams(master_seed=seed).get(CHARACTER_CREATION_STREAM),
         **choices,
     )
@@ -91,13 +104,13 @@ def osrlib_eligible(scores: dict[str, int]) -> list[str]:
     return [definition.id for definition in load_classes().classes if not validate_class_choice(table, definition)]
 
 
-def legal_choices(definition: ClassDefinition, seed: int) -> dict[str, Any] | None:
+def legal_choices(definition: ClassDefinition, seed: int, method: AbilityScoreMethod) -> dict[str, Any] | None:
     """Return osrlib's arguments for a character that uses every choice, or `None` if this seed can't have one.
 
     The choices are a legal adjustment, an extra language, a first spell for an arcane caster, a
     weapon the class may wield, and a torch.
     """
-    scores = roll_ability_scores(RngStreams(master_seed=seed).get(CHARACTER_CREATION_STREAM)).scores
+    scores = osrlib_roll(seed, method).scores
     if validate_class_choice(scores, definition):
         return None
     primes, fixed = definition.prime_requisites, definition.may_not_lower
@@ -131,7 +144,7 @@ def legal_choices(definition: ClassDefinition, seed: int) -> dict[str, Any] | No
     }
 
 
-def request_body(class_id: str, choices: dict[str, Any], *, hp_reroll: bool) -> dict[str, Any]:
+def request_body(class_id: str, choices: dict[str, Any], *, ruleset: Ruleset) -> dict[str, Any]:
     """Return the API's body for the osrlib arguments `legal_choices` returns."""
     return FIGHTER | {
         "class_id": class_id,
@@ -140,26 +153,26 @@ def request_body(class_id: str, choices: dict[str, Any], *, hp_reroll: bool) -> 
         "extra_languages": choices["extra_languages"],
         "purchases": [{"item_id": item_id, "quantity": lots} for item_id, lots in choices["purchases"]],
         "equip_item_ids": choices["equip_ids"],
-        "hp_reroll_at_first_level": hp_reroll,
+        "ruleset": ruleset.model_dump(mode="json"),
     }
 
 
-def full_cases(class_id: str, *, hp_reroll: bool, count: int = 3) -> list[tuple[int, dict[str, Any]]]:
+def full_cases(class_id: str, *, ruleset: Ruleset, count: int = 3) -> list[tuple[int, dict[str, Any]]]:
     """Return seeds, with their choices, for which osrlib creates the character with every choice.
 
-    With `hp_reroll`, each seed's first hit die shows 1 or 2, so the reroll changes the hit points.
+    With the reroll rule on, each seed's first hit die shows 1 or 2, so the reroll throws another die.
     """
     definition = load_classes().get(class_id)
     found: list[tuple[int, dict[str, Any]]] = []
     for seed in range(5000):
-        choices = legal_choices(definition, seed)
+        choices = legal_choices(definition, seed, ruleset.ability_score_method)
         if choices is None:
             continue
         try:
-            result = osrlib_character(seed, class_id, hp_reroll=hp_reroll, **choices)
+            result = osrlib_character(seed, class_id, ruleset=ruleset, **choices)
         except ValueError:
             continue
-        if hp_reroll and len(result.hit_point_roll.rolls) == 1:
+        if ruleset.hp_reroll_at_first_level and len(result.hit_point_roll.rolls) == 1:
             continue
         found.append((seed, choices))
         if len(found) == count:
@@ -167,14 +180,24 @@ def full_cases(class_id: str, *, hp_reroll: bool, count: int = 3) -> list[tuple[
     raise AssertionError(f"no {count} seeds below 5000 give a {class_id} every choice")
 
 
-def rolled_scores(seed: int) -> dict[str, int]:
-    rolled = roll_ability_scores(RngStreams(master_seed=seed).get(CHARACTER_CREATION_STREAM))
-    return {ability.value: score for ability, score in rolled.scores.items()}
+def osrlib_roll(seed: int, method: AbilityScoreMethod = "3d6") -> AbilityScoreRolls:
+    return roll_ability_scores(RngStreams(master_seed=seed).get(CHARACTER_CREATION_STREAM), method=method)
 
 
-def rolled_dice(seed: int) -> dict[str, Any]:
+def rolled_scores(seed: int, method: AbilityScoreMethod = "3d6") -> dict[str, int]:
+    return {ability.value: score for ability, score in osrlib_roll(seed, method).scores.items()}
+
+
+def rolled_dice(seed: int, method: AbilityScoreMethod = "3d6") -> dict[str, Any]:
     """Return osrlib's `AbilityScoreRolls` for a seed, as JSON."""
-    return roll_ability_scores(RngStreams(master_seed=seed).get(CHARACTER_CREATION_STREAM)).model_dump(mode="json")
+    return osrlib_roll(seed, method).model_dump(mode="json")
+
+
+def roll_under(caller: TestClient, ruleset: Ruleset, seed: int) -> dict[str, Any]:
+    """Store an ability roll made from a seed under a ruleset, and return it."""
+    response = caller.post("/v1/ability-rolls", json={"seed": seed, "ruleset": ruleset.model_dump(mode="json")})
+    assert response.status_code == 201, response.text
+    return response.json()
 
 
 def stored_row(settings: Settings, character_id: str) -> CharacterDocumentRow:
@@ -197,10 +220,12 @@ def test_a_referee_roll_matches_osrlib_and_lists_the_eligible_classes(referee: T
     response = referee.post("/v1/ability-rolls", json={"seed": 7})
     assert response.status_code == 201
     body = response.json()
-    assert set(body) == {"id", "scores", "rolls", "eligible_class_ids", "used", "created_at"}
+    assert set(body) == {"id", "scores", "ability_score_method", "rolls", "eligible_class_ids", "used", "created_at"}
     assert body["id"].startswith("rol_")
     assert body["scores"] == rolled_scores(7)
+    assert body["ability_score_method"] == "3d6"
     assert body["rolls"] == rolled_dice(7)
+    assert body["rolls"]["dropped"] == {}
     assert referee.get(f"/v1/ability-rolls/{body['id']}").json()["rolls"] == body["rolls"]
     assert body["eligible_class_ids"] == osrlib_eligible(body["scores"])
     assert body["used"] is False
@@ -270,20 +295,23 @@ def test_the_stored_document_is_the_osrlib_document(referee: TestClient, keyed_s
     assert row.max_hp == character.max_hp
 
 
-@pytest.mark.parametrize("path", ["generate", "ability roll"])
-@pytest.mark.parametrize("hp_reroll", [False, True])
+@pytest.mark.parametrize("path", ["generate", "create", "ability roll"])
+@pytest.mark.parametrize("ruleset", RULESETS)
 @pytest.mark.parametrize("class_id", CLASS_IDS)
 def test_every_choice_matches_osrlib_create_character(
-    referee: TestClient, class_id: str, hp_reroll: bool, path: str
+    referee: TestClient, class_id: str, ruleset: Ruleset, path: str
 ) -> None:
-    for seed, choices in full_cases(class_id, hp_reroll=hp_reroll):
-        expected = osrlib_character(seed, class_id, hp_reroll=hp_reroll, **choices).character
-        body = request_body(class_id, choices, hp_reroll=hp_reroll)
+    for seed, choices in full_cases(class_id, ruleset=ruleset):
+        expected = osrlib_character(seed, class_id, ruleset=ruleset, **choices).character
+        body = request_body(class_id, choices, ruleset=ruleset)
         if path == "generate":
             response = referee.post("/v1/generate/character", json=body | {"seed": seed})
             assert response.status_code == 200, response.text
+        elif path == "create":
+            response = referee.post("/v1/characters", json=body | {"seed": seed})
+            assert response.status_code == 201, response.text
         else:
-            roll = referee.post("/v1/ability-rolls", json={"seed": seed}).json()
+            roll = roll_under(referee, ruleset, seed)
             response = referee.post("/v1/characters", json=body | {"ability_roll_id": roll["id"]})
             assert response.status_code == 201, response.text
         made = response.json()
@@ -477,13 +505,14 @@ def all_classes_seed() -> int:
     return seed_where(lambda scores: osrlib_eligible(scores) == CLASS_IDS)
 
 
-@pytest.mark.parametrize("hp_reroll", [False, True])
+@pytest.mark.parametrize("ruleset", RULESETS)
 @pytest.mark.parametrize("class_id", CLASS_IDS)
-def test_a_preview_is_what_creation_then_stores(referee: TestClient, class_id: str, hp_reroll: bool) -> None:
-    for seed, choices in full_cases(class_id, hp_reroll=hp_reroll):
-        result = osrlib_character(seed, class_id, hp_reroll=hp_reroll, **choices)
-        body = request_body(class_id, choices, hp_reroll=hp_reroll)
-        roll = referee.post("/v1/ability-rolls", json={"seed": seed}).json()
+def test_a_preview_is_what_creation_then_stores(referee: TestClient, class_id: str, ruleset: Ruleset) -> None:
+    for seed, choices in full_cases(class_id, ruleset=ruleset):
+        result = osrlib_character(seed, class_id, ruleset=ruleset, **choices)
+        body = request_body(class_id, choices, ruleset=ruleset)
+        roll = roll_under(referee, ruleset, seed)
+        assert roll["rolls"] == result.ability_rolls.model_dump(mode="json")
         response = preview(referee, roll["id"], body)
         assert response.status_code == 200, response.text
         assert response.json() == {
@@ -601,13 +630,13 @@ def test_a_malformed_preview_body_is_a_validation_error(player: TestClient) -> N
         assert (response.status_code, response.json()["code"]) == (422, "validation_error")
 
 
-def single_choice_variants(class_id: str, choices: dict[str, Any], *, hp_reroll: bool) -> list[dict[str, Any]]:
+def single_choice_variants(class_id: str, choices: dict[str, Any], *, ruleset: Ruleset) -> list[dict[str, Any]]:
     """Return request bodies that each differ from the fewest legal choices in one choice that takes no dice."""
-    full = request_body(class_id, choices, hp_reroll=hp_reroll)
+    full = request_body(class_id, choices, ruleset=ruleset)
     base = FIGHTER | {
         "class_id": class_id,
         "starting_spell_ids": choices["starting_spell_ids"],
-        "hp_reroll_at_first_level": hp_reroll,
+        "ruleset": full["ruleset"],
     }
     # The extra language is legal only with the adjustment, which raises a score that can add a language.
     variants = [
@@ -627,15 +656,15 @@ def single_choice_variants(class_id: str, choices: dict[str, Any], *, hp_reroll:
     return [base, *variants]
 
 
-@pytest.mark.parametrize("hp_reroll", [False, True])
+@pytest.mark.parametrize("ruleset", RULESETS)
 @pytest.mark.parametrize("class_id", CLASS_IDS)
-def test_only_the_class_and_the_reroll_option_change_the_hit_point_and_gold_rolls(
-    referee: TestClient, class_id: str, hp_reroll: bool
+def test_only_the_class_and_the_ruleset_change_the_hit_point_and_gold_rolls(
+    referee: TestClient, class_id: str, ruleset: Ruleset
 ) -> None:
-    for seed, choices in full_cases(class_id, hp_reroll=hp_reroll):
-        roll = referee.post("/v1/ability-rolls", json={"seed": seed}).json()
+    for seed, choices in full_cases(class_id, ruleset=ruleset):
+        roll = roll_under(referee, ruleset, seed)
         shown = []
-        for body in single_choice_variants(class_id, choices, hp_reroll=hp_reroll):
+        for body in single_choice_variants(class_id, choices, ruleset=ruleset):
             response = preview(referee, roll["id"], body)
             assert response.status_code == 200, response.text
             rolls = response.json()["rolls"]
@@ -652,12 +681,142 @@ def test_the_class_and_the_reroll_option_can_change_the_gold(referee: TestClient
             continue
         fighter = preview(referee, roll["id"], FIGHTER).json()["rolls"]["gold_roll"]
         cleric = preview(referee, roll["id"], FIGHTER | {"class_id": "cleric"}).json()["rolls"]["gold_roll"]
-        rerolled = preview(referee, roll["id"], FIGHTER | {"hp_reroll_at_first_level": True}).json()["rolls"]
+        reroll = {"ruleset": {"hp_reroll_at_first_level": True}}
+        rerolled = preview(referee, roll["id"], FIGHTER | reroll).json()["rolls"]
         by_class = by_class or fighter != cleric
         by_reroll = by_reroll or (len(rerolled["hit_point_roll"]["rolls"]) > 1 and rerolled["gold_roll"] != fighter)
         if by_class and by_reroll:
             return
     raise AssertionError("no seed below 200 changes the gold with the class and with the reroll option")
+
+
+def test_the_maximum_hit_point_rule_changes_the_hit_points_and_never_the_dice(referee: TestClient) -> None:
+    maximum = {"ruleset": {"max_hp_at_first_level": True}}
+    both = {"ruleset": {"max_hp_at_first_level": True, "hp_reroll_at_first_level": True}}
+    reroll = {"ruleset": {"hp_reroll_at_first_level": True}}
+    raised = 0
+    for seed in range(40):
+        roll = referee.post("/v1/ability-rolls", json={"seed": seed}).json()
+        if "fighter" not in roll["eligible_class_ids"]:
+            continue
+        for plain, maximized in ((FIGHTER, FIGHTER | maximum), (FIGHTER | reroll, FIGHTER | both)):
+            rolled, taken = (preview(referee, roll["id"], body).json() for body in (plain, maximized))
+            assert rolled["rolls"]["gold_roll"] == taken["rolls"]["gold_roll"], f"seed {seed}"
+            assert rolled["rolls"]["hit_point_roll"]["rolls"] == taken["rolls"]["hit_point_roll"]["rolls"]
+            assert rolled["rolls"]["hit_point_roll"]["maximized"] is False
+            assert taken["rolls"]["hit_point_roll"]["maximized"] is True
+            modifier = taken["derived"]["hit_point_modifier"]
+            # A fighter's hit die is a d8.
+            assert taken["character"]["max_hp"] == max(1, 8 + modifier), f"seed {seed}"
+            raised += taken["character"]["max_hp"] > rolled["character"]["max_hp"]
+    assert raised, "no seed below 40 rolls a fighter fewer hit points than the maximum"
+
+
+# Ability score methods
+
+
+def test_the_method_type_is_osrlibs() -> None:
+    assert AbilityScoreMethod == Ruleset.model_fields["ability_score_method"].annotation
+
+
+@pytest.mark.parametrize("method", ["3d6", "4d6_drop_lowest"])
+def test_a_roll_uses_the_method_of_its_ruleset_and_keeps_it(referee: TestClient, method: AbilityScoreMethod) -> None:
+    ruleset = {"ability_score_method": method}
+    for seed in range(10):
+        roll = referee.post("/v1/ability-rolls", json={"seed": seed, "ruleset": ruleset}).json()
+        expected = osrlib_roll(seed, method)
+        assert roll["ability_score_method"] == method
+        assert roll["scores"] == rolled_scores(seed, method)
+        assert roll["rolls"] == expected.model_dump(mode="json")
+        assert roll["eligible_class_ids"] == osrlib_eligible(roll["scores"])
+        # A reload shows the dice the first response showed, because the server stores the method with the seed.
+        assert referee.get(f"/v1/ability-rolls/{roll['id']}").json() == roll
+    if method == "3d6":
+        assert roll["rolls"]["dropped"] == {}
+    else:
+        assert set(roll["rolls"]["dropped"]) == set(roll["scores"])
+        for ability, dice in roll["rolls"]["rolls"].items():
+            assert roll["rolls"]["dropped"][ability] <= min(dice)
+
+
+def test_a_player_can_roll_with_a_ruleset(player: TestClient) -> None:
+    roll = player.post("/v1/ability-rolls", json=FOUR_D6)
+    assert roll.status_code == 201, roll.text
+    assert roll.json()["ability_score_method"] == "4d6_drop_lowest"
+    assert len(roll.json()["rolls"]["dropped"]) == 6
+    assert player.post("/v1/ability-rolls", json={"ruleset": None}).json()["ability_score_method"] == "3d6"
+
+
+@pytest.mark.parametrize(
+    "ruleset", [{"ability_score_method": "5d6"}, {"no_such_rule": True}, {"max_hp_at_first_level": "sometimes"}, 7]
+)
+def test_a_ruleset_osrlib_does_not_accept_is_a_validation_error(player: TestClient, ruleset: Any) -> None:
+    roll = player.post("/v1/ability-rolls").json()
+    for response in (
+        player.post("/v1/ability-rolls", json={"ruleset": ruleset}),
+        preview(player, roll["id"], FIGHTER | {"ruleset": ruleset}),
+        player.post("/v1/characters", json=FIGHTER | {"ruleset": ruleset}),
+        player.post("/v1/generate/character", json=FIGHTER | {"ruleset": ruleset}),
+    ):
+        assert (response.status_code, response.json()["code"]) == (422, "validation_error"), response.text
+    refused = player.post("/v1/characters", json=FIGHTER | {"hp_reroll_at_first_level": True})
+    assert (refused.status_code, refused.json()["code"]) == (422, "validation_error")
+
+
+def test_a_roll_reports_sub_par_scores_as_osrlib_does(referee: TestClient) -> None:
+    seen = set()
+    for seed in range(400):
+        expected = scores_are_sub_par(osrlib_roll(seed).scores)
+        if expected in seen:
+            continue
+        seen.add(expected)
+        roll = referee.post("/v1/ability-rolls", json={"seed": seed}).json()
+        assert roll["rolls"]["sub_par"] is expected, f"seed {seed}"
+        assert referee.get(f"/v1/ability-rolls/{roll['id']}").json()["rolls"]["sub_par"] is expected
+        if "fighter" in roll["eligible_class_ids"]:
+            assert preview(referee, roll["id"], FIGHTER).json()["rolls"]["ability_rolls"]["sub_par"] is expected
+    assert seen == {True, False}, "no seed below 400 rolls sub-par scores"
+
+
+@pytest.mark.parametrize(
+    ("rolled_with", "sent", "method"),
+    [
+        (FOUR_D6, {}, "4d6_drop_lowest"),
+        (FOUR_D6, {"ruleset": {"max_hp_at_first_level": True}}, "4d6_drop_lowest"),
+        ({}, FOUR_D6, "3d6"),
+    ],
+)
+def test_a_ruleset_with_another_method_than_the_rolls_is_refused(
+    player: TestClient, rolled_with: dict[str, Any], sent: dict[str, Any], method: str
+) -> None:
+    roll = player.post("/v1/ability-rolls", json=rolled_with).json()
+    assert roll["ability_score_method"] == method
+    for response in (
+        preview(player, roll["id"], FIGHTER | sent),
+        player.post("/v1/characters", json=FIGHTER | sent | {"ability_roll_id": roll["id"]}),
+    ):
+        assert response.status_code == 409, response.text
+        problem = response.json()
+        assert (problem["code"], problem["ability_score_method"]) == ("ability_roll_ruleset_mismatch", method)
+    assert player.get(f"/v1/ability-rolls/{roll['id']}").json()["used"] is False
+    assert player.get("/v1/characters").json()["items"] == []
+    # The ruleset the roll was made under still makes the character.
+    body = FIGHTER | rolled_with
+    previewed = preview(player, roll["id"], body)
+    assert previewed.status_code == 200, previewed.text
+    created = player.post("/v1/characters", json=body | {"ability_roll_id": roll["id"]})
+    assert created.status_code == 201, created.text
+    assert created.json()["character"] == previewed.json()["character"]
+
+
+def test_a_used_roll_is_reported_before_a_ruleset_mismatch(player: TestClient) -> None:
+    roll = player.post("/v1/ability-rolls", json=FOUR_D6).json()
+    assert player.post("/v1/characters", json=FIGHTER | FOUR_D6 | {"ability_roll_id": roll["id"]}).status_code == 201
+    for response in (
+        preview(player, roll["id"], FIGHTER),
+        player.post("/v1/characters", json=FIGHTER | {"ability_roll_id": roll["id"]}),
+    ):
+        assert (response.status_code, response.json()["code"]) == (409, "ability_roll_used")
 
 
 # Import, list, get, and delete
