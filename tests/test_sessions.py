@@ -545,6 +545,11 @@ def test_a_preview_attributes_each_rejection_to_its_member(player: TestClient, r
     rejections = ok(preview(player, session["id"], plan))["rejections"]
     assert rejections[first] == []
     assert [rejection["code"] for rejection in rejections[second]] == ["combat.attack.out_of_reach"]
+    assert rejections[second][0]["params"]["character"] == second
+    # The refused round names the member too, so a client can attribute it without a preview.
+    refused = send(player, session["id"], {"command_type": "resolve_battle_round", "declarations": plan})
+    assert refused["accepted"] is False
+    assert [rejection["params"]["character"] for rejection in refused["rejections"]] == [second]
 
 
 def test_a_preview_outside_a_battle_is_409(player: TestClient, referee: TestClient) -> None:

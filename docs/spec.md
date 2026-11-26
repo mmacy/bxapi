@@ -319,7 +319,7 @@ The body of `POST /v1/sessions/{session_id}/battle-round/preview` is `{"declarat
 | `advance_feet` | Each living member's projected place on the range track after the declared moves. |
 | `front_rank` | Each group's projected front rank after the declared moves, keyed by group id. |
 
-A client with several players uses the preview to tell each player which of their choices the session would refuse, because some rejections of `resolve_battle_round`, like `combat.attack.out_of_reach`, don't name the member. When the preview has a declaration for every declarer and every list in `rejections` is empty, `resolve_battle_round` accepts the same declarations.
+A client uses the preview to tell each player which of their choices the session would refuse before anyone commits the round, and to check a plan that doesn't have every declarer yet. Each rejection of a declaration, from the preview or from `resolve_battle_round`, also names the declaring member in `params.character`. When the preview has a declaration for every declarer and every list in `rejections` is empty, `resolve_battle_round` accepts the same declarations.
 
 The preview takes the session's lock, takes no random number, and changes nothing, so the session's revision stays the same. A session that isn't in `battle` mode gets 409 `not_in_battle`, with the session's `mode`. A declaration for a member who isn't a declarer, or a second declaration for one member, gets 422 `declaration_invalid`.
 
