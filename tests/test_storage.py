@@ -32,7 +32,7 @@ def test_the_count_follows_every_insert_update_and_delete() -> None:
     db = Database(":memory:")
     assert db.get_usage(ME) == 0
     scores = {"str": 12, "int": 9}
-    db.insert_ability_roll(ME, scores=scores, seed=7)
+    db.insert_ability_roll(ME, scores=scores, seed=7, ability_score_method="3d6")
     expected = _size(scores)
     assert db.get_usage(ME) == expected
 
@@ -114,13 +114,13 @@ def test_the_count_includes_a_stored_response_until_its_key_expires() -> None:
 def test_a_database_file_keeps_the_count_and_has_the_new_layout(tmp_path: Path) -> None:
     path = str(tmp_path / "bxapi.db")
     db = Database(path)
-    db.insert_ability_roll(ME, scores={"str": 12}, seed=7)
+    db.insert_ability_roll(ME, scores={"str": 12}, seed=7, ability_score_method="3d6")
     db.close()
     again = Database(path)
     assert again.get_usage(ME) == len(b'{"str":12}')
     again.close()
     connection = sqlite3.connect(path)
-    assert connection.execute("PRAGMA user_version").fetchone()[0] == LAYOUT_VERSION == 3
+    assert connection.execute("PRAGMA user_version").fetchone()[0] == LAYOUT_VERSION == 4
     triggers = connection.execute("SELECT count(*) FROM sqlite_schema WHERE type = 'trigger'").fetchone()[0]
     connection.close()
     assert triggers == 18
@@ -138,7 +138,7 @@ def test_a_database_with_a_limit_refuses_each_write_at_the_limit() -> None:
     session_fields: dict[str, Any] = {"adventure_id": None, "adventure_name": "B", "mode": "town", "clock_rounds": 0}
     writes: list[Callable[[], object]] = [
         lambda: db.require_room(ME),
-        lambda: db.insert_ability_roll(ME, scores={}, seed=1),
+        lambda: db.insert_ability_roll(ME, scores={}, seed=1, ability_score_method="3d6"),
         lambda: db.insert_character(ME, name="B", class_id="fighter", level=1, max_hp=8, document={}),
         lambda: db.insert_adventure(ME, name="B", info={}, document={}),
         lambda: db.insert_session(ME, name="G", document=dict(ENVELOPE), **session_fields),
@@ -160,7 +160,7 @@ def test_a_database_with_a_limit_refuses_each_write_at_the_limit() -> None:
 
 def test_a_full_client_cannot_use_an_ability_roll_or_write_a_session() -> None:
     db = Database(":memory:", max_client_bytes=150)
-    roll = db.insert_ability_roll(ME, scores={"str": 12}, seed=7)
+    roll = db.insert_ability_roll(ME, scores={"str": 12}, seed=7, ability_score_method="3d6")
     session = db.insert_session(
         ME, name="G", adventure_id=None, adventure_name="B", mode="town", clock_rounds=0, document=ENVELOPE | {"x": ""}
     )

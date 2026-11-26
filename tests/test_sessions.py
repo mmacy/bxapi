@@ -303,6 +303,10 @@ def test_a_ruleset_reaches_osrlib(referee: TestClient) -> None:
     assert ok(referee.get(f"/v1/sessions/{session['id']}/referee-view"))["ruleset"] == rules.model_dump(mode="json")
     plain = start(referee)
     assert ok(referee.get(f"/v1/sessions/{plain['id']}/referee-view"))["ruleset"] == Ruleset().model_dump(mode="json")
+    # A client sends a table's whole ruleset, with the creation house rules in it, and the session keeps it.
+    house = Ruleset(ability_score_method="4d6_drop_lowest", max_hp_at_first_level=True)
+    table = start(referee, ruleset=house.model_dump(mode="json"))
+    assert ok(referee.get(f"/v1/sessions/{table['id']}/referee-view"))["ruleset"] == house.model_dump(mode="json")
 
 
 # Session info

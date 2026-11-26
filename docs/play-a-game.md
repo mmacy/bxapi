@@ -20,7 +20,7 @@ Walk through a dungeon-crawl session (one game in progress) of `builtin-barrow`,
    ```json
    {
      "api_version": "0.1.0",
-     "engine_version": "2.8.0",
+     "engine_version": "2.9.0",
      "schema_version": 4,
      "auth_enabled": true,
      "client": "my-game",
@@ -33,7 +33,7 @@ The output blocks below format and abbreviate the server's compact JSON with `..
 
 ## Roll ability scores and create a party
 
-1. Roll six 3d6 ability scores with [`POST /v1/ability-rolls`](https://mmacy.github.io/bxapi/reference/endpoint/characters#operation-create_ability_roll) to see which B/X classes the roll qualifies for. `rolls.rolls` lists the three d6 behind each score, for a client that animates the dice:
+1. Roll six 3d6 ability scores with [`POST /v1/ability-rolls`](https://mmacy.github.io/bxapi/reference/endpoint/characters#operation-create_ability_roll) to see which B/X classes the roll qualifies for. `rolls.rolls` lists the three d6 behind each score, for a client that animates the dice. `rolls.sub_par` says whether the scores are poor enough that the B/X rules let a referee allow a new roll:
 
    ```sh
    curl -sS -w '\n' -X POST http://127.0.0.1:8640/v1/ability-rolls -H "Authorization: Bearer $KEY"
@@ -43,9 +43,12 @@ The output blocks below format and abbreviate the server's compact JSON with `..
    {
      "id": "rol_yQsuUWgqmzpnDA6Sm51kQA",
      "scores": {"str": 6, "int": 12, "wis": 17, "dex": 11, "con": 5, "cha": 11},
+     "ability_score_method": "3d6",
      "rolls": {
        "scores": {"str": 6, "int": 12, "wis": 17, "dex": 11, "con": 5, "cha": 11},
-       "rolls": {"str": [1, 3, 2], "int": [4, 5, 3], "wis": [6, 5, 6], "dex": [2, 4, 5], "con": [1, 1, 3], "cha": [3, 6, 2]}
+       "rolls": {"str": [1, 3, 2], "int": [4, 5, 3], "wis": [6, 5, 6], "dex": [2, 4, 5], "con": [1, 1, 3], "cha": [3, 6, 2]},
+       "dropped": {},
+       "sub_par": false
      },
      "eligible_class_ids": ["cleric", "elf", "fighter", "magic_user", "thief"],
      "used": false,
@@ -71,13 +74,13 @@ The output blocks below format and abbreviate the server's compact JSON with `..
      "derived": {"thac0": 19, "armour_class": 9, ...},
      "rolls": {
        "ability_rolls": {...},
-       "hit_point_roll": {"rolls": [5], "hit_points": 3},
+       "hit_point_roll": {"rolls": [5], "hit_points": 3, "maximized": false},
        "gold_roll": {"rolls": [3, 2, 4], "modifier": 0, "multiplier": 10, "total": 90}
      }
    }
    ```
 
-   The purchases, the equipment, and every other choice except the class and `hp_reroll_at_first_level` leave `hit_point_roll` and `gold_roll` as they are. So you can show the player 90 gp, let them shop, and preview again to check the purchases before you create the character.
+   The purchases, the equipment, and every other choice except the class and the `ruleset` leave `hit_point_roll` and `gold_roll` as they are. So you can show the player 90 gp, let them shop, and preview again to check the purchases before you create the character.
 
 4. Create a fighter from that roll with [`POST /v1/characters`](https://mmacy.github.io/bxapi/reference/endpoint/characters#operation-create_character), buying and equipping leather armour (20 gp) and a sword (10 gp) from [`GET /v1/rules/equipment`](https://mmacy.github.io/bxapi/reference/endpoint/rules#operation-list_equipment):
 
@@ -133,7 +136,7 @@ The output blocks below format and abbreviate the server's compact JSON with `..
      "revision": 0,
      "clock": {"rounds": 0, "turns": 0, "days": 0},
      "schema_version": 4,
-     "engine_version": "2.8.0",
+     "engine_version": "2.9.0",
      "created_at": "2026-11-21T05:24:33Z",
      "updated_at": "2026-11-21T05:24:33Z"
    }

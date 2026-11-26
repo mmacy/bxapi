@@ -5,13 +5,16 @@ from typing import Annotated, Any, Self
 from fastapi import APIRouter, Body, Path, Request, Response
 from osrlib.core.abilities import AbilityScore
 from osrlib.core.character import AbilityScoreRolls, Character, roll_ability_scores
+from osrlib.core.ruleset import Ruleset
 from pydantic import model_validator
 
 from bxapi.auth import CurrentPrincipal, RefereePrincipal
 from bxapi.creation import (
+    AbilityScoreMethod,
     CharacterChoices,
     CreationRolls,
     DerivedValues,
+    ability_score_method,
     character_from_roll,
     creation_stream,
     derive,
@@ -80,6 +83,13 @@ class AbilityRollRequest(RequestModel):
     """Referee only. Seed (0 to 2^53 - 1) that determines the six ability scores as well as the hit
     point and gold rolls of the character created from this roll. The server never returns `seed`.
     Omit `seed` (or send no body) to let the server draw one."""
+    ruleset: Ruleset | None = None
+    """Optional rules for the roll, as osrlib's `Ruleset`. Send the ruleset of the table the
+    character is for, the one you pass to `POST /v1/sessions`. The roll reads one field,
+    `ability_score_method`: `"3d6"` (the default) rolls three d6 for each score, and
+    `"4d6_drop_lowest"` rolls four and drops the lowest. The server stores the method with the roll.
+    Send the same ruleset when you preview or create the character from the roll. Omit or set to
+    `null` for the rules as written."""
 
 
 class AbilityRoll(ApiModel):
@@ -90,9 +100,16 @@ class AbilityRoll(ApiModel):
     `POST /v1/characters`, or as `roll_id` to `POST /v1/ability-rolls/{roll_id}/preview`."""
     scores: dict[AbilityScore, int]
     """Six rolled ability scores (`str`, `int`, `wis`, `dex`, `con`, `cha`), each from 3 to 18."""
+    ability_score_method: AbilityScoreMethod
+    """How osrlib rolled the scores: `"3d6"` or `"4d6_drop_lowest"`, from the `ability_score_method` of the
+    `ruleset` that `POST /v1/ability-rolls` received. A preview or a creation from this roll needs a `ruleset`
+    with the same method."""
     rolls: AbilityScoreRolls
-    """osrlib's `AbilityScoreRolls` behind `scores`: each score's total and its three d6 results in the order
-    osrlib rolled them, the same as `rolls.ability_rolls` on `POST /v1/ability-rolls/{roll_id}/preview`."""
+    """osrlib's `AbilityScoreRolls` behind `scores`, the same as `rolls.ability_rolls` on
+    `POST /v1/ability-rolls/{roll_id}/preview`. `rolls.rolls` has the three d6 that count toward each score, in
+    the order osrlib rolled them. `rolls.dropped` has the die that a `4d6_drop_lowest` roll dropped for each
+    ability, and it's empty for a `3d6` roll. `rolls.sub_par` is `true` when the scores are sub-par under the B/X
+    rule that lets a referee allow a new roll: every score is 8 or less, or two or more scores are 5 or less."""
     eligible_class_ids: list[str]
     """Class `id` values from `GET /v1/rules/classes` whose minimum ability requirements `scores`
     satisfy, in catalog order."""
@@ -216,14 +233,24 @@ def _ability_roll(row: AbilityRollRow, rolled: AbilityScoreRolls | None = None) 
     roll it just made.
     """
     scores = scores_from_json(row.scores)
+    method = ability_score_method(row.ability_score_method)
     return AbilityRoll(
         id=row.id,
         scores=scores,
-        rolls=roll_ability_scores(creation_stream(row.seed)) if rolled is None else rolled,
+        ability_score_method=method,
+        rolls=roll_ability_scores(creation_stream(row.seed), method=method) if rolled is None else rolled,
         eligible_class_ids=eligible_class_ids(scores),
         used=row.used,
         created_at=row.created_at,
     )
+
+
+_RULESET_MISMATCH = (
+    "`ability_roll_ruleset_mismatch`: The `ability_score_method` of the request's `ruleset` isn't the method the "
+    "roll was made with, which the problem's `ability_score_method` names. A request with no `ruleset` asks for "
+    "`3d6`. Send the ruleset you sent to `POST /v1/ability-rolls` for this roll, or create a new roll. The roll "
+    "stays unused."
+)
 
 
 def _roll_used(roll_id: str) -> ApiError:
@@ -290,12 +317,22 @@ def create_ability_roll(
     principal: CurrentPrincipal,
     body: Annotated[AbilityRollRequest, Body(default_factory=AbilityRollRequest)],
 ) -> AbilityRoll:
-    """Roll six 3d6 ability scores with osrlib, store the roll, and return the scores, their dice, and eligible classes.
+    """Roll six ability scores with osrlib, store the roll, and return the scores, their dice, and eligible classes.
 
     Display `scores` and `eligible_class_ids` to the player. A client that animates the dice shows `rolls.rolls`, the
-    three d6 osrlib rolled for each score. Then pass `id` as `ability_roll_id` to `POST /v1/characters` along with
-    the player's class, alignment, and equipment choices. The request body is optional: players send no body, whereas
-    a referee may pass `seed`.
+    three d6 that count toward each score. Then pass `id` as `ability_roll_id` to `POST /v1/characters` along with
+    the player's class, alignment, and equipment choices. The request body is optional: with no body, osrlib rolls
+    3d6 for each score from a seed the server draws. A referee may pass `seed`.
+
+    To roll under a table's house rules, pass the table's `ruleset`. With `ability_score_method` set to
+    `4d6_drop_lowest`, osrlib rolls four d6 for each score and drops the lowest, and `rolls.dropped` has the dropped
+    die of each ability. The server stores the method with the roll and returns it as `ability_score_method`. Send
+    the same `ruleset` when you preview or create the character, because a request whose ruleset has another method
+    gets 409 `ability_roll_ruleset_mismatch`.
+
+    `rolls.sub_par` tells you whether the scores are sub-par under the B/X rules, which let a referee allow the
+    player to discard such a character and roll again. osrlib only reports it, and the server accepts a sub-par roll
+    like any other.
 
     The server stores the roll's seed privately and derives the character's hit points and starting gold from that
     same seed when `POST /v1/characters` consumes the roll. Retrying `POST /v1/characters` after a 422
@@ -307,9 +344,13 @@ def create_ability_roll(
     `ability_roll_id` on `POST /v1/characters`.
     """
     seed = referee_seed(body.seed, principal)
-    rolled = roll_ability_scores(creation_stream(seed))
+    method = (body.ruleset or Ruleset()).ability_score_method
+    rolled = roll_ability_scores(creation_stream(seed), method=method)
     row = _db(request).insert_ability_roll(
-        principal.client, scores={ability.value: score for ability, score in rolled.scores.items()}, seed=seed
+        principal.client,
+        scores={ability.value: score for ability, score in rolled.scores.items()},
+        seed=seed,
+        ability_score_method=method,
     )
     return _ability_roll(row, rolled)
 
@@ -329,6 +370,9 @@ def get_ability_roll(
     roll_id: RollId,
 ) -> AbilityRoll:
     """Return a stored ability roll: its six `scores`, the dice in `rolls`, `eligible_class_ids`, and `used`.
+
+    `ability_score_method` is the method the roll was made with, and the dice in `rolls` are the ones the roll's
+    first response showed.
 
     Use this endpoint to resume character creation after a page reload. When `used` is `false`, pass `id` as
     `ability_roll_id` to `POST /v1/characters`. When `used` is `true`, the roll has already created a character and
@@ -353,7 +397,8 @@ def get_ability_roll(
             ],
             409: [
                 "`ability_roll_used`: A character was already created from this roll, so `POST /v1/characters` "
-                "would refuse it too. Create a new roll with `POST /v1/ability-rolls`."
+                "would refuse it too. Create a new roll with `POST /v1/ability-rolls`.",
+                _RULESET_MISMATCH,
             ],
             422: [
                 VALIDATION_ERROR + " A body with `seed` or `ability_roll_id` returns this code too, as does any member "
@@ -384,17 +429,23 @@ def preview_character(
     - A choice that `POST /v1/characters` refuses gets the same 422 `character_invalid` here, with the same members,
       and the roll stays unused.
 
-    For one roll, `hit_point_roll` and `gold_roll` change only when `class_id` or `hp_reroll_at_first_level` changes.
-    The `adjustment`, `starting_spell_ids`, `extra_languages`, `name`, `alignment`, `purchases`, and `equip_item_ids`
-    change neither roll. So once the player has chosen a class and the reroll option, you can show the hit points and
-    gold and let the player make every other choice without the dice changing. A different class or reroll option can
-    change the gold as well as the hit points.
+    For one roll, `gold_roll` changes only when `class_id` or the ruleset's `hp_reroll_at_first_level` changes, and
+    `hit_point_roll` changes only with those two and the ruleset's `max_hp_at_first_level`. The `adjustment`,
+    `starting_spell_ids`, `extra_languages`, `name`, `alignment`, `purchases`, and `equip_item_ids` change neither
+    roll. So once the player has chosen a class under the table's ruleset, you can show the hit points and gold and
+    let the player make every other choice without the dice changing. A different class or reroll option can change
+    the gold as well as the hit points.
+
+    Send the `ruleset` you sent to `POST /v1/ability-rolls` for this roll. A ruleset with another
+    `ability_score_method` than the roll's gets 409 `ability_roll_ruleset_mismatch`, and so does a request with no
+    `ruleset` for a roll made with `4d6_drop_lowest`.
 
     The response has no `seed`, because the roll's seed stays private, and no `id`, because the server stores no
     character. `character.id` is `null`. A `player` key and a `referee` key can both call this operation.
     """
     roll = _unused_roll(_db(request), principal.client, roll_id)
-    previewed = character_from_roll(body, roll.seed, scores_from_json(roll.scores))
+    method = ability_score_method(roll.ability_score_method)
+    previewed = character_from_roll(body, roll.seed, scores_from_json(roll.scores), method)
     return CharacterPreview(character=previewed.character, derived=_derived(previewed.character), rolls=previewed.rolls)
 
 
@@ -410,7 +461,8 @@ def preview_character(
             404: ["`not_found`: Your client has no ability roll with the id in `ability_roll_id`."],
             409: [
                 "`ability_roll_used`: A character was already created from `ability_roll_id`. Deleting that "
-                "character doesn't reset the roll. Create a new roll with `POST /v1/ability-rolls`."
+                "character doesn't reset the roll. Create a new roll with `POST /v1/ability-rolls`.",
+                _RULESET_MISMATCH,
             ],
             422: [
                 VALIDATION_ERROR + " Sending both `seed` and `ability_roll_id` returns this code too.",
@@ -427,7 +479,10 @@ def create_character(request: Request, principal: CurrentPrincipal, body: Charac
 
     When `ability_roll_id` (from `POST /v1/ability-rolls`) is provided, the character uses those scores, draws hit
     points and starting gold from that roll's seed, and marks the roll `used` in the same transaction. Without
-    `ability_roll_id`, the server rolls ability scores first. osrlib then validates and applies choices in order:
+    `ability_roll_id`, the server rolls ability scores first, with the `ability_score_method` of `ruleset`. The
+    ruleset's `hp_reroll_at_first_level` and `max_hp_at_first_level` decide the hit point roll either way. With an
+    `ability_roll_id`, send the `ruleset` you sent for the roll, because another `ability_score_method` than the
+    roll's gets 409 `ability_roll_ruleset_mismatch`. osrlib then validates and applies choices in order:
     class requirements, ability `adjustment`, `starting_spell_ids`, hit point roll, `extra_languages`, starting gold
     roll, `purchases`, and `equip_item_ids`. Creation stops at the first invalid step with 422 `character_invalid`
     and stores nothing.
@@ -442,7 +497,8 @@ def create_character(request: Request, principal: CurrentPrincipal, body: Charac
         seed = referee_seed(body.seed, principal)
         return _store(db, principal.client, roll_character(body, seed).character)
     roll = _unused_roll(db, principal.client, body.ability_roll_id)
-    created = character_from_roll(body, roll.seed, scores_from_json(roll.scores))
+    method = ability_score_method(roll.ability_score_method)
+    created = character_from_roll(body, roll.seed, scores_from_json(roll.scores), method)
     return _store(db, principal.client, created.character, body.ability_roll_id)
 
 
@@ -594,8 +650,8 @@ def generate_character(body: GenerateCharacterRequest) -> GeneratedCharacterResp
 
     osrlib rolls the six ability scores and applies your class, adjustment, spell, language, and equipment choices in
     order, returning the `character`, `derived` stats, and every individual die in `rolls` (`ability_rolls`,
-    `hit_point_roll`, and `gold_roll`). Both `player` and `referee` keys may pass `seed` to reproduce a character, or
-    omit it to draw a new seed.
+    `hit_point_roll`, and `gold_roll`). The `ruleset` decides how osrlib rolls the scores and the hit points. Both
+    `player` and `referee` keys may pass `seed` to reproduce a character, or omit it to draw a new seed.
 
     Because the character isn't stored, it has `id` set to `null` and cannot be passed in `character_ids` to
     `POST /v1/sessions`. To store a character for play, call `POST /v1/characters` instead. This operation rolls new

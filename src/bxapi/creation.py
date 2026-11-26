@@ -20,6 +20,7 @@ problem document has `field`, `index` for a list, and `id`, which locate the inp
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from typing import Literal
 
 from osrlib.core.abilities import AbilityAdjustment, AbilityScore, apply_adjustment, validate_adjustment
 from osrlib.core.alignment import Alignment
@@ -43,12 +44,13 @@ from osrlib.core.rng import RngStream, RngStreams
 from osrlib.core.ruleset import Ruleset
 from osrlib.core.validation import Rejection
 from osrlib.data import load_ability_tables, load_classes, load_equipment, load_spells
-from pydantic import Field
+from pydantic import Field, TypeAdapter
 
-from bxapi.errors import ApiError, invalid
+from bxapi.errors import ApiError, conflict, invalid
 from bxapi.models import ApiModel, NameText, RequestModel
 
 __all__ = [
+    "AbilityScoreMethod",
     "CharacterChoices",
     "CreationRolls",
     "DerivedValues",
@@ -56,6 +58,7 @@ __all__ = [
     "Purchase",
     "MAX_NAME_LENGTH",
     "MAX_QUANTITY",
+    "ability_score_method",
     "character_from_roll",
     "creation_stream",
     "derive",
@@ -70,6 +73,12 @@ MAX_NAME_LENGTH = 100
 
 MAX_QUANTITY = 10_000
 """The largest `quantity` one purchase can have, in lots."""
+
+AbilityScoreMethod = Literal["3d6", "4d6_drop_lowest"]
+"""A way to roll ability scores: the values of osrlib's `Ruleset.ability_score_method`. osrlib
+exports no name for the type, and `tests/test_characters.py` checks that the two agree."""
+
+_ABILITY_SCORE_METHOD: TypeAdapter[AbilityScoreMethod] = TypeAdapter(AbilityScoreMethod)
 
 
 class Purchase(RequestModel):
@@ -109,22 +118,37 @@ class CharacterChoices(RequestModel):
     purchases: list[Purchase] = []
     """Starting equipment bought in list order from rolled starting gold (3d6 x 10 gp). To show the
     player their gold before they shop, call `POST /v1/ability-rolls/{roll_id}/preview` with the
-    same roll, class, and `hp_reroll_at_first_level`, and read `rolls.gold_roll.total`. The
-    purchases don't change the gold roll."""
+    same roll, class, and `ruleset`, and read `rolls.gold_roll.total`. The purchases don't change
+    the gold roll."""
     equip_item_ids: list[str] = []
     """Purchased item `id` values to wear or wield, applied in list order. Each entry equips one
     purchased stack from `purchases` and must be permitted for `class_id`."""
-    hp_reroll_at_first_level: bool = False
-    """Whether to reroll a first-level hit die result of 1 or 2. Defaults to `false`."""
+    ruleset: Ruleset | None = None
+    """Optional rules for the creation rolls, as osrlib's `Ruleset`. Send the ruleset of the table
+    the character is for, the one you pass to `POST /v1/sessions`. Creation reads three of its
+    fields, and the others change nothing here:
+
+    - `ability_score_method`: `"3d6"` (the default) or `"4d6_drop_lowest"`. With an ability roll,
+      it must be the method the roll was made with, or the request gets 409
+      `ability_roll_ruleset_mismatch`.
+    - `hp_reroll_at_first_level`: reroll a first-level hit die that shows 1 or 2.
+    - `max_hp_at_first_level`: count the first-level hit die as its maximum.
+
+    Omit or set to `null` for the rules as written."""
 
 
 class CreationRolls(ApiModel):
     """Dice rolled by osrlib while creating a first-level character."""
 
     ability_rolls: AbilityScoreRolls
-    """Six ability scores as rolled (3d6 each) before any `adjustment`, with the three dice for each."""
+    """Six ability scores as rolled, before any `adjustment`, with the three dice that count toward
+    each in `rolls`. With the `4d6_drop_lowest` method, `dropped` has the fourth die of each
+    ability, and it's empty for a `3d6` roll. `sub_par` is `true` when the scores as rolled are
+    sub-par under the B/X rule that lets a referee allow a new roll."""
     hit_point_roll: HitPointRoll
-    """First-level hit point roll, including any rerolled dice and the Constitution modifier."""
+    """First-level hit point roll, including any rerolled dice and the Constitution modifier.
+    `maximized` is `true` when the ruleset's `max_hp_at_first_level` set the hit points to the hit
+    die's size plus the modifier, and `rolls` still lists every die thrown."""
     gold_roll: RollResult
     """Starting gold roll (3d6 x 10 gp). Its `total` is the gold pieces before `purchases`."""
 
@@ -284,7 +308,8 @@ def roll_character(choices: CharacterChoices, seed: int) -> GeneratedCharacter:
 
     The function draws from osrlib's character creation stream for `seed`, in the order that
     osrlib's `create_character` draws: scores, hit points, then gold. So the same seed and
-    choices give the character `create_character` returns. The steps after the ability roll are
+    choices give the character `create_character` returns under the same ruleset. The ruleset's
+    `ability_score_method` decides how the scores are rolled. The steps after the ability roll are
     the ones [`character_from_roll`][bxapi.creation.character_from_roll] lists.
 
     Args:
@@ -300,17 +325,21 @@ def roll_character(choices: CharacterChoices, seed: int) -> GeneratedCharacter:
     """
     definition = _class(choices.class_id)
     stream = creation_stream(seed)
-    ability_rolls = roll_ability_scores(stream)
+    ability_rolls = roll_ability_scores(stream, method=_ruleset(choices).ability_score_method)
     character, hit_point_roll, gold_roll = _create(choices, definition, dict(ability_rolls.scores), stream)
     rolls = CreationRolls(ability_rolls=ability_rolls, hit_point_roll=hit_point_roll, gold_roll=gold_roll)
     return GeneratedCharacter(character=character, rolls=rolls)
 
 
-def character_from_roll(choices: CharacterChoices, seed: int, scores: dict[AbilityScore, int]) -> GeneratedCharacter:
+def character_from_roll(
+    choices: CharacterChoices, seed: int, scores: dict[AbilityScore, int], method: AbilityScoreMethod
+) -> GeneratedCharacter:
     """Create a first-level character from a stored ability roll and the seed it was rolled from.
 
     The function re-creates the creation stream for `seed` and rolls the ability scores on it
-    again, so the hit points and the gold come from the same draws on every call. The character
+    again with `method`, so the hit points and the gold come from the same draws on every call. The
+    choices' ruleset must name the same method, because a roll made with one method can't make a
+    character under a ruleset that asks for another. The character
     gets `scores`, the scores the player saw. With the osrlib that rolled them, the scores rolled
     again are the same, and the character is the one osrlib's `create_character` returns for the
     same seed and choices.
@@ -335,8 +364,10 @@ def character_from_roll(choices: CharacterChoices, seed: int, scores: dict[Abili
     8. The `Character` constructor, then `choose_starting_spells` to write the spell book.
 
     Only steps 4 and 6 draw from the stream. Step 4 draws once for the class's hit die, and again
-    for each 1 or 2 when `hp_reroll_at_first_level` is on. So for one seed, the hit point roll and
-    the gold roll change only with `class_id` and `hp_reroll_at_first_level`. The hit points also
+    for each 1 or 2 when the ruleset's `hp_reroll_at_first_level` is on. Its
+    `max_hp_at_first_level` changes the hit points and draws the same dice. So for one seed, the
+    gold roll changes only with `class_id` and `hp_reroll_at_first_level`, and the hit point roll
+    changes only with those two and `max_hp_at_first_level`. The hit points also
     add the Constitution modifier, which no adjustment changes. osrlib lets an adjustment lower
     only Strength, Intelligence, and Wisdom and raise only a prime requisite, and no class in
     osrlib's catalog has Constitution as a prime requisite.
@@ -345,18 +376,27 @@ def character_from_roll(choices: CharacterChoices, seed: int, scores: dict[Abili
         choices: The player's choices.
         seed: The seed the stored roll was rolled from.
         scores: The stored roll's six ability scores.
+        method: The method the stored roll was rolled with.
 
     Returns:
         The character, and the dice rolled for it.
 
     Raises:
-        ApiError: With status 422 and the code `character_invalid`, at the first step that
-            refuses a choice. The error includes osrlib's rejections when the step returns
-            them.
+        ApiError: With status 409 and the code `ability_roll_ruleset_mismatch`, when the choices'
+            ruleset names another method than `method`. With status 422 and the code
+            `character_invalid`, at the first step that refuses a choice. That error includes
+            osrlib's rejections when the step returns them.
     """
+    wanted = _ruleset(choices).ability_score_method
+    if wanted != method:
+        detail = (
+            f"The ability roll was made with the method {method!r}, and the request's ruleset has {wanted!r}. "
+            "Send the ruleset the roll was made under, or make a new roll."
+        )
+        raise conflict("ability_roll_ruleset_mismatch", detail, ability_score_method=method)
     definition = _class(choices.class_id)
     stream = creation_stream(seed)
-    ability_rolls = roll_ability_scores(stream)
+    ability_rolls = roll_ability_scores(stream, method=method)
     character, hit_point_roll, gold_roll = _create(choices, definition, scores, stream)
     rolls = CreationRolls(ability_rolls=ability_rolls, hit_point_roll=hit_point_roll, gold_roll=gold_roll)
     return GeneratedCharacter(character=character, rolls=rolls)
@@ -379,8 +419,7 @@ def _create(
     if rejections:
         raise _refused("The starting spells don't fit the class's first spell book.", rejections)
     con_modifier = load_ability_tables().hit_point_modifier(scores[AbilityScore.CON])
-    ruleset = Ruleset(hp_reroll_at_first_level=choices.hp_reroll_at_first_level)
-    hit_point_roll = roll_hit_points(definition, con_modifier, ruleset, stream)
+    hit_point_roll = roll_hit_points(definition, con_modifier, _ruleset(choices), stream)
     rejections = validate_extra_languages(definition, scores[AbilityScore.INT], choices.extra_languages)
     if rejections:
         raise _refused("The extra languages aren't allowed for this character.", rejections)
@@ -405,6 +444,32 @@ def _create(
     if rejections:
         raise _refused("The starting spells don't fit the class's first spell book.", rejections)
     return character, hit_point_roll, gold_roll
+
+
+def _ruleset(choices: CharacterChoices) -> Ruleset:
+    return choices.ruleset or Ruleset()
+
+
+def ability_score_method(stored: str) -> AbilityScoreMethod:
+    """Return a stored ability roll's method as the type osrlib's functions take.
+
+    Args:
+        stored: The method as the database stores it.
+
+    Returns:
+        The same value.
+
+    Raises:
+        pydantic.ValidationError: If `stored` isn't a method osrlib has.
+
+    Examples:
+        ```python
+        from bxapi.creation import ability_score_method
+
+        assert ability_score_method("4d6_drop_lowest") == "4d6_drop_lowest"
+        ```
+    """
+    return _ABILITY_SCORE_METHOD.validate_python(stored)
 
 
 def derive(character: Character) -> DerivedValues:

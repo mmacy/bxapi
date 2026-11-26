@@ -300,7 +300,7 @@ def test_purchases_and_equipment(player: TestClient) -> None:
 def test_the_first_level_hit_point_reroll(referee: TestClient) -> None:
     tables = load_ability_tables()
     for seed in range(1, 9):
-        stored = create_character_via_api(referee, hp_reroll_at_first_level=True, seed=seed)
+        stored = create_character_via_api(referee, ruleset={"hp_reroll_at_first_level": True}, seed=seed)
         character = Character.model_validate(stored["character"])
         # With the reroll, the d8 that counts shows 3 or more.
         floor = max(1, 3 + tables.hit_point_modifier(character.scores[AbilityScore.CON]))
