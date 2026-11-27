@@ -179,8 +179,8 @@ doesn't exist.
   come from osrlib. Where an osrlib description mentions a validation check, the server returns 422
   `validation_error` for a malformed command or request body, and 422 `content_invalid` for an
   uploaded or imported document. A name in code there, like `MAX_SCORE` or `load_ability_tables`,
-  is a constant or a function in osrlib's Python package, documented at
-  <https://mmacy.github.io/osrlib-python/>. For the scores that an ability adjustment can reach,
+  is a constant or a function in osrlib's Python package, documented in the
+  [osrlib reference](https://mmacy.github.io/osrlib-python/). For the scores that an ability adjustment can reach,
   call `GET /v1/ability-rolls/{roll_id}/adjustment-limits`.
 - **JSON bodies.** Send a request body as UTF-8 JSON with `Content-Type: application/json` (or an
   `application/*+json` media type). A non-empty body without a JSON `Content-Type` gets 415
