@@ -22,7 +22,14 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Literal
 
-from osrlib.core.abilities import AbilityAdjustment, AbilityScore, apply_adjustment, validate_adjustment
+from osrlib.core.abilities import (
+    AbilityAdjustment,
+    AbilityScore,
+    AdjustmentLimits,
+    adjustment_limits,
+    apply_adjustment,
+    validate_adjustment,
+)
 from osrlib.core.alignment import Alignment
 from osrlib.core.character import (
     CHARACTER_CREATION_STREAM,
@@ -60,6 +67,7 @@ __all__ = [
     "MAX_QUANTITY",
     "ability_score_method",
     "character_from_roll",
+    "class_adjustment_limits",
     "creation_stream",
     "derive",
     "eligible_class_ids",
@@ -105,9 +113,12 @@ class CharacterChoices(RequestModel):
     adjustment: AbilityAdjustment | None = None
     """Optional point trade between ability scores before rolling hit points, as osrlib's
     `AbilityAdjustment`. Map abilities to lower in `lowered` and abilities to raise in `raised`
-    using keys `str`, `int`, `wis`, `dex`, `con`, and `cha`. If osrlib refuses the trade, creation
-    fails with 422 `character_invalid` and `rejections`. Omit or set to `null` to keep the rolled
-    scores."""
+    using keys `str`, `int`, `wis`, `dex`, `con`, and `cha`. osrlib's descriptions of `lowered` and
+    `raised` name `ADJUSTMENT_FLOOR` and `MAX_SCORE`, which are osrlib's Python constants for the
+    lowest and the highest score a trade can leave. For the scores a trade can reach from a stored
+    ability roll with this class, and the reason for each limit, call
+    `GET /v1/ability-rolls/{roll_id}/adjustment-limits`. If osrlib refuses the trade, creation fails with 422
+    `character_invalid` and `rejections`. Omit or set to `null` to keep the rolled scores."""
     starting_spell_ids: list[str] = []
     """First-level spell `id` values from `GET /v1/rules/spells` for an arcane caster's starting
     spell book. A first-level `magic_user` or `elf` requires exactly one first-level `magic_user`
@@ -273,6 +284,45 @@ def _class(class_id: str) -> ClassDefinition:
         raise _bad_input(f"No class has the id {class_id!r}.", "class_id", class_id) from error
 
 
+def _require_class_choice(scores: dict[AbilityScore, int], definition: ClassDefinition) -> None:
+    rejections = validate_class_choice(scores, definition)
+    if rejections:
+        raise _refused(f"The ability scores don't meet the requirements of the class {definition.id!r}.", rejections)
+
+
+def class_adjustment_limits(scores: dict[AbilityScore, int], class_id: str) -> AdjustmentLimits:
+    """Return osrlib's limits on the ability score trade for scores as rolled and a class.
+
+    The function refuses a class the way creation does, with the same problem, and then calls
+    osrlib's `adjustment_limits` with the class's `prime_requisites` and `may_not_lower`.
+
+    Args:
+        scores: All six ability scores, as rolled.
+        class_id: The id of a class in osrlib's catalog.
+
+    Returns:
+        osrlib's `AdjustmentLimits`, unchanged.
+
+    Raises:
+        ApiError: With status 422 and the code `character_invalid`, when osrlib has no class with
+            the id, or when the scores don't meet the class's requirements.
+
+    Examples:
+        ```python
+        from osrlib.core.abilities import AbilityScore
+
+        from bxapi.creation import class_adjustment_limits
+
+        scores = dict.fromkeys(AbilityScore, 12)
+        scores[AbilityScore.STR] = 18
+        assert not class_adjustment_limits(scores, "fighter").can_trade
+        ```
+    """
+    definition = _class(class_id)
+    _require_class_choice(scores, definition)
+    return adjustment_limits(scores, definition.prime_requisites, definition.may_not_lower)
+
+
 def _buy_and_equip(inventory: Inventory, definition: ClassDefinition, choices: CharacterChoices) -> None:
     equipment = load_equipment()
     for index, wanted in enumerate(choices.purchases):
@@ -405,9 +455,7 @@ def character_from_roll(
 def _create(
     choices: CharacterChoices, definition: ClassDefinition, scores: dict[AbilityScore, int], stream: RngStream
 ) -> tuple[Character, HitPointRoll, RollResult]:
-    rejections = validate_class_choice(scores, definition)
-    if rejections:
-        raise _refused(f"The ability scores don't meet the requirements of the class {definition.id!r}.", rejections)
+    _require_class_choice(scores, definition)
     if choices.adjustment is not None:
         prime, fixed = definition.prime_requisites, definition.may_not_lower
         rejections = validate_adjustment(scores, choices.adjustment, prime, fixed)

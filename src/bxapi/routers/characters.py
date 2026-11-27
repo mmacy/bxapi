@@ -2,8 +2,8 @@
 
 from typing import Annotated, Any, Self
 
-from fastapi import APIRouter, Body, Path, Request, Response
-from osrlib.core.abilities import AbilityScore
+from fastapi import APIRouter, Body, Path, Query, Request, Response
+from osrlib.core.abilities import AbilityScore, AdjustmentLimits
 from osrlib.core.character import AbilityScoreRolls, Character, roll_ability_scores
 from osrlib.core.ruleset import Ruleset
 from pydantic import model_validator
@@ -16,6 +16,7 @@ from bxapi.creation import (
     DerivedValues,
     ability_score_method,
     character_from_roll,
+    class_adjustment_limits,
     creation_stream,
     derive,
     eligible_class_ids,
@@ -384,6 +385,82 @@ def get_ability_roll(
     return _ability_roll(row)
 
 
+_UNKNOWN_CLASS_OR_UNMET = (
+    "`character_invalid`: osrlib has no class with this `class_id`, and the problem has `field` (`class_id`) and "
+    "`id`. Or the roll's scores don't meet the class's minimum scores, and the problem has osrlib's `rejections`. "
+    "Send a class `id` from the roll's `eligible_class_ids`."
+)
+
+
+@router.get(
+    "/ability-rolls/{roll_id}/adjustment-limits",
+    tags=["characters"],
+    summary="Get the limits on an ability score trade",
+    response_description="osrlib's `AdjustmentLimits` for the roll's scores as rolled and the class.",
+    responses=problem_responses(
+        {
+            404: [
+                "`not_found`: Your client has no ability roll with this id, including a roll that another client "
+                "created. `POST /v1/ability-rolls` creates one."
+            ],
+            422: [VALIDATION_ERROR + " A request without `class_id` returns this code.", _UNKNOWN_CLASS_OR_UNMET],
+        }
+    ),
+)
+def get_adjustment_limits(
+    request: Request,
+    principal: CurrentPrincipal,
+    roll_id: RollId,
+    class_id: Annotated[
+        str, Query(description="Character class `id` from the roll's `eligible_class_ids`, such as `fighter`.")
+    ],
+) -> AdjustmentLimits:
+    """Return how far the `adjustment` trade can move each of this roll's ability scores for a class.
+
+    The response is osrlib's `AdjustmentLimits`, unchanged. osrlib computes it from the roll's scores as rolled and
+    from the class's prime requisites and `may_not_lower`, so it holds for every trade on this roll and class. Read it
+    once, when the player picks a class, and use it to drive the adjustment step's controls. A trade that
+    `POST /v1/characters` or `POST /v1/ability-rolls/{roll_id}/preview` refuses doesn't change it.
+
+    Count the points the current trade buys: `raise_step` for each step of lowering. Then drive each ability's
+    controls from its entry in `abilities`:
+
+    - A lower control takes `lower_step` off the ability. Enable it while the current score is above `lowest` and the
+      points bought are below `max_points`. When the score is at `lowest`, show `lowest_reason`. Otherwise show
+      `max_points_reason`.
+    - A raise control adds `raise_step` to the ability. Enable it while the current score is below `highest` and the
+      trade has a point that it bought and hasn't spent. When the score is at `highest`, show `highest_reason`.
+      Otherwise the player has no point to spend, which your client tracks itself and which has no code.
+    - When `can_trade` is `false`, no trade changes a score. Disable the whole step and show `max_points_reason`.
+
+    For a class with two prime requisites, each one's `highest` is its own limit, and `max_points` caps the points
+    raised across both. The rules above keep the total within `max_points`, because a raise spends a point the trade
+    bought and the lower controls stop buying at `max_points`.
+
+    Each reason is a `Rejection`, with the `code` and `params` that the rejections of a 422 `character_invalid` have:
+
+    - `lowest_reason`: `creation.adjustment.not_lowerable`, `creation.adjustment.prime_requisite_lowered`,
+      `creation.adjustment.class_restriction`, `creation.adjustment.below_floor`, or the code of `max_points_reason`.
+    - `highest_reason`: `creation.adjustment.raise_not_prime_requisite`, `creation.adjustment.above_cap`, or the code
+      of `max_points_reason`.
+    - `max_points_reason`: `creation.adjustment.no_room_to_raise` when the prime requisites have room for only
+      `max_points` points, or `creation.adjustment.no_room_to_lower` when the abilities the class can lower pay for
+      only that many. Both have the params `{"max_points": integer}`. These two codes appear only here, never in the
+      `rejections` of a 422.
+
+    `below_floor` and `above_cap` have the `ability`, and the `score` and `amount` of the first trade osrlib refuses:
+    the rolled score, and the amount that takes it one step past the limit.
+
+    The operation takes no `ruleset` and no other choice, and it works on a used roll, as
+    `GET /v1/ability-rolls/{roll_id}` does. The server stores nothing. A `player` key and a `referee` key can both
+    call this operation.
+    """
+    roll = _db(request).get_ability_roll(principal.client, roll_id)
+    if roll is None:
+        raise not_found("ability roll", roll_id)
+    return class_adjustment_limits(scores_from_json(roll.scores), class_id)
+
+
 @router.post(
     "/ability-rolls/{roll_id}/preview",
     tags=["characters"],
@@ -435,6 +512,10 @@ def preview_character(
     roll. So once the player has chosen a class under the table's ruleset, you can show the hit points and gold and
     let the player make every other choice without the dice changing. A different class or reroll option can change
     the gold as well as the hit points.
+
+    For the limits on the `adjustment`, call `GET /v1/ability-rolls/{roll_id}/adjustment-limits` with the class. It
+    takes no other choice, so it answers before the player has chosen the starting spells that a preview of a
+    `magic_user` or an `elf` requires.
 
     Send the `ruleset` you sent to `POST /v1/ability-rolls` for this roll. A ruleset with another
     `ability_score_method` than the roll's gets 409 `ability_roll_ruleset_mismatch`, and so does a request with no

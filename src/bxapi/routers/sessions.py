@@ -832,7 +832,9 @@ def get_player_view(request: Request, principal: CurrentPrincipal, session_id: S
       `reverses_at` says whether they choose a reversible spell's form at `"memorize"` or at `"cast"`.
     - `item_names` and `item_names_plural`: what to call each item ID the view shows, in a member's `inventory` or
       in the `contents` of a pile in `piles`. `valuable_names` has the own name of each gem or piece of jewellery
-      that has one, keyed by its instance ID.
+      that has one, keyed by its instance ID, to show in a list. `valuable_phrases` has what to call each of those
+      pieces in the middle of a sentence, with its article and its case, such as `"a silver altar candlestick"` or
+      `"Ossor's Eye"`.
     - `encounter`: active encounter state, or `null`. Pass `declarers` to build `resolve_battle_round`, and pass a
       group's `id` as `target_group_id` for attacks, `close`, thrown splash items, and `area` or `hd_budget` spells
       (such as `fire_ball` and `sleep`). Each group also has `members` with individual `"monster-NNNN"` or

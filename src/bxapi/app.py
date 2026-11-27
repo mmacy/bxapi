@@ -178,7 +178,10 @@ doesn't exist.
 - **osrlib's descriptions.** The schema descriptions for commands, events, views, and rules models
   come from osrlib. Where an osrlib description mentions a validation check, the server returns 422
   `validation_error` for a malformed command or request body, and 422 `content_invalid` for an
-  uploaded or imported document.
+  uploaded or imported document. A name in code there, like `MAX_SCORE` or `load_ability_tables`,
+  is a constant or a function in osrlib's Python package, documented at
+  <https://mmacy.github.io/osrlib-python/>. For the scores that an ability adjustment can reach,
+  call `GET /v1/ability-rolls/{roll_id}/adjustment-limits`.
 - **JSON bodies.** Send a request body as UTF-8 JSON with `Content-Type: application/json` (or an
   `application/*+json` media type). A non-empty body without a JSON `Content-Type` gets 415
   `unsupported_media_type`. The server refuses undecodable bytes, integers with more than 4,300
@@ -364,12 +367,15 @@ starting gold from the same seed, so retrying after an invalid choice keeps the 
 
 1. `POST /v1/ability-rolls` rolls and stores six scores, returning `id`, `scores`, and
    `eligible_class_ids`. `GET /v1/ability-rolls/{roll_id}` reads a stored roll again.
-2. `POST /v1/ability-rolls/{roll_id}/preview` returns the character, hit points, and starting
+2. `GET /v1/ability-rolls/{roll_id}/adjustment-limits` returns how far the player can trade
+   ability points for the class they pick, so your client can disable each control that can't
+   change a score.
+3. `POST /v1/ability-rolls/{roll_id}/preview` returns the character, hit points, and starting
    gold that the player's choices would give, without storing anything or using the roll. Call it
    as often as the player changes a choice.
-3. `POST /v1/characters` creates and stores a first-level character from `ability_roll_id` (or
+4. `POST /v1/characters` creates and stores a first-level character from `ability_roll_id` (or
    freshly rolled scores) and the player's choices.
-4. `POST /v1/sessions` starts a game session with the character's `id` in `character_ids`.
+5. `POST /v1/sessions` starts a game session with the character's `id` in `character_ids`.
 
 `GET /v1/characters` lists your client's stored characters, `GET /v1/characters/{character_id}`
 returns one character with its derived stats, and `DELETE /v1/characters/{character_id}` deletes
