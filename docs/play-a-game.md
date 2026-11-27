@@ -82,6 +82,8 @@ The output blocks below format and abbreviate the server's compact JSON with `..
 
    The purchases, the equipment, and every other choice except the class and the `ruleset` leave `hit_point_roll` and `gold_roll` as they are. So you can show the player 90 gp, let them shop, and preview again to check the purchases before you create the character.
 
+   To show the player how far they can trade ability points before you preview, call [`GET /v1/ability-rolls/{roll_id}/adjustment-limits`](https://mmacy.github.io/bxapi/reference/endpoint/characters#operation-get_adjustment_limits) with `class_id=fighter`. The limits depend only on the roll and the class.
+
 4. Create a fighter from that roll with [`POST /v1/characters`](https://mmacy.github.io/bxapi/reference/endpoint/characters#operation-create_character), buying and equipping leather armour (20 gp) and a sword (10 gp) from [`GET /v1/rules/equipment`](https://mmacy.github.io/bxapi/reference/endpoint/rules#operation-list_equipment):
 
    ```sh

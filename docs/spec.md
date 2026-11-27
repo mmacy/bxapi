@@ -143,7 +143,7 @@ Stateless. Any role. Every request body accepts an optional `seed` (an integer f
 | --- | --- | --- |
 | `POST /v1/dice/roll` | `expression`, `times` (1 to 100, default 1) | `expression`, `seed`, and `rolls`: one osrlib `RollResult` (`rolls`, `modifier`, `multiplier`, `total`) for each time. |
 | `POST /v1/generate/character` | The choices `POST /v1/characters` accepts, except `ability_roll_id`. | `seed`, `character`, `derived`, and the creation `rolls`. The server stores nothing. To preview the character a stored ability roll creates, see `POST /v1/ability-rolls/{roll_id}/preview` under **Characters**. |
-| `POST /v1/generate/treasure` | `treasure_type` (a letter), `tier` (`basic` or `expert`) | `seed` and `treasure`, osrlib's generated treasure. |
+| `POST /v1/generate/treasure` | `treasure_type` (a letter), `tier` (`basic` or `expert`) | `seed` and `treasure`, osrlib's generated treasure. Each entry in `treasure.valuables` is osrlib's `ValuableInstance`, whose `phrase` is empty for a rolled piece. |
 | `POST /v1/generate/npc-party` | `kind` (`basic` or `expert`), `count` (1 to 100) | `seed` and `party`, osrlib's NPC party. |
 | `POST /v1/generate/room` | `level_number` (1 or more) | `seed` and `room`, the stocked area osrlib rolled. |
 | `POST /v1/generate/monsters` | `monster_id`, `count` (1 to 100, default 1) | `seed` and `monsters`, each with rolled hit points. |
@@ -161,6 +161,7 @@ B/X players roll ability scores before they choose a class. To support that, a c
 | `POST /v1/ability-rolls` | player | `seed` (referee only), which determines the scores and the hit point and gold rolls, and `ruleset`, osrlib's `Ruleset`, whose `ability_score_method` decides how osrlib rolls the scores. The body is optional. | 201: the roll: `id`, `scores`, `ability_score_method`, `rolls`, `eligible_class_ids`, `used` (`false`), `created_at`. `rolls` is osrlib's `AbilityScoreRolls`. See **Ability score methods**. The server stores the seed and the method, and rolls the dice again from them for each response, as the preview does. |
 | `GET /v1/ability-rolls/{roll_id}` | player | | The roll, with `used` set to whether a character was created from it. |
 | `POST /v1/ability-rolls/{roll_id}/preview` | player | The choices `POST /v1/characters` accepts, except `ability_roll_id` and `seed`. | `character`, `derived`, and the creation `rolls` of the character `POST /v1/characters` would create from the roll. The server stores nothing. |
+| `GET /v1/ability-rolls/{roll_id}/adjustment-limits?class_id={class_id}` | player | | osrlib's `AdjustmentLimits` for the roll's scores and the class. See **Adjustment limits**. |
 | `POST /v1/characters` | player | See below. | 201: the stored character. |
 | `POST /v1/characters/import` | referee | A character document. | 201: the stored character. |
 | `GET /v1/characters` | player | | A page of character summaries: `id`, `name`, `class_id`, `level`, `max_hp`, `created_at`. |
@@ -175,7 +176,7 @@ The body of `POST /v1/characters`:
 | `class_id` | yes | A class id from `/v1/rules/classes`. |
 | `alignment` | yes | `lawful`, `neutral`, or `chaotic`. |
 | `ability_roll_id` | no | Create the character from the roll's scores, with the hit point and gold rolls of the roll's seed. Without it, the server rolls the scores as part of the request. |
-| `adjustment` | no | A trade of ability points, as osrlib's `AbilityAdjustment`: `lowered` and `raised`, each a map from an ability to a number of points. osrlib checks the trade. |
+| `adjustment` | no | A trade of ability points, as osrlib's `AbilityAdjustment`: `lowered` and `raised`, each a map from an ability to a number of points. osrlib checks the trade. `GET /v1/ability-rolls/{roll_id}/adjustment-limits` says how far a trade can move each score from a stored roll. |
 | `starting_spell_ids` | no | An arcane caster's first spells. |
 | `extra_languages` | no | The extra languages a high Intelligence allows. |
 | `purchases` | no | Starting gear to buy, in order: a list of `{item_id, quantity}`. `quantity` is a number of osrlib's purchase lots, from 1 to 10,000, and defaults to 1. osrlib sells weapons and armour one at a time, and gear and ammunition in bundles, so one lot of torches is six torches. |
@@ -217,6 +218,46 @@ An import also gets 422 `content_invalid` when the character has a stat modifier
 A preview and a creation run the same steps on the roll's seed. So every preview of one roll with the same choices returns the same response, and `POST /v1/characters` with the roll and the same choices then stores a character equal to the previewed `character`, with the same hit points, gold, and inventory. A choice that creation refuses gets the same 422 `character_invalid` from the preview, with the same members. A preview never marks the roll used, whether it succeeds or osrlib refuses a choice, and it adds nothing to `storage.used_bytes` unless the request has an `Idempotency-Key`, whose stored response counts as **Storage** under **Conventions** describes. A roll that another client created, or that doesn't exist, gets 404 `not_found`. A used roll gets 409 `ability_roll_used`, because creation would refuse it too.
 
 For one ability roll, `gold_roll` changes only when `class_id` or the ruleset's `hp_reroll_at_first_level` changes, and `hit_point_roll` changes only with those two and the ruleset's `max_hp_at_first_level`. The `adjustment`, `starting_spell_ids`, `extra_languages`, `name`, `alignment`, `purchases`, and `equip_item_ids` change neither roll. A client can therefore show a player the hit points and gold for the chosen class under the table's ruleset, and let the player make every other choice without the dice changing. A change of class or of the reroll option can change the gold as well as the hit points, because osrlib rolls the gold after the hit points, from the same seed, and the number of random draws that the hit point roll takes depends on the class's hit die and on the reroll option. `max_hp_at_first_level` never changes the gold, because osrlib throws the same hit dice with it on.
+
+**Adjustment limits.** `GET /v1/ability-rolls/{roll_id}/adjustment-limits` takes a required `class_id` query parameter and returns osrlib's `AdjustmentLimits`, which osrlib's `adjustment_limits` returns for the roll's scores as rolled and the class's `prime_requisites` and `may_not_lower`. The server returns it unchanged and computes none of it. The limits depend only on the roll and the class, so they hold for every trade on that roll and class, including a trade that the preview or creation refuses with 422 `character_invalid`. A client reads them once, when the player picks a class. The operation takes no `ruleset` and no other choice, so it answers for a `magic_user` or an `elf` before the player has chosen the starting spells that their preview requires. It works on a used roll, as `GET /v1/ability-rolls/{roll_id}` does, and stores nothing. A roll that another client created, or that doesn't exist, gets 404 `not_found`. A request without `class_id` gets 422 `validation_error`. A class osrlib doesn't have gets 422 `character_invalid` with `field` (`class_id`) and `id`, and a class whose minimum scores the roll misses gets 422 `character_invalid` with osrlib's `rejections`. Both are the problems that the preview and creation return for the same class.
+
+| Member | Meaning |
+| --- | --- |
+| `lower_step` | The points one step of lowering takes off an ability. |
+| `raise_step` | The points one step of lowering buys, and one step of raising spends. |
+| `can_trade` | Whether any legal trade changes a score for this roll and class. |
+| `max_points` | The most points a legal trade buys. 0 when `can_trade` is `false`. |
+| `max_points_reason` | Why no trade buys more than `max_points`. Always present. |
+| `abilities` | One entry for each of `str`, `int`, `wis`, `dex`, `con`, and `cha`. |
+
+A *legal trade* is an `adjustment` that osrlib's `validate_adjustment` accepts for the same scores and class. Each entry in `abilities` has these members:
+
+| Member | Meaning |
+| --- | --- |
+| `can_lower` | Whether any legal trade lowers this ability. |
+| `can_raise` | Whether any legal trade raises this ability. |
+| `lowest` | The lowest score a legal trade leaves this ability at. The rolled score when `can_lower` is `false`. |
+| `lowest_reason` | Why the score can't go below `lowest`. Always present. |
+| `highest` | The highest score a legal trade leaves this ability at. The rolled score when `can_raise` is `false`. |
+| `highest_reason` | Why the score can't go above `highest`. Always present. |
+
+Each reason is a `Rejection`, `{code, params}`, the same object as an entry in the `rejections` of 422 `character_invalid`:
+
+- `lowest_reason.code` is `creation.adjustment.not_lowerable`, `creation.adjustment.prime_requisite_lowered`, `creation.adjustment.class_restriction`, `creation.adjustment.below_floor`, or the code of `max_points_reason`.
+- `highest_reason.code` is `creation.adjustment.raise_not_prime_requisite`, `creation.adjustment.above_cap`, or the code of `max_points_reason`.
+- `max_points_reason.code` is `creation.adjustment.no_room_to_raise` when the prime requisites have room for only `max_points` points, which is 0 when each one is 18, or `creation.adjustment.no_room_to_lower` when the abilities the class can lower pay for only that many. Both have the params `{"max_points": integer}`.
+- `no_room_to_raise` and `no_room_to_lower` appear only in `AdjustmentLimits`. osrlib's `validate_adjustment` never returns them, so a 422 `character_invalid` never has them in `rejections`.
+- `below_floor` and `above_cap` have the `ability`, and the `score` and `amount` of the first trade osrlib refuses: the rolled score, and the amount that takes it one step past the limit.
+
+`lowest` accounts for the step, so a score that one step of lowering would take below the floor has `lowest` equal to the score and `can_lower` set to `false`, with `below_floor`. For a class with two prime requisites, each one's `highest` is its own limit, and `max_points` caps the points raised across both.
+
+A client drives the adjustment step from these limits, without a rule of its own. It counts the points the current trade buys, `raise_step` for each step of lowering, and then:
+
+- Enables a lower control, which takes `lower_step` off its ability, while the current score is above `lowest` and the points bought are below `max_points`. At `lowest`, the reason is `lowest_reason`, and otherwise it's `max_points_reason`.
+- Enables a raise control, which adds `raise_step` to its ability, while the current score is below `highest` and the trade has a point it bought and hasn't spent. At `highest`, the reason is `highest_reason`. Otherwise the player has no point to spend, which is the client's own state and has no code.
+- Disables the whole step and shows `max_points_reason` when `can_trade` is `false`.
+
+These rules keep the points raised within `max_points` for a class with two prime requisites too, because a raise spends a point the trade bought and the lower controls stop buying at `max_points`.
 
 `POST /v1/generate/character` runs the same steps and stores nothing. Its `rolls` is the same `{ability_rolls, hit_point_roll, gold_roll}`. With the same seed and choices, it returns the character osrlib's `create_character` returns. It rolls new scores, so it can't preview a stored roll.
 

@@ -137,7 +137,8 @@ def generate_treasure(body: TreasureRequest) -> TreasureResponse:
     osrlib's `generate_treasure` rolls each entry in `GET /v1/rules/tables/treasure` in table order. `coins` reports
     each denomination (`pp`, `gp`, `ep`, `sp`, `cp`), `valuables` lists rolled gems and jewellery with `value_gp`,
     and each entry in `magic_items` includes `template_id` for lookup via `GET /v1/rules/magic-items/{item_id}`. A
-    monster's treasure letters appear on `GET /v1/rules/monsters/{monster_id}` under `treasure`.
+    rolled gem or piece of jewellery has no name of its own, so its `phrase` is empty. A monster's treasure letters
+    appear on `GET /v1/rules/monsters/{monster_id}` under `treasure`.
 
     Any caller may pass `seed` to repeat a roll, or omit it to get a new random seed. In an active session, osrlib
     rolls area and lair treasure automatically during play.

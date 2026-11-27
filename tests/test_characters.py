@@ -5,7 +5,14 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from osrlib.core.abilities import AbilityAdjustment, AbilityScore, apply_adjustment, validate_adjustment
+from osrlib.core.abilities import (
+    AbilityAdjustment,
+    AbilityScore,
+    AdjustmentLimits,
+    adjustment_limits,
+    apply_adjustment,
+    validate_adjustment,
+)
 from osrlib.core.alignment import Alignment
 from osrlib.core.character import (
     CHARACTER_CREATION_STREAM,
@@ -817,6 +824,109 @@ def test_a_used_roll_is_reported_before_a_ruleset_mismatch(player: TestClient) -
         player.post("/v1/characters", json=FIGHTER | {"ability_roll_id": roll["id"]}),
     ):
         assert (response.status_code, response.json()["code"]) == (409, "ability_roll_used")
+
+
+# Adjustment limits
+
+
+def get_limits(caller: TestClient, roll_id: str, class_id: str | None) -> Any:
+    query = {} if class_id is None else {"class_id": class_id}
+    return caller.get(f"/v1/ability-rolls/{roll_id}/adjustment-limits", params=query)
+
+
+def osrlib_limits(scores: dict[str, int], class_id: str) -> AdjustmentLimits:
+    """Return osrlib's limits on the ability score trade for scores as rolled and a class."""
+    definition = load_classes().get(class_id)
+    table = {AbilityScore(key): value for key, value in scores.items()}
+    return adjustment_limits(table, definition.prime_requisites, definition.may_not_lower)
+
+
+def test_the_adjustment_limits_are_osrlibs_for_each_class_the_roll_qualifies_for(referee: TestClient) -> None:
+    roll = referee.post("/v1/ability-rolls", json={"seed": all_classes_seed()}).json()
+    shown = {}
+    for class_id in roll["eligible_class_ids"]:
+        response = get_limits(referee, roll["id"], class_id)
+        assert response.status_code == 200, response.text
+        shown[class_id] = response.json()
+        assert shown[class_id] == osrlib_limits(roll["scores"], class_id).model_dump(mode="json"), class_id
+    assert set(shown) == set(CLASS_IDS)
+    assert shown["fighter"] != shown["cleric"]
+    assert shown["fighter"] != shown["magic_user"]
+
+
+@pytest.mark.parametrize("class_id", ["elf", "magic_user"])
+def test_an_arcane_caster_gets_limits_before_choosing_a_first_spell(referee: TestClient, class_id: str) -> None:
+    roll = referee.post("/v1/ability-rolls", json={"seed": 1832}).json()
+    assert class_id in roll["eligible_class_ids"]
+    refused = preview(referee, roll["id"], FIGHTER | {"class_id": class_id})
+    assert (refused.status_code, refused.json()["code"]) == (422, "character_invalid")
+    response = get_limits(referee, roll["id"], class_id)
+    assert response.status_code == 200, response.text
+    assert response.json() == osrlib_limits(roll["scores"], class_id).model_dump(mode="json")
+
+
+def test_a_used_roll_has_the_same_limits_and_reading_them_stores_nothing(player: TestClient) -> None:
+    roll = player.post("/v1/ability-rolls").json()
+    used_bytes = player.get("/v1/meta").json()["storage"]["used_bytes"]
+    before = get_limits(player, roll["id"], "fighter")
+    assert before.status_code == 200, before.text
+    assert player.get("/v1/meta").json()["storage"]["used_bytes"] == used_bytes
+    assert player.get(f"/v1/ability-rolls/{roll['id']}").json() == roll
+    assert player.post("/v1/characters", json=FIGHTER | {"ability_roll_id": roll["id"]}).status_code == 201
+    after = get_limits(player, roll["id"], "fighter")
+    assert after.status_code == 200, after.text
+    assert after.json() == before.json() == osrlib_limits(roll["scores"], "fighter").model_dump(mode="json")
+
+
+def test_a_roll_with_no_legal_trade_says_why(referee: TestClient) -> None:
+    seed = seed_where(lambda scores: not osrlib_limits(scores, "fighter").can_trade)
+    roll = referee.post("/v1/ability-rolls", json={"seed": seed}).json()
+    shown = get_limits(referee, roll["id"], "fighter").json()
+    assert shown == osrlib_limits(roll["scores"], "fighter").model_dump(mode="json")
+    assert (shown["can_trade"], shown["max_points"]) == (False, 0)
+    assert shown["max_points_reason"]["params"] == {"max_points": 0}
+
+
+def test_a_class_with_two_prime_requisites_has_a_limit_for_each(referee: TestClient) -> None:
+    primes = load_classes().get("elf").prime_requisites
+    assert len(primes) == 2
+
+    def both_can_rise(scores: dict[str, int]) -> bool:
+        if "elf" not in osrlib_eligible(scores):
+            return False
+        limits = osrlib_limits(scores, "elf")
+        return all(limits.abilities[ability].can_raise for ability in primes)
+
+    roll = referee.post("/v1/ability-rolls", json={"seed": seed_where(both_can_rise)}).json()
+    shown = get_limits(referee, roll["id"], "elf").json()
+    assert shown == osrlib_limits(roll["scores"], "elf").model_dump(mode="json")
+    assert all(shown["abilities"][ability.value]["can_raise"] for ability in primes)
+
+
+def test_limits_for_a_class_osrlib_refuses_are_the_previews_refusal(referee: TestClient) -> None:
+    roll = referee.post("/v1/ability-rolls", json={"seed": seed_where(lambda scores: scores["con"] < 9)}).json()
+    for class_id in ("dwarf", "no_such_class"):
+        refused = get_limits(referee, roll["id"], class_id)
+        assert (refused.status_code, refused.json()["code"]) == (422, "character_invalid")
+        previewed = preview(referee, roll["id"], FIGHTER | {"class_id": class_id})
+        assert problem_without_id(refused) == problem_without_id(previewed)
+    assert get_limits(referee, roll["id"], "no_such_class").json()["field"] == "class_id"
+    assert get_limits(referee, roll["id"], "dwarf").json()["rejections"]
+
+
+def test_limits_without_a_class_are_a_validation_error(player: TestClient) -> None:
+    roll = player.post("/v1/ability-rolls").json()
+    response = get_limits(player, roll["id"], None)
+    assert (response.status_code, response.json()["code"]) == (422, "validation_error")
+
+
+def test_limits_for_another_clients_roll_or_an_unknown_roll_are_not_found(
+    player: TestClient, other: TestClient
+) -> None:
+    roll = player.post("/v1/ability-rolls").json()
+    stolen = get_limits(other, roll["id"], "fighter")
+    assert (stolen.status_code, stolen.json()["code"], stolen.json()["id"]) == (404, "not_found", roll["id"])
+    assert get_limits(player, "rol_5mJq0nY2bXr8TzW4cH1eKd", "fighter").status_code == 404
 
 
 # Import, list, get, and delete
