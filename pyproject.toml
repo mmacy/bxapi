@@ -1,6 +1,6 @@
 [project]
 name = "bxapi"
-version = "0.1.0"
+version = "0.2.0"
 description = "HTTP API for the B/X rules, built with FastAPI on osrlib"
 readme = "README.md"
 license = "MIT"

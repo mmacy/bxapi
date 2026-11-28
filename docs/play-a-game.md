@@ -19,7 +19,7 @@ Walk through a dungeon-crawl session (one game in progress) of `builtin-barrow`,
 
    ```json
    {
-     "api_version": "0.1.0",
+     "api_version": "0.2.0",
      "engine_version": "2.11.0",
      "schema_version": 4,
      "auth_enabled": true,
