@@ -16,8 +16,8 @@ jobs:
   gate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.4.0
       - run: uv sync --locked
       - run: uv run ruff format --check
       - run: uv run ruff check
@@ -30,9 +30,9 @@ jobs:
   docs:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.4.0
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -42,10 +42,11 @@ jobs:
         working-directory: website
       - run: npm run build
         working-directory: website
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         with:
           path: website/build
+          include-hidden-files: true
 
   # Publishes the site to GitHub Pages at https://mmacy.github.io/bxapi/ when a push to main
   # passes the gate. The repository's Pages source is "GitHub Actions", so the job needs no
@@ -62,7 +63,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
 
   # Installs the lowest version that pyproject.toml allows of each direct dependency, so the
   # lower bounds stay true. The sync resolves again and rewrites uv.lock in the runner's checkout
@@ -70,7 +71,7 @@ jobs:
   lowest-direct:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.4.0
       - run: uv sync --resolution lowest-direct
       - run: uv run --no-sync pytest
