@@ -18,7 +18,7 @@ from osrlib.core.rng import RngStreams
 from osrlib.core.ruleset import Ruleset
 from osrlib.core.spells import SpellTemplate
 from osrlib.crawl.adventure import Adventure, TownSpec
-from osrlib.crawl.battle import preview_battle_round
+from osrlib.crawl.battle import BattleCandidate, preview_battle_round
 from osrlib.crawl.commands import ALL_COMMAND_CLASSES, BattleDeclaration, SessionMode, SetFlag, parse_command
 from osrlib.crawl.dungeon import AreaSpec, DungeonSpec, Edge, EdgeKind, LevelSpec, WanderingSpec
 from osrlib.crawl.interpreter import Interpreter
@@ -34,6 +34,7 @@ from bxapi.adventures import adventure_document, builtin_adventures
 from bxapi.app import create_app
 from bxapi.commands import command_kind
 from bxapi.db import Database
+from bxapi.routers.sessions import MAX_PREVIEW_CANDIDATE_TARGETS, MAX_PREVIEW_CANDIDATES
 from bxapi.session_manager import MAX_PARTY_SIZE, SessionManager, session_busy, session_unreadable
 from bxapi.settings import Settings
 
@@ -53,6 +54,7 @@ JOURNAL = {"command_type": "add_journal_entry", "text": "A line from the referee
 ENGAGE = {"command_type": "engage_battle"}
 TO_BATTLE = [ENTER, EAST, EAST, ENGAGE]
 """Commands that take the test party into a battle with the barrow's goblins, with the test seed."""
+FIGHTING_WITHDRAWAL = {"character_id": "character-0001", "action": "move", "move": "fighting_withdrawal"}
 INFO_KEYS = {
     "id",
     "name",
@@ -596,10 +598,163 @@ def test_a_preview_of_a_member_who_cannot_declare_is_422(
     problem(preview(player, session["id"], plan), 422, "declaration_invalid")
 
 
+def candidate(member: str, target_ids: list[str], **declaration: Any) -> dict[str, Any]:
+    """Return a `BattleCandidate` body that judges an `attack` by a member at group ids."""
+    return {
+        "declaration": {"character_id": member, "action": "attack"} | declaration,
+        "target_field": "target_group_id",
+        "target_ids": target_ids,
+    }
+
+
+def test_a_preview_judges_each_candidate_at_each_target(player: TestClient, referee: TestClient) -> None:
+    session = start(referee)
+    oracle = Oracle(roll_characters())
+    for command in TO_BATTLE:
+        send(player, session["id"], command)
+        oracle.execute(command)
+    first, second = ok(player.get(f"/v1/sessions/{session['id']}/view"))["encounter"]["declarers"]
+    plan = [{"character_id": second, "action": "hold"}]
+    candidates = [
+        candidate(first, ["group-0001", "group-0009"], move="close"),
+        candidate(second, ["group-0001"]),
+    ]
+    body = {"declarations": plan, "candidates": candidates}
+    found = ok(player.post(f"/v1/sessions/{session['id']}/battle-round/preview", json=body))
+    expected = preview_battle_round(
+        oracle.game,
+        [BattleDeclaration.model_validate(entry) for entry in plan],
+        [BattleCandidate.model_validate(entry) for entry in candidates],
+    )
+    assert found == expected.model_dump(mode="json")
+    closing, standing = found["candidates"]
+    assert closing["rejections"]["group-0001"] == []
+    assert [rejection["code"] for rejection in closing["rejections"]["group-0009"]] == [
+        "battle.declaration.unknown_group"
+    ]
+    assert closing["attack_kinds"] == {"group-0001": "melee"}
+    # The candidate takes the place of the member's planned `hold`, so the plan's own rejections don't change.
+    assert [rejection["code"] for rejection in standing["rejections"]["group-0001"]] == ["combat.attack.out_of_reach"]
+    assert found["rejections"] == {second: []}
+
+
+def test_a_preview_without_candidates_is_unchanged(player: TestClient, referee: TestClient) -> None:
+    session = start(referee)
+    for command in TO_BATTLE:
+        send(player, session["id"], command)
+    plan = [{"character_id": "character-0001", "action": "attack", "target_group_id": "group-0001"}]
+    without = ok(preview(player, session["id"], plan))
+    assert without["candidates"] == []
+    empty = {"declarations": plan, "candidates": []}
+    assert ok(player.post(f"/v1/sessions/{session['id']}/battle-round/preview", json=empty)) == without
+
+
+@pytest.mark.parametrize(
+    ("candidates", "message"),
+    [
+        (
+            [candidate("character-0001", ["group-0001"]), candidate("character-0099", ["group-0001"])],
+            "candidate 1 for 'character-0099' names a member who isn't one of this round's declarers",
+        ),
+        (
+            [candidate("character-0001", ["group-0001"], target_group_id="group-0001")],
+            "candidate 0 for 'character-0001' already sets target_group_id",
+        ),
+        (
+            [
+                {
+                    "declaration": {"character_id": "character-0002", "action": "use_item", "targets": ["a"]},
+                    "target_field": "targets",
+                    "target_ids": ["character-0001"],
+                }
+            ],
+            "candidate 0 for 'character-0002' already sets targets",
+        ),
+        (
+            [candidate("character-0001", ["group-0001", "group-0001"])],
+            "candidate 0 for 'character-0001' repeats the target id 'group-0001'",
+        ),
+        (
+            [{**candidate("character-0001", ["group-0001"]), "declaration": FIGHTING_WITHDRAWAL}],
+            "candidate 0 for 'character-0001' makes a fighting_withdrawal, which can't be a candidate",
+        ),
+        (
+            [
+                {
+                    **candidate("character-0001", ["group-0001"]),
+                    "declaration": {"character_id": "character-0001", "action": "move", "move": "retreat"},
+                }
+            ],
+            "candidate 0 for 'character-0001' makes a retreat, which can't be a candidate",
+        ),
+    ],
+)
+def test_a_malformed_candidate_is_422(
+    player: TestClient, referee: TestClient, candidates: list[dict[str, Any]], message: str
+) -> None:
+    session = start(referee)
+    for command in TO_BATTLE:
+        send(player, session["id"], command)
+    body = {"declarations": [], "candidates": candidates}
+    response = player.post(f"/v1/sessions/{session['id']}/battle-round/preview", json=body)
+    found = problem(response, 422, "declaration_invalid")
+    assert found["detail"] == f"osrlib can't judge the request: {message}"
+
+
+@pytest.mark.parametrize(
+    ("candidates", "error_type", "message"),
+    [
+        # One candidate more than the limit.
+        (
+            [candidate("character-0001", ["group-0001"])] * (MAX_PREVIEW_CANDIDATES + 1),
+            "too_long",
+            "List should have at most 64 items after validation, not 65",
+        ),
+        # One candidate and target pair more than the limit, over fewer candidates than the limit.
+        (
+            [candidate("character-0001", [f"group-{index:04}" for index in range(MAX_PREVIEW_CANDIDATE_TARGETS // 4)])]
+            * 4
+            + [candidate("character-0002", ["group-0001"])],
+            "value_error",
+            "Value error, the candidates list 257 target ids in all, and a preview judges at most 256",
+        ),
+    ],
+)
+def test_a_preview_over_a_candidate_limit_is_a_validation_error(
+    referee: TestClient, candidates: list[dict[str, Any]], error_type: str, message: str
+) -> None:
+    session = start(referee)
+    for command in TO_BATTLE:
+        send(referee, session["id"], command)
+    body = {"declarations": [], "candidates": candidates}
+    response = referee.post(f"/v1/sessions/{session['id']}/battle-round/preview", json=body)
+    found = problem(response, 422, "validation_error")
+    assert found["errors"] == [{"loc": ["body", "candidates"], "msg": message, "type": error_type}]
+
+
+def test_a_preview_at_the_candidate_limits_is_judged(player: TestClient, referee: TestClient) -> None:
+    session = start(referee)
+    for command in TO_BATTLE:
+        send(player, session["id"], command)
+    per_candidate = MAX_PREVIEW_CANDIDATE_TARGETS // MAX_PREVIEW_CANDIDATES
+    candidates = [
+        candidate(
+            f"character-000{1 + index % 2}",
+            [f"group-{index * per_candidate + offset:04}" for offset in range(per_candidate)],
+        )
+        for index in range(MAX_PREVIEW_CANDIDATES)
+    ]
+    body = {"declarations": [], "candidates": candidates}
+    found = ok(player.post(f"/v1/sessions/{session['id']}/battle-round/preview", json=body))
+    assert sum(len(judgement["rejections"]) for judgement in found["candidates"]) == MAX_PREVIEW_CANDIDATE_TARGETS
+
+
 @pytest.mark.parametrize(
     "body",
     [
         {"declarations": [{"character_id": "character-0001", "action": "hold"}] * (MAX_PARTY_SIZE + 1)},
+        {"declarations": [], "candidates": [{"target_field": "target_group_id", "target_ids": []}]},
+        {"declarations": [], "candidates": [candidate("character-0001", []) | {"target_field": "area"}]},
         {"declarations": [], "expected_revision": 3},
         {"declarations": [{"character_id": "character-0001", "action": "dance"}]},
         {},

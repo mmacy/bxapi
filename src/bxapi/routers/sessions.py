@@ -18,14 +18,14 @@ from osrlib.core.ruleset import Ruleset
 from osrlib.core.spells import SpellTemplate
 from osrlib.core.validation import Rejection
 from osrlib.crawl import battle
-from osrlib.crawl.battle import BattleRoundPreview
+from osrlib.crawl.battle import BattleCandidate, BattleRoundPreview
 from osrlib.crawl.commands import ALL_COMMAND_CLASSES, AnyCommand, BattleDeclaration, Command, SessionMode
 from osrlib.crawl.events import AnyEvent
 from osrlib.crawl.party import Party
 from osrlib.crawl.session import GameSession
 from osrlib.crawl.views import PlayerView, RefereeView, build_player_view, build_referee_view
 from osrlib.messages import format_message
-from pydantic import Field, ValidationError, model_validator
+from pydantic import Field, ValidationError, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
 
 from bxapi.adventures import find_adventure
@@ -50,6 +50,8 @@ from bxapi.seeds import Seed, referee_seed
 from bxapi.session_manager import MAX_PARTY_SIZE, SessionManager
 
 __all__ = [
+    "MAX_PREVIEW_CANDIDATES",
+    "MAX_PREVIEW_CANDIDATE_TARGETS",
     "NAME_MAX_LENGTH",
     "BattleRoundPreviewRequest",
     "Clock",
@@ -247,12 +249,40 @@ class CreateSaveRequest(RequestModel):
     default) for an unlabeled save."""
 
 
+MAX_PREVIEW_CANDIDATES = 64
+"""The most candidates one battle round preview judges."""
+MAX_PREVIEW_CANDIDATE_TARGETS = 256
+"""The most candidate and target pairs one battle round preview judges, counted over every candidate's `target_ids`."""
+
+
 class BattleRoundPreviewRequest(RequestModel):
-    """The declarations planned so far for a battle round, for `POST /v1/sessions/{session_id}/battle-round/preview`."""
+    """The planned declarations and the candidate actions for `POST /v1/sessions/{session_id}/battle-round/preview`."""
 
     declarations: list[BattleDeclaration] = Field(max_length=MAX_PARTY_SIZE)
     """osrlib `BattleDeclaration` objects, at most one for each member ID in `encounter.declarers` of the player view,
     in any order. Pass any subset of the declarers, including none (`[]`). At most 20 entries."""
+    candidates: list[BattleCandidate] = Field(default=[], max_length=MAX_PREVIEW_CANDIDATES)
+    """osrlib `BattleCandidate` objects: the actions a member could declare, each to be judged at every id in its
+    `target_ids`. The response's `candidates` has one judgement for each, in the order you send them. Omit the field,
+    or send `[]`, for a preview without candidates. At most 64 entries, with at most 256 target IDs counted over every
+    candidate's `target_ids`.
+
+    Build each candidate from a declaration that leaves its target out: set `declaration` to a `BattleDeclaration`
+    for a member in `encounter.declarers`, with the field that `target_field` names left at its default
+    (`target_group_id` `null`, or `targets` empty). Set `target_field` to `"target_group_id"` to judge group IDs from
+    `encounter.groups`, or to `"targets"` to judge member, monster, or NPC IDs, and list the IDs in `target_ids`
+    with none repeated."""
+
+    @field_validator("candidates")
+    @classmethod
+    def _candidate_targets_fit(cls, candidates: list[BattleCandidate]) -> list[BattleCandidate]:
+        pairs = sum(len(candidate.target_ids) for candidate in candidates)
+        if pairs > MAX_PREVIEW_CANDIDATE_TARGETS:
+            raise ValueError(
+                f"the candidates list {pairs} target ids in all, and a preview judges at most "
+                f"{MAX_PREVIEW_CANDIDATE_TARGETS}"
+            )
+        return candidates
 
 
 class CommandChoice(ApiModel):
@@ -733,8 +763,8 @@ def send_command(
 @router.post(
     "/{session_id}/battle-round/preview",
     summary="Preview a battle round",
-    response_description="osrlib's `BattleRoundPreview`: each declaration's rejections, keyed by member ID, and "
-    "where the members would stand.",
+    response_description="osrlib's `BattleRoundPreview`: each declaration's rejections, keyed by member ID, where the "
+    "members would stand, and a judgement for each candidate you sent.",
     responses=problem_responses(
         {
             404: [_NOT_FOUND],
@@ -744,10 +774,17 @@ def send_command(
                 _BUSY,
             ],
             422: [
-                VALIDATION_ERROR + " More than 20 `declarations` returns this code too.",
-                "`declaration_invalid`: A declaration names a member who isn't in `encounter.declarers`, or two "
-                "declarations name the same member. Send at most one declaration for each member in "
-                "`encounter.declarers`.",
+                VALIDATION_ERROR + " More than 20 `declarations`, more than 64 `candidates`, or more than 256 target "
+                "IDs counted over every candidate's `target_ids` returns this code too. Split the candidates over "
+                "several previews.",
+                "`declaration_invalid`: osrlib can't judge a declaration or a candidate, and `detail` ends with "
+                "osrlib's reason. A declaration names a member who isn't in `encounter.declarers`, or two declarations "
+                "name the same member. Or a candidate names a member who isn't in `encounter.declarers`, its "
+                "declaration already sets the field that `target_field` names, its `target_ids` repeats an ID, or its "
+                "declaration is a `move` with `fighting_withdrawal` or `retreat`. osrlib's reason for a candidate "
+                "starts with `candidate`, the candidate's zero-based position in `candidates`, and the member's ID, "
+                "such as `candidate 0 for 'character-0001' already sets target_group_id`. Fix that declaration or "
+                "candidate before you send the request again.",
             ],
             500: [INTERNAL_ERROR, _UNREADABLE],
         }
@@ -773,6 +810,44 @@ def preview_battle_round(
     `can_back_stab` lists the declarers who could declare an `attack` with `back_stab`. Use them to offer those two
     choices only to a member the session would accept them from.
 
+    To learn which targets each action on a member's menu reaches before the player picks one, send the actions in
+    `candidates`. A candidate is an osrlib `BattleCandidate`: a `declaration` that leaves out its target, the
+    `target_field` that each target ID goes in (`"target_group_id"` or `"targets"`), and the `target_ids` to judge
+    it at. Build one candidate for each choice on the menu:
+
+    - A melee attack is an `attack` with `weapon_id`, at group IDs in `target_group_id`.
+    - A close and attack is the same `attack` with `move` set to `"close"`.
+    - Each missile weapon the member wields is an `attack` of its own with that `weapon_id`.
+    - A spell is a `cast` with `spell_id`, `spell_mode`, and `reversed`. Use `target_group_id` for a spell aimed at a
+      group, and `targets` for one aimed at a member, a monster, or an NPC.
+    - A potion given to another member, or a touch with an item such as a staff of healing, is a `use_item` with
+      `item_id`, at member IDs in `targets`.
+    - Handing over an item is a `give_item` with `item_id`, at member IDs in `targets`.
+
+    Name `weapon_id` in every `attack` candidate. When you leave it out, the session picks the weapon at the member's
+    projected distance to each group, and the answer doesn't say which weapon it judged. A `move` with
+    `fighting_withdrawal` or `retreat` can't be a candidate, because it takes no target and can turn the plan into a
+    formation move. Send it in `declarations` instead.
+
+    The response's `candidates` has one `BattleCandidateJudgement` for each candidate, in the order you sent them.
+    Its `rejections` maps each target ID to every reason the session would refuse the action there, with the same
+    `code` and `params` as the plan's `rejections`, and an empty list means the session would accept it. A rejection
+    that doesn't depend on the target, such as `battle.declaration.weapon_not_wielded`, appears under every target,
+    and an ID that names nothing gets the rejection the same declaration would get in the plan, such as
+    `battle.declaration.unknown_group`. Its `attack_kinds` maps each target ID of an `attack` candidate to `"melee"`
+    or `"missile"`, the kind of attack the member would make there. A target refused before the session decides the
+    kind of attack, for example because its group is unknown, has no entry.
+
+    Each candidate is judged in place of the member's own planned declaration, after every other member's planned
+    move, as `can_hide` is judged. The member's own planned move isn't made first, so a candidate that closes is judged
+    from where the member stands now. A candidate's entry reports only its own rejections: a close that would push
+    another member's planned close and attack out of the front rank is still accepted, and the other member's
+    rejection shows in the next preview. To send the action the player picks, set the target in the candidate's
+    declaration and put it in `declarations`, replacing the member's earlier declaration.
+
+    A request takes at most 64 candidates and 256 target IDs counted over every candidate's `target_ids`. Split a
+    larger menu over several previews.
+
     The preview takes the session lock, rolls no dice, passes no game time, and changes nothing: `revision` stays the
     same, so the request takes no `expected_revision` and needs no `Idempotency-Key`.
     """
@@ -785,9 +860,9 @@ def preview_battle_round(
                 mode=game.mode.value,
             )
         try:
-            return battle.preview_battle_round(game, body.declarations)
+            return battle.preview_battle_round(game, body.declarations, body.candidates)
         except ValueError as error:
-            raise invalid("declaration_invalid", f"osrlib refused the declarations: {error}") from error
+            raise invalid("declaration_invalid", f"osrlib can't judge the request: {error}") from error
 
     return _sessions(request).read(principal.client, session_id, preview)
 
@@ -840,9 +915,25 @@ def get_player_view(request: Request, principal: CurrentPrincipal, session_id: S
       (such as `fire_ball` and `sleep`). Each group also has `members` with individual `"monster-NNNN"` or
       `"npc-NNNN"` IDs and coarse `status` values. Use an `"alive"` member's `id` in `targets` for a `single` or
       `up_to_n` spell or scroll. To find catalog templates matching a group's `family_id`, search
-      `GET /v1/rules/monsters` with `q` and check `family_id` on `GET /v1/rules/monsters/{monster_id}`.
+      `GET /v1/rules/monsters` with `q` and check `family_id` on `GET /v1/rules/monsters/{monster_id}`. In
+      `encounter` mode, `evade_rejections` maps each `evade` `drop` value (`"none"`, `"treasure"`, and `"food"`) to
+      the rejections the session would give that `evade` now, and an empty list means it would accept it. Read it to
+      enable or disable each choice of a flee menu. The map is empty in `battle` mode, where the session refuses
+      every `evade`.
     - `journal` and `quests`: discovered journal entries and active or completed quests.
+    - `supplies`: how long the party's light and food last, in rounds and days, so a client can show "light left"
+      and "food left" without counting items. `light_reserve_usable` says whether the party has what a
+      `light_source` for a carried torch or lantern needs, and `food_days` is the fewest rations any living member
+      carries, with `food_short_first_ids` naming those members.
     - `town_healing_prices`: gold-piece prices for temple services accepted by `purchase_healing`.
+      `town_healing_funds_gp` is the whole gold pieces the party can pay toward a fee, so a service is affordable
+      when its price is at most that number.
+    - `town_healing_rejections` and `town_healing_caster_levels`: in `town` mode, for each member ID and then each
+      temple service, the rejections `purchase_healing` without `caster_level` would get, leaving the fee out, and
+      the lowest cleric level that can perform each service the member can receive. An empty list means the temple
+      can perform the service for that member, and the temple refuses a service that would do nothing, with
+      `town.healing.no_effect` and a `reason` param. Read both to build the temple screen, and send the level as
+      `caster_level`. Both maps are empty outside `town` mode.
     """
     return _sessions(request).read(principal.client, session_id, build_player_view)
 

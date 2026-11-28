@@ -20,7 +20,7 @@ Walk through a dungeon-crawl session (one game in progress) of `builtin-barrow`,
    ```json
    {
      "api_version": "0.1.0",
-     "engine_version": "2.9.0",
+     "engine_version": "2.11.0",
      "schema_version": 4,
      "auth_enabled": true,
      "client": "my-game",
@@ -138,7 +138,7 @@ The output blocks below format and abbreviate the server's compact JSON with `..
      "revision": 0,
      "clock": {"rounds": 0, "turns": 0, "days": 0},
      "schema_version": 4,
-     "engine_version": "2.9.0",
+     "engine_version": "2.11.0",
      "created_at": "2026-11-21T05:24:33Z",
      "updated_at": "2026-11-21T05:24:33Z"
    }
@@ -278,6 +278,14 @@ The output blocks below format and abbreviate the server's compact JSON with `..
    ```sh
    curl -sS -w '\n' -X POST "http://127.0.0.1:8640/v1/sessions/$SESSION/battle-round/preview" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"declarations": [{"character_id": "character-0001", "action": "attack", "target_group_id": "group-0001", "move": "close"}, {"character_id": "character-0002", "action": "attack", "target_group_id": "group-0001", "move": "close"}, {"character_id": "character-0003", "action": "attack", "target_group_id": "group-0001", "move": "close"}]}'
    ```
+
+   To learn which groups an action reaches before the player picks a target, add `candidates` to the same request. Each candidate is a declaration without its target, the field the target goes in, and the target IDs to try. Name `weapon_id` in every attack candidate, so the answer is about the weapon the player picks. This one asks whether Wren (`character-0003`) could close and attack `group-0001` with a dagger beside the other two members' plans:
+
+   ```sh
+   curl -sS -w '\n' -X POST "http://127.0.0.1:8640/v1/sessions/$SESSION/battle-round/preview" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"declarations": [{"character_id": "character-0001", "action": "attack", "target_group_id": "group-0001", "move": "close"}, {"character_id": "character-0002", "action": "attack", "target_group_id": "group-0001", "move": "close"}], "candidates": [{"declaration": {"character_id": "character-0003", "action": "attack", "move": "close", "weapon_id": "dagger"}, "target_field": "target_group_id", "target_ids": ["group-0001"]}]}'
+   ```
+
+   The response's `candidates` has one entry for each candidate. Its `rejections` lists the refusals for each target ID, and an empty list means the session would accept the action at that target. Its `attack_kinds` says whether the attack would be a melee or a missile attack there: a dagger is a missile attack when the close stops short of the group.
 
 3. Submit one valid declaration per character in your current `view.encounter.declarers` (if a surprise round already closed the gap to 5 feet or knocked out a character, omit `"move": "close"` or drop that character's entry to match `view.encounter`):
 
